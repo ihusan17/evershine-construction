@@ -167,6 +167,14 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .kindpick button.on{border:2px solid var(--brand);padding:13px 15px;background:var(--brand-soft)}
 .kindpick button.on b{color:var(--brand)}
 @media (max-width:600px){.kindpick{grid-template-columns:minmax(0,1fr)}}
+.ppick{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;gap:10px}
+.ppick[hidden]{display:none}
+.ppick input{padding:7px 11px;border:1px solid var(--line);border-radius:7px;background:var(--surface);width:100%}
+.pgrid{display:flex;flex-wrap:wrap;gap:8px;max-height:236px;overflow:auto}
+.pbtn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer;text-align:left;max-width:100%}
+.pbtn:hover{border-color:var(--brand);background:var(--brand-soft)}
+.pbtn b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.pbtn span{font-size:13px;color:var(--muted)}
 /* doc view */
 .docview{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
 .sheet-fit{width:100%;overflow:hidden;border-radius:4px;box-shadow:0 1px 2px rgba(20,30,40,.08),0 8px 28px rgba(20,30,40,.10)}
@@ -490,6 +498,8 @@ async function boot(){
 
 /* ---------- lookups ---------- */
 const docsOf = type => Object.values(S.docs).filter(d => d.type === type).sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.number||'').localeCompare(a.number||''));
+const products = () => (S.settings.products || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
+const saveProducts = list => saveSettings({...S.settings, products:list});
 const custList = () => Object.values(S.customers).sort((a,b) => (a.name||'').localeCompare(b.name||''));
 
 function nextNumber(type, date){
@@ -505,6 +515,7 @@ function itemMemory(){
     const k = (it.desc||'').trim(); if (!k || k.length > 80) return;
     m[k.toLowerCase()] = {desc:k, unit:it.unit || (m[k.toLowerCase()]||{}).unit || '', rate: d.layout === 'lump' || d.type === 'delivery' ? (m[k.toLowerCase()]||{}).rate : it.rate};
   }));
+  products().forEach(p => { const k = (p.name||'').trim(); if (k) m[k.toLowerCase()] = {desc:k, unit:p.unit||'', rate:p.rate === '' || p.rate == null ? '' : String(p.rate)}; });
   return m;
 }
 
@@ -538,6 +549,7 @@ function render(force, keepScroll){
   else if (r.a === 'edit' && S.docs[r.b]) viewEditor(main, clone(S.docs[r.b]), true);
   else if (r.a === 'convert' && S.docs[r.b] && TYPES[r.c]) viewEditor(main, convertDraft(S.docs[r.b], r.c), false);
   else if (r.a === 'customers') viewCustomers(main);
+  else if (r.a === 'products') viewProducts(main);
   else if (r.a === 'settings') viewSettings(main);
   else { main.innerHTML = `<div class="empty">That page doesn't exist or the document was deleted. <a href="#/dashboard">Go to the overview</a></div>`; }
   if (changed && !keepScroll) window.scrollTo(0,0); else if (keepScroll) window.scrollTo(0,y);
@@ -562,6 +574,7 @@ function renderSide(){
       ${link('invoices','Invoices', overdue || unpaid, overdue > 0)}
       ${link('delivery','Delivery notes', pend)}
       ${link('customers','Customers')}
+      ${link('products','Products')}
       ${link('settings','Settings')}
     </nav>
     <div class="quick"><h6>Create</h6>
@@ -715,6 +728,10 @@ function viewEditor(main, d, isEdit){
         </div>
       </section>
       <section class="panel"><h2><span id="ititle">Items</span></h2>
+        <div class="ppick" id="ppick" hidden>
+          <input id="pq" type="search" placeholder="Search products, then click one to add it" aria-label="Search products">
+          <div class="pgrid" id="pgrid"></div>
+        </div>
         <div style="padding:6px 12px 0" class="tablewrap"><table class="items"><thead id="ihead"></thead><tbody id="ibody"></tbody></table></div>
         <div style="padding:10px 12px"><button type="button" class="btn sm" id="add">Add line</button></div>
         <div id="tot"></div>
@@ -742,8 +759,26 @@ function viewEditor(main, d, isEdit){
     const sel = $('#f-cust').value;
     $('#c-note').textContent = sel === '__new' || (!sel && d.customer.name) ? 'This customer will be added to your customer list when you save.' : sel ? 'Changes here apply to this document only. Edit the saved customer under Customers.' : '';
   };
+  const plist = products();
+  const drawPicker = () => {
+    const box = $('#ppick'); box.hidden = !isDN && d.kind === 'hire';
+    if (!plist.length){ $('#pq').hidden = true; $('#pgrid').innerHTML = '<span class="dim">Save your products under <b>Products</b> and they appear here to add with one click.</span>'; return; }
+    const q = $('#pq').value.trim().toLowerCase();
+    const shown = plist.filter(p => !q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q));
+    $('#pgrid').innerHTML = shown.length ? shown.map(p => `<button type="button" class="pbtn" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><span>${esc([p.unit, !isDN && String(p.rate ?? '') !== '' ? 'MVR ' + money(num(p.rate)) : ''].filter(Boolean).join(' · ') || 'Add')}</span></button>`).join('')
+      : '<span class="dim">No products match.</span>';
+  };
+  const addProduct = p => {
+    const blank = it => !(it.desc||'').trim() && !(it.unit||'').trim() && !num(it.qty) && !num(it.rate) && !num(it.amount);
+    let i = d.items.findIndex(blank);
+    if (i < 0){ d.items.push(blankItem()); i = d.items.length - 1; }
+    d.items[i] = {...d.items[i], desc:p.name || '', unit:p.unit || '', qty:'1', rate: isDN ? '' : String(p.rate ?? '')};
+    drawItems();
+    const qty = $('#ibody').querySelector(`[data-i="${i}"][data-k="qty"]`); if (qty){ qty.focus(); qty.select(); }
+  };
   const drawItems = () => {
     const hire = !isDN && d.kind === 'hire';
+    drawPicker();
     $('#ititle').textContent = hire ? 'Trips / hire charges' : 'Items';
     if (hire){
       $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:17%">Loading at</th><th style="width:17%">Unloading at</th><th style="width:13%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
@@ -806,6 +841,8 @@ function viewEditor(main, d, isEdit){
     if (isDN && v && v !== '__new' && !d.deliveryAddress){ /* leave delivery address for the user */ }
     custNote(); if (v === '__new') $('#f-cname').focus();
   });
+  $('#pq').addEventListener('input', drawPicker);
+  $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
   $('#ibody').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (!b) return; d.items.splice(+b.dataset.rm, 1); if (!d.items.length) d.items.push(blankItem()); drawItems(); });
   $('#add').addEventListener('click', () => { d.items.push(blankItem()); drawItems(); const t = $('#ibody').querySelectorAll('textarea'); t[t.length-1].focus(); });
   const kp = $('#kind');
@@ -1277,6 +1314,64 @@ function customerBox(c){
   if (dc) dc.addEventListener('click', () => { w.remove(); confirmBox(`Delete ${c.name}?`, 'The customer is removed from your list. Existing documents keep their details and are not deleted.', 'Delete customer', async () => { await del('customers', c.id); toast('Customer deleted'); }); });
 }
 
+/* ---------- products ---------- */
+let prodQ = '';
+function viewProducts(main){
+  const list = products();
+  main.innerHTML = `
+    <div class="pagehead"><div><h1>Products</h1><p>${list.length} saved. Click a product in the quotation, invoice or delivery note editor to add it as a line.</p></div>
+      <div class="row"><button class="btn" id="impp">Import from past documents</button><button class="btn primary" id="addp">Add product</button></div></div>
+    <section class="panel">
+      <div class="filters"><input id="pq2" type="search" placeholder="Search products" value="${esc(prodQ)}" aria-label="Search products"></div>
+      <div class="tablewrap"><table class="list"><thead><tr><th>Product</th><th>Unit</th><th class="num">Rate (MVR)</th></tr></thead><tbody id="prows"></tbody></table></div>
+    </section>`;
+  const draw = () => {
+    const q = prodQ.trim().toLowerCase();
+    const shown = list.filter(p => !q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q));
+    $('#prows').innerHTML = shown.length ? shown.map(p => `<tr data-p="${esc(p.id)}"><td><div class="cust">${esc(p.name)}</div></td><td class="dim">${esc(p.unit)}</td><td class="num">${String(p.rate ?? '') === '' ? '–' : money(num(p.rate))}</td></tr>`).join('')
+      : `<tr><td colspan="3" class="empty">${list.length ? 'No products match.' : 'No products yet. Add one, or import the items you used in past documents.'}</td></tr>`;
+    $('#prows').querySelectorAll('[data-p]').forEach(r => r.addEventListener('click', () => productBox(list.find(p => p.id === r.dataset.p))));
+  };
+  $('#pq2').addEventListener('input', e => { prodQ = e.target.value; draw(); });
+  $('#addp').addEventListener('click', () => productBox(null));
+  $('#impp').addEventListener('click', () => {
+    const have = new Set(list.map(p => (p.name||'').trim().toLowerCase()));
+    const past = {};
+    Object.values(S.docs).sort((a,b) => (a.date||'').localeCompare(b.date||'')).forEach(d => { if (d.layout === 'lump' || d.kind === 'hire') return; (d.items||[]).forEach(it => {
+      const k = (it.desc||'').trim(); if (!k || k.length > 80 || have.has(k.toLowerCase())) return;
+      const o = past[k.toLowerCase()] || {name:k, unit:'', rate:''};
+      if (it.unit) o.unit = it.unit; if (d.type !== 'delivery' && String(it.rate ?? '') !== '') o.rate = String(it.rate);
+      past[k.toLowerCase()] = o;
+    }); });
+    const add = Object.values(past);
+    if (!add.length) return toast('No new items found in past documents.');
+    confirmBox(`Import ${add.length} product${add.length === 1 ? '' : 's'}?`, `Adds the items used in your past quotations, invoices and delivery notes, with their last unit and rate: ${add.slice(0,6).map(p => p.name).join(', ')}${add.length > 6 ? '…' : ''}`, 'Import', async () => {
+      await saveProducts((S.settings.products || []).concat(add.map(p => ({...p, id:uid()}))));
+      toast(`${add.length} product${add.length === 1 ? '' : 's'} imported`);
+    });
+  });
+  draw();
+}
+function productBox(p){
+  const isNew = !p; p = p || {name:'', unit:'', rate:''};
+  const w = modal(isNew ? 'Add product' : p.name, `
+    <div class="fld"><label for="p-n">Name / description</label><textarea id="p-n" rows="2">${esc(p.name)}</textarea></div>
+    <div class="fgrid two" style="padding:0"><div class="fld"><label for="p-u">Unit</label><input id="p-u" list="punits" value="${esc(p.unit)}" placeholder="Nos, Bags, CUM…"></div><div class="fld"><label for="p-r">Rate (MVR)</label><input id="p-r" inputmode="decimal" value="${esc(p.rate)}" placeholder="0.00"></div></div>
+    <datalist id="punits">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>
+    ${isNew ? '' : '<div class="row"><button class="btn sm danger" data-delp>Delete product</button></div>'}`,
+    'Save product', async w => {
+      const name = w.querySelector('#p-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
+      const all = S.settings.products || [];
+      if (all.some(x => x.id !== p.id && (x.name||'').trim().toLowerCase() === name.toLowerCase())){ toast('A product with that name already exists.'); return false; }
+      const rv = w.querySelector('#p-r').value.trim();
+      const item = {id:p.id || uid(), name, unit:w.querySelector('#p-u').value.trim(), rate: rv === '' ? '' : String(num(rv))};
+      await saveProducts(isNew ? all.concat(item) : all.map(x => x.id === p.id ? item : x));
+      toast('Product saved');
+    });
+  const dp = w.querySelector('[data-delp]');
+  if (dp) dp.addEventListener('click', () => { w.remove(); confirmBox(`Delete ${p.name}?`, 'The product is removed from your list. Existing documents are not changed.', 'Delete product', async () => { await saveProducts((S.settings.products || []).filter(x => x.id !== p.id)); toast('Product deleted'); }); });
+}
+
 /* ---------- settings ---------- */
 function viewSettings(main){
   const s = {...S.settings};
@@ -1333,6 +1428,7 @@ function viewSettings(main){
     const b = e.currentTarget; b.disabled = true;
     s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery;
     s.prefix = (s.prefix||'ESC').trim().replace(/[\/\s]+/g,'') || 'ESC';
+    s.products = S.settings.products || [];
     try { await saveSettings(s); toast('Settings saved'); } catch(err){}
     b.disabled = false;
   });
