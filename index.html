@@ -362,6 +362,32 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+.pvlink{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:zoom-in;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:color .15s,text-decoration-color .15s}
+.pvlink:hover,.pvlink:focus-visible{color:var(--brand);text-decoration-color:currentColor}
+.pvscrim{place-items:stretch center;padding:24px 16px}
+.pv{background:var(--surface);border-radius:24px;width:min(900px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.pvhead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px 14px 22px;border-bottom:1px solid var(--line)}
+.pvtitle{min-width:0}
+.pvtitle b{font-size:17px;margin-right:8px}
+.pvtitle .dim{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pvnav{flex:none;gap:2px}
+.pvnav .ibtn{font-size:24px;line-height:1;background:var(--surface-2)}
+.pvnav .ibtn:disabled{opacity:.35;cursor:default}
+.pvnav .ibtn[hidden]{display:none}
+.pvnav .pvcount{min-width:52px;text-align:center}
+.pvbody{flex:1;overflow:auto;padding:18px;background:var(--surface-2)}
+.pvbody .sheet-fit{max-width:794px;margin:0 auto;box-shadow:0 2px 12px rgba(16,24,40,.12)}
+.pvfoot{padding:12px 16px;border-top:1px solid var(--line);justify-content:flex-end}
+@media (max-width:640px){
+  .pvscrim{padding:0}
+  .pv{border-radius:0;max-height:100vh;height:100vh;width:100%}
+  .pvhead{padding:10px 8px 10px 14px}
+  .pvnav .pvcount{display:none}
+  .pvbody{padding:10px}
+  .pvfoot{padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .pvfoot .btn{justify-content:center}
+  table.list.docs .pvlink{text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent)}
+}
 /* phones: each document is a compact two-line card, so the status is visible without scrolling sideways */
 @media (max-width:640px){
   table.list.docs thead{display:none}
@@ -937,18 +963,21 @@ function viewList(main, type){
     const cols = type === 'invoice' ? 7 : 6;
     $('#rows').innerHTML = list.length ? list.map(d => { const extra = type==='delivery' ? (d.deliveryAddress||'').split('\n')[0] : [d.project, d.po && d.po !== '-' ? 'PO '+d.po : ''].filter(Boolean).join(' · ');
       return `<tr data-go="doc/${d.id}">
-      <td class="c-no"><div class="docno">${esc(d.number)}${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</div></td><td class="c-date" style="white-space:nowrap">${fmtDate(d.date)}${extra ? `<span class="m-only"> · ${esc(extra)}</span>` : ''}</td><td class="cust c-cust">${esc(d.customer?.name)}</td>
+      <td class="c-no"><div class="docno"><button type="button" class="pvlink" data-pv="${esc(d.id)}" title="Quick preview">${esc(d.number)}</button>${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</div></td><td class="c-date" style="white-space:nowrap">${fmtDate(d.date)}${extra ? `<span class="m-only"> · ${esc(extra)}</span>` : ''}</td><td class="cust c-cust">${esc(d.customer?.name)}</td>
       <td class="dim c-proj">${esc(extra)}</td>
       <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
       ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || d.status === 'cancelled' ? 'zero' : ''}" data-l="Balance ">${d.status==='cancelled' ? '–' : money(balance(d))}</td>` : ''}
       <td class="c-st">${badge(statusOf(d))}</td></tr>`; }).join('')
       : `<tr><td colspan="${cols}" class="empty">${docsOf(type).length ? 'No matches. Try a different search or filter.' : `No ${T.plural.toLowerCase()} yet. <a href="#/new/${type}">Create one</a>.`}</td></tr>`;
     bindGo($('#rows'));
+    shown = list.map(d => d.id);
     const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>d.status!=='cancelled').reduce((s,d)=>s+total(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>d.status!=='cancelled').reduce((s,d)=>s+balance(d),0))} unpaid` : '');
     $('#lsum').textContent = sum;
     return list;
   };
+  let shown = [];
   let current = rows();
+  $('#rows').addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) previewDoc(b.dataset.pv, shown); });
   $('#q').addEventListener('input', e => { st.q = e.target.value; current = rows(); });
   const kf = $('#kf'); if (kf) kf.addEventListener('change', e => { st.k = e.target.value; current = rows(); });
   $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; main.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); current = rows(); });
@@ -958,6 +987,45 @@ function viewList(main, type){
     const lines = current.map(d => [d.number, d.date, d.customer?.name, d.project, d.po, STATUS[statusOf(d)][0]].concat(type==='delivery' ? [qtyTotal(d), d.deliveryAddress] : [subtotal(d), taxAmt(d), total(d)].concat(type==='invoice' ? [paidOf(d), balance(d), addDays(d.date,d.dueDays)] : [addDays(d.date,d.validDays)])).map(q).join(','));
     saveFile(`${T.plural.toLowerCase().replace(/ /g,'-')}-${todayISO()}.csv`, '\ufeff' + [head.map(q).join(',')].concat(lines).join('\r\n'));
   });
+}
+
+/* ---------- quick preview ---------- */
+function previewDoc(id, ids){
+  ids = ids && ids.length ? ids : [id];
+  let i = Math.max(0, ids.indexOf(id));
+  const w = document.createElement('div'); w.className = 'scrim pvscrim';
+  w.innerHTML = `<div class="pv" role="dialog" aria-modal="true" aria-label="Quick preview">
+    <div class="pvhead"><div class="pvtitle"></div>
+      <div class="row pvnav"><button type="button" class="ibtn" data-step="-1" title="Previous (←)" aria-label="Previous document">‹</button><span class="dim pvcount"></span><button type="button" class="ibtn" data-step="1" title="Next (→)" aria-label="Next document">›</button><button type="button" class="ibtn" data-close title="Close (Esc)" aria-label="Close">×</button></div></div>
+    <div class="pvbody"><div class="sheet-fit"></div></div>
+    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit>Edit</a><button type="button" class="btn tg" data-tg>${icon('send',17)}Telegram</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
+  document.body.appendChild(w);
+  const show = () => {
+    const d = S.docs[ids[i]]; if (!d) return close();
+    w.querySelector('.pvtitle').innerHTML = `<b>${esc(d.number)}</b>${badge(statusOf(d))}<div class="dim">${esc(d.customer?.name || '')}${d.type === 'delivery' ? '' : ' · MVR ' + money(total(d))}</div>`;
+    w.querySelector('.pvcount').textContent = ids.length > 1 ? `${i + 1} of ${ids.length}` : '';
+    w.querySelectorAll('[data-step]').forEach(b => b.hidden = ids.length < 2);
+    w.querySelector('[data-step="-1"]').disabled = i === 0; w.querySelector('[data-step="1"]').disabled = i === ids.length - 1;
+    w.querySelector('[data-open]').href = '#/doc/' + d.id; w.querySelector('[data-edit]').href = '#/edit/' + d.id;
+    w.querySelector('.sheet-fit').innerHTML = sheetHTML(d); fitSheets(); w.querySelector('.pvbody').scrollTop = 0;
+  };
+  const close = () => { w.remove(); document.removeEventListener('keydown', key); onData(); };
+  const step = n => { const j = i + n; if (j >= 0 && j < ids.length){ i = j; show(); } };
+  const key = e => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1); };
+  document.addEventListener('keydown', key);
+  w.addEventListener('click', e => {
+    if (e.target === w || e.target.closest('[data-close]')) return close();
+    const st = e.target.closest('[data-step]'); if (st) return step(+st.dataset.step);
+    if (e.target.closest('[data-open],[data-edit]')) return close();
+    const d = S.docs[ids[i]];
+    if (e.target.closest('[data-pdf]')) makePDF(d, e.target.closest('[data-pdf]'));
+    else if (e.target.closest('[data-tg]')) shareTelegram(d, e.target.closest('[data-tg]'));
+  });
+  // swipe left / right on phones
+  let sx = null; const body = w.querySelector('.pvbody');
+  body.addEventListener('touchstart', e => { sx = e.touches.length === 1 ? e.touches[0].clientX : null; }, {passive:true});
+  body.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 70) step(dx < 0 ? 1 : -1); });
+  show(); w.querySelector('[data-close]').focus();
 }
 
 /* ---------- drafts ---------- */
