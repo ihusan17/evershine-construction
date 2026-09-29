@@ -363,6 +363,17 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+.stbtn{border:0;background:none;padding:2px;margin:-2px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;color:var(--muted)}
+.stbtn:hover .badge,.stbtn:focus-visible .badge{box-shadow:0 0 0 2px var(--line)}
+.stmenu{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(16,24,40,.18);padding:6px;min-width:210px;max-width:min(300px,calc(100vw - 16px));display:grid;gap:1px}
+.stmenu .hd{font-size:12px;font-weight:700;color:var(--muted);padding:6px 10px 4px}
+.stmenu button{display:flex;align-items:center;gap:10px;border:0;background:none;padding:9px 10px;border-radius:9px;font-size:14.5px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.stmenu button:hover,.stmenu button:focus-visible{background:var(--surface-2);outline:none}
+.stmenu button.on{color:var(--brand)}
+.stmenu button i{width:10px;height:10px;border-radius:50%;flex:none;background:currentColor}
+.stmenu i.b-neutral{background:#9aa3ad} .stmenu i.b-brand{background:var(--brand)} .stmenu i.b-ok{background:var(--ok)} .stmenu i.b-warn{background:var(--warn)} .stmenu i.b-bad{background:var(--bad)}
+.stmenu .ck{margin-left:auto}
+.stmenu .note{font-size:12.5px;color:var(--muted);padding:4px 10px 6px;line-height:1.35}
 .dpick{display:flex;gap:8px}
 .dpick select{flex:1;min-width:0}
 .dpick input{width:92px;flex:none}
@@ -973,7 +984,7 @@ function viewList(main, type){
       <td class="dim c-proj">${esc(extra)}</td>
       <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
       ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || d.status === 'cancelled' ? 'zero' : ''}" data-l="Balance ">${d.status==='cancelled' ? '–' : money(balance(d))}</td>` : ''}
-      <td class="c-st">${badge(statusOf(d))}</td></tr>`; }).join('')
+      <td class="c-st"><button type="button" class="stbtn" data-stm="${esc(d.id)}" title="Change status" aria-haspopup="menu">${badge(statusOf(d))}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></td></tr>`; }).join('')
       : `<tr><td colspan="${cols}" class="empty">${docsOf(type).length ? 'No matches. Try a different search or filter.' : `No ${T.plural.toLowerCase()} yet. <a href="#/new/${type}">Create one</a>.`}</td></tr>`;
     bindGo($('#rows'));
     shown = list.map(d => d.id);
@@ -983,7 +994,7 @@ function viewList(main, type){
   };
   let shown = [];
   let current = rows();
-  $('#rows').addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) previewDoc(b.dataset.pv, shown); });
+  $('#rows').addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) previewDoc(b.dataset.pv, shown); const m = e.target.closest('[data-stm]'); if (m) statusMenu(m); });
   $('#q').addEventListener('input', e => { st.q = e.target.value; current = rows(); });
   const kf = $('#kf'); if (kf) kf.addEventListener('change', e => { st.k = e.target.value; current = rows(); });
   $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; main.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); current = rows(); });
@@ -1008,6 +1019,54 @@ document.addEventListener('change', e => {
   if (sel.value === 'custom'){ inp.hidden = false; inp.focus(); inp.select(); return; }
   inp.hidden = true; inp.value = sel.value; inp.dispatchEvent(new Event('input', {bubbles:true}));
 });
+
+/* ---------- quick status change from the lists ---------- */
+function statusMenu(btn){
+  const old = document.querySelector('.stmenu'); if (old){ const same = old.dataset.for === btn.dataset.stm; old._close(); if (same) return; }
+  const d = S.docs[btn.dataset.stm]; if (!d) return;
+  const st = statusOf(d), items = [];
+  const it = (act, label, on, tone) => items.push(`<button type="button" role="menuitem" data-sa="${act}" class="${on ? 'on' : ''}" ${on ? 'aria-current="true"' : ''}><i class="b-${tone}"></i>${label}${on ? '<span class="ck">✓</span>' : ''}</button>`);
+  if (d.type === 'quotation'){
+    it('draft', 'Draft', d.status === 'draft' || !d.status, 'neutral'); it('sent', 'Sent', d.status === 'sent', 'brand');
+    it('accepted', 'Accepted', st === 'accepted', 'ok'); it('rejected', 'Rejected', st === 'rejected', 'bad');
+    if (st === 'expired') items.push('<div class="note">Past its valid-until date, so it shows as Expired until accepted or rejected.</div>');
+  } else if (d.type === 'invoice'){
+    if (st === 'cancelled') it('restore', 'Restore invoice', false, 'brand');
+    else {
+      if (st !== 'paid'){ it('paidFull', `Mark as paid (MVR ${money(balance(d))})`, false, 'ok'); it('pay', 'Record a payment…', false, 'warn'); }
+      else items.push(`<div class="note">Paid in full. Remove payments on the invoice page to reopen it.</div>`);
+      it('cancel', 'Cancel invoice', false, 'bad');
+    }
+  } else {
+    it('deliver', st === 'delivered' ? 'Delivered – edit details…' : 'Mark as delivered…', st === 'delivered', 'ok');
+    it('undeliver', 'To deliver', st === 'pending', 'warn');
+  }
+  const m = document.createElement('div'); m.className = 'stmenu'; m.setAttribute('role', 'menu'); m.dataset.for = d.id;
+  m.innerHTML = `<div class="hd">${esc(d.number)}</div>${items.join('')}`;
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(innerWidth - mw - 8, r.right - mw)) + 'px';
+  m.style.top = (r.bottom + mh + 8 > innerHeight ? Math.max(8, r.top - mh - 6) : r.bottom + 6) + 'px';
+  const close = () => { m.remove(); document.removeEventListener('mousedown', out, true); document.removeEventListener('touchstart', out, true); document.removeEventListener('keydown', key); window.removeEventListener('scroll', onScroll); };
+  const y0 = window.scrollY, onScroll = () => { if (Math.abs(window.scrollY - y0) > 40) close(); };
+  const out = e => { if (!m.contains(e.target) && !btn.contains(e.target)) close(); };
+  const key = e => { if (e.key === 'Escape') close(); };
+  m._close = close;
+  document.addEventListener('mousedown', out, true); document.addEventListener('touchstart', out, {capture:true, passive:true}); document.addEventListener('keydown', key); window.addEventListener('scroll', onScroll, {passive:true});
+  m.addEventListener('click', e => {
+    const b = e.target.closest('[data-sa]'); if (!b) return; close();
+    const a = b.dataset.sa;
+    if (b.classList.contains('on') && a !== 'deliver') return;
+    if (a === 'draft') setStatus(d, 'draft', 'Marked as draft');
+    else if (a === 'undeliver') docAction(d, 'undeliver');
+    else if (a === 'paidFull'){
+      const amt = r2(balance(d)); if (amt <= 0) return;
+      put('docs', d.id, {...clone(d), payments:[...(d.payments || []), {amount:amt, date:todayISO(), method:'Other', ref:'Marked as paid from the list'}], updatedAt:new Date().toISOString()}).then(() => toast(`${d.number} marked as paid`));
+    }
+    else docAction(d, a);
+  });
+  (m.querySelector('[data-sa]:not(.on)') || m.querySelector('[data-sa]'))?.focus({preventScroll:true});
+}
 
 /* ---------- quick preview ---------- */
 function previewDoc(id, ids){
