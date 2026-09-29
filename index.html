@@ -611,13 +611,13 @@ const TYPES = {
 const ROUTE_TYPE = {quotations:'quotation', invoices:'invoice', delivery:'delivery'};
 const STATUS = {
   draft:['Draft','neutral'], sent:['Sent','brand'], accepted:['Accepted','ok'], rejected:['Rejected','bad'], expired:['Expired','warn'],
-  unpaid:['Unpaid','brand'], partial:['Part paid','warn'], paid:['Paid','ok'], overdue:['Overdue','bad'], cancelled:['Cancelled','neutral'],
+  unpaid:['Unpaid','brand'], partial:['Part paid','warn'], paid:['Paid','ok'], overdue:['Overdue','bad'], cancelled:['Void','neutral'], void:['Void','neutral'],
   pending:['To deliver','warn'], delivered:['Delivered','ok']
 };
 const FILTERS = {
-  quotation:['all','draft','sent','accepted','rejected','expired'],
-  invoice:['all','unpaid','partial','overdue','paid','cancelled'],
-  delivery:['all','pending','delivered']
+  quotation:['all','draft','sent','accepted','rejected','expired','void'],
+  invoice:['all','unpaid','partial','overdue','paid','void'],
+  delivery:['all','pending','delivered','void']
 };
 const UNITS = ['Nos','Bags','CUFT','CUM','Trip','Lot','Kg','Ton','Ltr','Sqft','Sqm','Rft','Day','Hour','Set'];
 const DEFAULTS = {
@@ -681,10 +681,12 @@ const paidOf = d => r2((d.payments||[]).reduce((s,p) => s + num(p.amount), 0));
 const balance = d => r2(total(d) - paidOf(d));
 const qtyTotal = d => (d.items||[]).reduce((s,it) => s + num(it.qty), 0);
 
+// A voided document stays on record (numbers are never reused) but no longer counts anywhere.
+const isVoid = d => d.status === 'void' || d.status === 'cancelled';
 function statusOf(d){
   const t = todayISO();
+  if (isVoid(d)) return 'void';
   if (d.type === 'invoice'){
-    if (d.status === 'cancelled') return 'cancelled';
     const tot = total(d), p = paidOf(d);
     if (tot > 0 && p >= tot - 0.005) return 'paid';
     if (addDays(d.date, d.dueDays) < t) return 'overdue';
@@ -923,7 +925,7 @@ function viewDashboard(main){
   const over = open.filter(d => statusOf(d) === 'overdue');
   const openQ = q.filter(d => ['draft','sent'].includes(statusOf(d)));
   const pend = dn.filter(d => statusOf(d) === 'pending');
-  const billed = inv.filter(d => d.status !== 'cancelled' && (d.date||'').startsWith(month)).reduce((s,d) => s + total(d), 0);
+  const billed = inv.filter(d => !isVoid(d) && (d.date||'').startsWith(month)).reduce((s,d) => s + total(d), 0);
   const collected = inv.reduce((s,d) => s + (d.payments||[]).filter(p => (p.date||'').startsWith(month)).reduce((a,p) => a + num(p.amount), 0), 0);
 
   const attn = [];
@@ -964,7 +966,7 @@ const listState = {quotation:{q:'',f:'all'}, invoice:{q:'',f:'all'}, delivery:{q
 function listStats(type){
   const t = todayISO(), month = t.slice(0,7), ds = docsOf(type);
   if (type === 'invoice'){
-    const live = ds.filter(d => d.status !== 'cancelled');
+    const live = ds.filter(d => !isVoid(d));
     const open = live.filter(d => ['unpaid','partial','overdue'].includes(statusOf(d))), over = open.filter(d => statusOf(d) === 'overdue');
     const got = live.reduce((s,d) => s + (d.payments||[]).filter(p => (p.date||'').startsWith(month)).reduce((a,p) => a + num(p.amount), 0), 0);
     const paid = live.filter(d => statusOf(d) === 'paid' && (d.payments||[]).length);
@@ -1008,12 +1010,12 @@ function viewList(main, type){
       <td class="c-no"><div class="docno"><button type="button" class="pvlink" data-pv="${esc(d.id)}" title="Quick preview">${esc(d.number)}</button>${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</div></td><td class="c-date" style="white-space:nowrap">${fmtDate(d.date)}${extra ? `<span class="m-only"> · ${esc(extra)}</span>` : ''}</td><td class="cust c-cust">${esc(d.customer?.name)}</td>
       <td class="dim c-proj">${esc(extra)}</td>
       <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
-      ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || d.status === 'cancelled' ? 'zero' : ''}" data-l="Balance ">${d.status==='cancelled' ? '–' : money(balance(d))}</td>` : ''}
+      ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || isVoid(d) ? 'zero' : ''}" data-l="Balance ">${isVoid(d) ? '–' : money(balance(d))}</td>` : ''}
       <td class="c-st"><button type="button" class="stbtn" data-stm="${esc(d.id)}" title="Change status" aria-haspopup="menu">${badge(statusOf(d))}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></td></tr>`; }).join('')
       : `<tr><td colspan="${cols}" class="empty">${docsOf(type).length ? 'No matches. Try a different search or filter.' : `No ${T.plural.toLowerCase()} yet. <a href="#/new/${type}">Create one</a>.`}</td></tr>`;
     bindGo($('#rows'));
     shown = list.map(d => d.id);
-    const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>d.status!=='cancelled').reduce((s,d)=>s+total(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>d.status!=='cancelled').reduce((s,d)=>s+balance(d),0))} unpaid` : '');
+    const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+total(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+balance(d),0))} unpaid` : '');
     $('#lsum').textContent = sum;
     return list;
   };
@@ -1051,20 +1053,22 @@ function statusMenu(btn){
   const d = S.docs[btn.dataset.stm]; if (!d) return;
   const st = statusOf(d), items = [];
   const it = (act, label, on, tone) => items.push(`<button type="button" role="menuitem" data-sa="${act}" class="${on ? 'on' : ''}" ${on ? 'aria-current="true"' : ''}><i class="b-${tone}"></i>${label}${on ? '<span class="ck">✓</span>' : ''}</button>`);
-  if (d.type === 'quotation'){
+  if (st === 'void'){
+    items.push(`<div class="note">Voided${d.voided?.date ? ' on ' + fmtDate(d.voided.date) : ''}${d.voided?.reason ? ': ' + esc(d.voided.reason) : ''}. It stays on record but doesn't count in totals.</div>`);
+    it('unvoid', 'Restore', false, 'brand');
+  } else if (d.type === 'quotation'){
     it('draft', 'Draft', d.status === 'draft' || !d.status, 'neutral'); it('sent', 'Sent', d.status === 'sent', 'brand');
     it('accepted', 'Accepted', st === 'accepted', 'ok'); it('rejected', 'Rejected', st === 'rejected', 'bad');
     if (st === 'expired') items.push('<div class="note">Past its valid-until date, so it shows as Expired until accepted or rejected.</div>');
+    it('void', 'Void…', false, 'neutral');
   } else if (d.type === 'invoice'){
-    if (st === 'cancelled') it('restore', 'Restore invoice', false, 'brand');
-    else {
-      if (st !== 'paid'){ it('paidFull', `Mark as paid (MVR ${money(balance(d))})`, false, 'ok'); it('pay', 'Record a payment…', false, 'warn'); }
-      else items.push(`<div class="note">Paid in full. Remove payments on the invoice page to reopen it.</div>`);
-      it('cancel', 'Cancel invoice', false, 'bad');
-    }
+    if (st !== 'paid'){ it('paidFull', `Mark as paid (MVR ${money(balance(d))})`, false, 'ok'); it('pay', 'Record a payment…', false, 'warn'); }
+    else items.push(`<div class="note">Paid in full. Remove payments on the invoice page to reopen it.</div>`);
+    it('void', 'Void…', false, 'neutral');
   } else {
     it('deliver', st === 'delivered' ? 'Delivered – edit details…' : 'Mark as delivered…', st === 'delivered', 'ok');
     it('undeliver', 'To deliver', st === 'pending', 'warn');
+    it('void', 'Void…', false, 'neutral');
   }
   const m = document.createElement('div'); m.className = 'stmenu'; m.setAttribute('role', 'menu'); m.dataset.for = d.id;
   m.innerHTML = `<div class="hd">${esc(d.number)}</div>${items.join('')}`;
@@ -1376,7 +1380,7 @@ function viewDoc(main, d){
   let facts = '';
   if (d.type === 'invoice'){
     facts = `<div><div class="k">Grand total (MVR)</div><div class="big">${money(total(d))}</div></div>
-      <div class="row" style="gap:24px"><div><div class="k">Paid</div><div class="v">${money(paidOf(d))}</div></div><div><div class="k">Balance</div><div class="v">${st==='cancelled'?'–':money(balance(d))}</div></div></div>
+      <div class="row" style="gap:24px"><div><div class="k">Paid</div><div class="v">${money(paidOf(d))}</div></div><div><div class="k">Balance</div><div class="v">${st==='void'?'–':money(balance(d))}</div></div></div>
       <div><div class="k">Due date</div><div class="v">${fmtDate(addDays(d.date,d.dueDays))}</div></div>`;
   } else if (d.type === 'quotation'){
     facts = `<div><div class="k">Grand total (MVR)</div><div class="big">${money(total(d))}</div></div>
@@ -1387,16 +1391,17 @@ function viewDoc(main, d){
   }
   const A = (id, label, cls='') => `<button class="btn ${cls}" data-act="${id}">${label}</button>`;
   let acts = '';
-  if (d.type === 'quotation'){
+  if (st === 'void'){
+    acts += A('unvoid','Restore ' + T.label.toLowerCase(),'primary');
+  } else if (d.type === 'quotation'){
     acts += A('toInvoice','Convert to invoice','primary') + A('toDN','Create delivery note');
     if (st !== 'sent' && st !== 'accepted') acts += A('sent','Mark as sent');
     if (st !== 'accepted') acts += A('accepted','Mark as accepted');
     if (st !== 'rejected') acts += A('rejected','Mark as rejected');
     if (st === 'accepted' || st === 'rejected') acts += A('reopen','Reopen as sent');
   } else if (d.type === 'invoice'){
-    if (st !== 'cancelled' && st !== 'paid') acts += A('pay','Record payment','primary');
+    if (st !== 'paid') acts += A('pay','Record payment','primary');
     acts += A('toDN','Create delivery note');
-    acts += st === 'cancelled' ? A('restore','Restore invoice') : A('cancel','Cancel invoice');
   } else {
     acts += st === 'pending' ? A('deliver','Mark as delivered','primary') : A('undeliver','Mark as not delivered');
     acts += A('toInvoice','Create invoice');
@@ -1410,7 +1415,7 @@ function viewDoc(main, d){
         <section class="panel"><div class="facts">${facts}</div><div class="acts">${acts}</div></section>
         ${d.type === 'invoice' ? `<section class="panel"><h2>Payments</h2>${(d.payments||[]).length ? `<ul class="plist">${d.payments.map((p,i) => `<li><span><b>${money(p.amount)}</b><br><span class="dim">${fmtDate(p.date)} · ${esc(p.method||'')}${p.ref ? ' · '+esc(p.ref) : ''}</span></span><button class="x" data-rmpay="${i}" aria-label="Remove payment" title="Remove payment">×</button></li>`).join('')}</ul>` : `<div class="empty" style="padding:16px">No payments recorded yet.</div>`}</section>` : ''}
         ${src || kids.length ? `<section class="panel"><h2>Linked documents</h2><div class="links">${src ? `<a href="#/doc/${src.id}"><span class="dim">Created from</span><br><b>${TYPES[src.type].label} ${esc(src.number)}</b></a>` : ''}${kids.map(k => `<a href="#/doc/${k.id}"><span class="dim">${TYPES[k.type].label}</span><br><b>${esc(k.number)}</b> ${badge(statusOf(k))}</a>`).join('')}</div></section>` : ''}
-        <section class="panel"><div class="acts" style="padding-top:18px">${A('dup','Duplicate')}${A('del','Delete','danger')}</div></section>
+        <section class="panel"><div class="acts" style="padding-top:18px">${A('dup','Duplicate')}${st === 'void' ? '' : A('void','Void ' + T.label.toLowerCase(),'danger')}</div>${st === 'void' ? `<p class="dim" style="margin:0;padding:0 18px 16px">Voided${d.voided?.date ? ' on ' + fmtDate(d.voided.date) : ''}${d.voided?.reason ? ': ' + esc(d.voided.reason) : ''}. It stays on record and in the list, but doesn't count in any totals.</p>` : `<p class="dim" style="margin:0;padding:0 18px 16px">Documents can't be deleted. Void it instead to keep the record.</p>`}</section>
       </div>
     </div>`;
   $('#print').addEventListener('click', () => { try { window.print(); } catch(e){ toast('Printing isn\'t available here. Use Download PDF instead.'); } });
@@ -1434,13 +1439,25 @@ function docAction(d, act){
   else if (act === 'accepted') setStatus(d, 'accepted', 'Marked as accepted');
   else if (act === 'rejected') setStatus(d, 'rejected', 'Marked as rejected');
   else if (act === 'reopen') setStatus(d, 'sent', 'Reopened');
-  else if (act === 'cancel') confirmBox(`Cancel ${d.number}?`, 'The invoice stays in your records marked as cancelled and no longer counts toward amounts owed.', 'Cancel invoice', () => setStatus(d, 'cancelled', 'Invoice cancelled'));
-  else if (act === 'restore') setStatus(d, 'issued', 'Invoice restored');
+  else if (act === 'void') voidBox(d);
+  else if (act === 'unvoid'){
+    const back = d.voided?.prev && d.voided.prev !== 'void' && d.voided.prev !== 'cancelled' ? d.voided.prev : (d.type === 'quotation' ? 'draft' : d.type === 'delivery' ? (d.delivered ? 'delivered' : 'pending') : 'issued');
+    put('docs', d.id, {...clone(d), status:back, voided:null, updatedAt:new Date().toISOString()}).then(() => toast(`${d.number} restored`));
+  }
   else if (act === 'undeliver') put('docs', d.id, {...clone(d), status:'pending', delivered:null, updatedAt:new Date().toISOString()}).then(() => toast('Marked as not delivered'));
   else if (act === 'pay') paymentBox(d);
   else if (act === 'deliver') deliverBox(d);
   else if (act === 'dup'){ const n = convertDraft(d, d.type); n.sourceId = null; history.pushState(null, '', '#/new/' + d.type); lastKey = 'new/' + d.type; renderSide(); viewEditor($('#main'), n, false); window.scrollTo(0,0); }
-  else if (act === 'del') confirmBox(`Delete ${d.number}?`, `This permanently removes the ${T.label.toLowerCase()}${d.type==='invoice' && (d.payments||[]).length ? ' and its payment records' : ''}. This can't be undone.`, 'Delete', async () => { await del('docs', d.id); toast(`${d.number} deleted`); location.hash = '#/' + T.route; });
+}
+function voidBox(d){
+  const T = TYPES[d.type];
+  modal(`Void ${d.number}?`, `<p style="margin:0">The ${T.label.toLowerCase()} stays in your records and lists, marked <b>VOID</b>, and no longer counts in any totals${d.type === 'invoice' ? ' or amounts owed' : ''}. Its number is not reused. You can restore it later.</p>
+    <div class="fld"><label for="v-r">Reason (optional)</label><input id="v-r" placeholder="e.g. Customer cancelled the order, issued by mistake"></div>`,
+    'Void ' + T.label.toLowerCase(), async w => {
+      const reason = w.querySelector('#v-r').value.trim();
+      await put('docs', d.id, {...clone(d), status:'void', voided:{date:todayISO(), reason, prev:d.status || ''}, updatedAt:new Date().toISOString()});
+      toast(`${d.number} voided`);
+    }, true);
 }
 
 /* ---------- dialogs ---------- */
@@ -1546,7 +1563,7 @@ function sheetHTML(d){
       ${d.type === 'invoice' && paidNow > 0 && st !== 'paid' ? `<tr><td>Paid</td><td>${money(paidNow)}</td></tr><tr class="bal"><td>Balance due</td><td>${money(balance(d))}</td></tr>` : ''}
     </table></div>`;
   return `<div class="sheet">
-    ${d.type === 'invoice' && st === 'cancelled' ? '<div class="void">CANCELLED</div>' : ''}
+    ${st === 'void' ? '<div class="void">VOID</div>' : ''}
     <div class="hd">
       <div class="co"><img src="${LOGO}" alt=""><div><b>${esc(s.name)}</b><div>${nl(s.address)}</div><div>Phone: ${esc(s.phone)}</div><div>Email: ${esc(s.email)}</div></div></div>
       <div class="ttl"><h1>${esc(T.title)}</h1><table class="meta">${meta.map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table></div>
@@ -1614,8 +1631,8 @@ function drawPDF(pdf, d){
   const tw = t => pdf.getTextWidth(vis(t));
   let y;
 
-  if (d.type === 'invoice' && st === 'cancelled'){
-    font(78, true, [248,224,221]); pdf.text('CANCELLED', 36, 215, {angle:28});
+  if (st === 'void'){
+    font(150, true, [248,224,221]); pdf.text('VOID', 52, 225, {angle:28});
   }
 
   // header: logo + company
@@ -1816,7 +1833,7 @@ function shareText(d){
   const lines = [`${T.label} ${d.number}`, d.customer?.name ? `Customer: ${d.customer.name}` : '', `Date: ${fmtDate(d.date)}`];
   if (d.type === 'delivery') lines.push(`Total quantity: ${qfmt(qtyTotal(d))}`);
   else lines.push(`Total: MVR ${money(total(d))}`);
-  if (d.type === 'invoice' && st !== 'paid' && st !== 'cancelled') lines.push(`Balance due: MVR ${money(balance(d))} by ${fmtDate(addDays(d.date, d.dueDays))}`);
+  if (d.type === 'invoice' && st !== 'paid' && st !== 'void') lines.push(`Balance due: MVR ${money(balance(d))} by ${fmtDate(addDays(d.date, d.dueDays))}`);
   if (d.type === 'quotation') lines.push(`Valid until: ${fmtDate(addDays(d.date, d.validDays))}`);
   lines.push('', s.name || '', [s.phone, s.email].filter(Boolean).join(' · '));
   return lines.filter((l, i) => l !== '' || i > 0).join('\n').trim();
@@ -1847,7 +1864,7 @@ async function shareTelegram(d, btn){
 const custState = {q:'', f:'all', sort:'name'};
 function viewCustomers(main){
   const st = custState, all = custList();
-  const stats = id => { const ds = Object.values(S.docs).filter(d => d.customerId === id); const inv = ds.filter(d => d.type === 'invoice' && d.status !== 'cancelled');
+  const stats = id => { const ds = Object.values(S.docs).filter(d => d.customerId === id); const inv = ds.filter(d => d.type === 'invoice' && !isVoid(d));
     return {n:ds.length, billed:inv.reduce((s,d)=>s+total(d),0), due:inv.reduce((s,d)=>s+Math.max(0,balance(d)),0), last:ds.reduce((m,d) => (d.date||'') > m ? d.date : m, '')}; };
   const X = {}; all.forEach(c => X[c.id] = stats(c.id));
   const FL = [['all','All', () => true, ''], ['owing','Owes money', c => X[c.id].due > 0.005, 'bad'], ['active','Has documents', c => X[c.id].n > 0, ''], ['none','No documents', c => X[c.id].n === 0, 'neutral']];
