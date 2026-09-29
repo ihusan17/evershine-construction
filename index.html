@@ -363,6 +363,31 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+/* phones: customers and products as compact cards */
+@media (max-width:640px){
+  table.list.custs thead,table.list.prods thead{display:none}
+  table.list.custs,table.list.custs tbody,table.list.prods,table.list.prods tbody{display:block}
+  table.list.custs tr,table.list.prods tr{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:3px;padding:12px 6px;border-bottom:1px solid var(--line);align-items:center}
+  table.list.custs tr:last-child,table.list.prods tr:last-child{border-bottom:0}
+  table.list.custs td,table.list.prods td{display:block;padding:0;border:0;min-width:0;background:none!important}
+  table.list.custs td.empty,table.list.prods td.empty{grid-column:1/-1;padding:24px 8px}
+  table.list.custs tr{grid-template-areas:"name owed" "name bill" "contact docs"}
+  table.list.custs .c-name{grid-area:name;align-self:start}
+  table.list.custs .c-name .cust{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.custs .c-name .dim{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.custs .c-contact{grid-area:contact;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.custs .c-owed{grid-area:owed;font-size:14px;font-weight:700}
+  table.list.custs .c-owed.zero{color:var(--muted);font-weight:500;font-size:12.5px}
+  table.list.custs .c-bill{grid-area:bill;font-size:12.5px;color:var(--muted)}
+  table.list.custs .c-docs{grid-area:docs;font-size:12.5px;color:var(--muted)}
+  table.list.custs .c-docs::after{content:attr(data-n)}
+  table.list.custs .c-owed::before,table.list.custs .c-bill::before{content:attr(data-l);font-size:11px;font-weight:600;color:var(--muted)}
+  table.list.prods tr{grid-template-areas:"name rate" "unit rate"}
+  table.list.prods .p-name{grid-area:name} table.list.prods .p-name .cust{font-weight:600}
+  table.list.prods .p-unit{grid-area:unit;font-size:12.5px}
+  table.list.prods .p-rate{grid-area:rate;font-weight:700}
+  table.list.prods .p-rate::before{content:"MVR ";font-size:11px;font-weight:600;color:var(--muted)}
+}
 .stbtn{border:0;background:none;padding:2px;margin:-2px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;color:var(--muted)}
 .stbtn:hover .badge,.stbtn:focus-visible .badge{box-shadow:0 0 0 2px var(--line)}
 .stmenu{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(16,24,40,.18);padding:6px;min-width:210px;max-width:min(300px,calc(100vw - 16px));display:grid;gap:1px}
@@ -1826,8 +1851,8 @@ function viewCustomers(main){
   main.innerHTML = `
     <div class="pagehead"><div><h1>Customers</h1><p>${list.length} saved. Customers are added automatically when you create a document for someone new.</p></div>
       <div class="row"><button class="btn primary" id="addc">Add customer</button></div></div>
-    <section class="panel"><div class="tablewrap"><table class="list"><thead><tr><th>Name</th><th>Contact</th><th class="num">Documents</th><th class="num">Invoiced (MVR)</th><th class="num">Owed (MVR)</th></tr></thead><tbody>
-      ${list.length ? list.map(c => { const x = stats(c.id); return `<tr data-c="${esc(c.id)}"><td><div class="cust">${esc(c.name)}</div><div class="dim">${esc((c.address||'').split('\n')[0])}</div></td><td class="dim">${esc([c.phone, c.email].filter(Boolean).join(' · '))}</td><td class="num">${x.n}</td><td class="num">${money(x.billed)}</td><td class="num" style="${x.due>0?'color:var(--bad);font-weight:600':''}">${money(x.due)}</td></tr>`; }).join('')
+    <section class="panel"><div class="tablewrap"><table class="list custs"><thead><tr><th>Name</th><th>Contact</th><th class="num">Documents</th><th class="num">Invoiced (MVR)</th><th class="num">Owed (MVR)</th></tr></thead><tbody>
+      ${list.length ? list.map(c => { const x = stats(c.id); return `<tr data-c="${esc(c.id)}"><td class="c-name"><div class="cust">${esc(c.name)}</div><div class="dim">${esc((c.address||'').split('\n')[0])}</div></td><td class="dim c-contact">${esc([c.phone, c.email].filter(Boolean).join(' · '))}</td><td class="num c-docs" data-n="${x.n === 1 ? ' document' : ' documents'}">${x.n}</td><td class="num c-bill" data-l="Invoiced ">${money(x.billed)}</td><td class="num c-owed ${x.due > 0 ? '' : 'zero'}" data-l="Owes " style="${x.due>0?'color:var(--bad);font-weight:600':''}">${money(x.due)}</td></tr>`; }).join('')
         : `<tr><td colspan="5" class="empty">No customers yet.</td></tr>`}
     </tbody></table></div></section>`;
   $('#addc').addEventListener('click', () => customerBox(null));
@@ -1865,12 +1890,12 @@ function viewProducts(main){
       <div class="row"><button class="btn" id="impp">Import from past documents</button><button class="btn primary" id="addp">Add product</button></div></div>
     <section class="panel">
       <div class="filters"><input id="pq2" type="search" placeholder="Search products" value="${esc(prodQ)}" aria-label="Search products"></div>
-      <div class="tablewrap"><table class="list"><thead><tr><th>Product</th><th>Unit</th><th class="num">Rate (MVR)</th></tr></thead><tbody id="prows"></tbody></table></div>
+      <div class="tablewrap"><table class="list prods"><thead><tr><th>Product</th><th>Unit</th><th class="num">Rate (MVR)</th></tr></thead><tbody id="prows"></tbody></table></div>
     </section>`;
   const draw = () => {
     const q = prodQ.trim().toLowerCase();
     const shown = list.filter(p => !q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q));
-    $('#prows').innerHTML = shown.length ? shown.map(p => `<tr data-p="${esc(p.id)}"><td><div class="cust">${esc(p.name)}</div></td><td class="dim">${esc(p.unit)}</td><td class="num">${String(p.rate ?? '') === '' ? '–' : money(num(p.rate))}</td></tr>`).join('')
+    $('#prows').innerHTML = shown.length ? shown.map(p => `<tr data-p="${esc(p.id)}"><td class="p-name"><div class="cust">${esc(p.name)}</div></td><td class="dim p-unit">${esc(p.unit)}</td><td class="num p-rate">${String(p.rate ?? '') === '' ? '–' : money(num(p.rate))}</td></tr>`).join('')
       : `<tr><td colspan="3" class="empty">${list.length ? 'No products match.' : 'No products yet. Add one, or import the items you used in past documents.'}</td></tr>`;
     $('#prows').querySelectorAll('[data-p]').forEach(r => r.addEventListener('click', () => productBox(list.find(p => p.id === r.dataset.p))));
   };
