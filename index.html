@@ -361,6 +361,29 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.primary:hover{background:var(--brand-2);border-color:var(--brand-2)}
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
+.m-only{display:none}
+/* phones: each document is a compact two-line card, so the status is visible without scrolling sideways */
+@media (max-width:640px){
+  table.list.docs thead{display:none}
+  table.list.docs,table.list.docs tbody{display:block}
+  table.list.docs tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"no amt" "cust st" "meta bal";column-gap:12px;row-gap:3px;padding:12px 6px;border-bottom:1px solid var(--line);align-items:center}
+  table.list.docs tr:last-child{border-bottom:0}
+  table.list.docs td{display:block;padding:0;border:0;min-width:0;background:none!important}
+  table.list.docs td.empty{grid-column:1/-1;padding:24px 8px}
+  table.list.docs .c-no{grid-area:no} table.list.docs .c-amt{grid-area:amt} table.list.docs .c-cust{grid-area:cust} table.list.docs .c-st{grid-area:st;justify-self:end}
+  table.list.docs .c-date{grid-area:meta;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.docs .c-bal{grid-area:bal;font-size:12.5px;color:var(--muted)}
+  table.list.docs .c-bal.zero{visibility:hidden}
+  table.list.docs .c-proj{display:none}
+  table.list.docs .m-only{display:inline}
+  table.list.docs .docno{font-size:13.5px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.docs .docno .tag{font-size:10.5px;padding:0 6px}
+  table.list.docs .c-cust{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.docs .c-amt{font-size:14px;font-weight:700;text-align:right}
+  table.list.docs .c-amt::before,table.list.docs .c-bal::before{content:attr(data-l);font-size:11px;font-weight:600;color:var(--muted)}
+  table.list.docs .badge{font-size:11.5px;padding:3px 9px}
+  table.list.docs tbody tr:active{background:var(--surface-2)}
+}
 .btn.sm{padding:6px 12px;font-size:13.5px}
 .acts .btn{border-radius:12px}
 
@@ -906,18 +929,19 @@ function viewList(main, type){
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="q" type="search" placeholder="Search number, customer, project, PO, item or island" value="${esc(st.q)}" aria-label="Search"></label>${type !== 'delivery' ? `<select id="kf" aria-label="Type"><option value="all">All types</option><option value="goods" ${st.k==='goods'?'selected':''}>Goods &amp; materials</option><option value="hire" ${st.k==='hire'?'selected':''}>Boat hire</option></select>` : ''}
         <div class="chips" id="chips">${FILTERS[type].map(f => { const n = f === 'all' ? docsOf(type).length : docsOf(type).filter(d => statusOf(d) === f).length; return `<button class="chip ${st.f===f?'on':''}" data-f="${f}">${f==='all'?'All':STATUS[f][0]}${n ? `<span class="n ${f==='all' ? '' : STATUS[f][1]}">${n}</span>` : ''}</button>`; }).join('')}</div></div>
-      <div class="tablewrap"><table class="list"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th>${type==='delivery'?'Deliver to':'Project / PO'}</th>${type==='delivery'?'<th class="num">Qty</th>':'<th class="num">Amount (MVR)</th>'}${type==='invoice'?'<th class="num">Balance</th>':''}<th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="tablewrap"><table class="list docs"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th>${type==='delivery'?'Deliver to':'Project / PO'}</th>${type==='delivery'?'<th class="num">Qty</th>':'<th class="num">Amount (MVR)</th>'}${type==='invoice'?'<th class="num">Balance</th>':''}<th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
     </section>`;
   const rows = () => {
     const q = st.q.trim().toLowerCase();
     const list = docsOf(type).filter(d => (st.f === 'all' || statusOf(d) === st.f) && (!st.k || st.k === 'all' || kindOf(d) === st.k) && (!q || [d.number, d.customer?.name, d.project, d.po, d.deliveryAddress, ...(d.items||[]).map(i => [i.desc, i.from, i.to].join(' '))].join(' ').toLowerCase().includes(q)));
     const cols = type === 'invoice' ? 7 : 6;
-    $('#rows').innerHTML = list.length ? list.map(d => `<tr data-go="doc/${d.id}">
-      <td><div class="docno">${esc(d.number)}</div>${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</td><td style="white-space:nowrap">${fmtDate(d.date)}</td><td class="cust">${esc(d.customer?.name)}</td>
-      <td class="dim">${esc(type==='delivery' ? (d.deliveryAddress||'').split('\n')[0] : [d.project, d.po && d.po !== '-' ? 'PO '+d.po : ''].filter(Boolean).join(' · '))}</td>
-      <td class="num">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
-      ${type==='invoice' ? `<td class="num">${d.status==='cancelled' ? '–' : money(balance(d))}</td>` : ''}
-      <td>${badge(statusOf(d))}${d.sourceId && S.docs[d.sourceId] ? '' : ''}</td></tr>`).join('')
+    $('#rows').innerHTML = list.length ? list.map(d => { const extra = type==='delivery' ? (d.deliveryAddress||'').split('\n')[0] : [d.project, d.po && d.po !== '-' ? 'PO '+d.po : ''].filter(Boolean).join(' · ');
+      return `<tr data-go="doc/${d.id}">
+      <td class="c-no"><div class="docno">${esc(d.number)}${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</div></td><td class="c-date" style="white-space:nowrap">${fmtDate(d.date)}${extra ? `<span class="m-only"> · ${esc(extra)}</span>` : ''}</td><td class="cust c-cust">${esc(d.customer?.name)}</td>
+      <td class="dim c-proj">${esc(extra)}</td>
+      <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
+      ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || d.status === 'cancelled' ? 'zero' : ''}" data-l="Balance ">${d.status==='cancelled' ? '–' : money(balance(d))}</td>` : ''}
+      <td class="c-st">${badge(statusOf(d))}</td></tr>`; }).join('')
       : `<tr><td colspan="${cols}" class="empty">${docsOf(type).length ? 'No matches. Try a different search or filter.' : `No ${T.plural.toLowerCase()} yet. <a href="#/new/${type}">Create one</a>.`}</td></tr>`;
     bindGo($('#rows'));
     const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>d.status!=='cancelled').reduce((s,d)=>s+total(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>d.status!=='cancelled').reduce((s,d)=>s+balance(d),0))} unpaid` : '');
