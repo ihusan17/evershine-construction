@@ -248,7 +248,7 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .signs .ln>span:last-child{flex:1;border-bottom:1px dotted #999;min-height:20px;padding-left:4px}
 .sheet .signs .ln.sg{height:78px;margin-top:0}
 .sheet .signs .ln.sg>span:last-child{position:relative;height:100%}
-.sheet .signs .ln.sg img{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);max-height:60px;max-width:92%;width:auto;height:auto}
+.sheet .signs .ln.sg img{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);max-height:calc(60px * var(--sc,1));max-width:92%;width:auto;height:auto}
 .sheet .foot{margin-top:auto;padding-top:22px;text-align:center}
 .sheet .foot b{display:block;font-size:13.5px;color:#33669b;letter-spacing:.04em;margin-bottom:8px}
 .sheet .foot .bar{display:flex;height:4px;margin-bottom:10px}
@@ -410,8 +410,22 @@ table.items th{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
 .kindpick button.on{padding:15px 17px}
 .pbtn{border-radius:14px}
 .lbl2{font-size:14px;font-weight:600;color:var(--muted)}
-.sigbox{height:120px;border:1px dashed var(--line);border-radius:14px;background:#fff;display:grid;place-items:center;padding:10px;margin-bottom:6px}
-.sigbox img{max-height:100%;max-width:100%}
+.sigbox{height:120px;border:1px dashed var(--line);border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;padding:10px;margin-bottom:6px;overflow:hidden}
+.sigbox img{display:block;max-height:98px;max-width:100%;width:auto;height:auto;object-fit:contain}
+.sigedit{display:grid;gap:16px}
+.sigdoc{background:#fff;color:#1b1b1b;border:1px solid var(--line);border-radius:14px;padding:18px 22px 22px;font-family:var(--serif);font-size:15px}
+.sigdoc b{display:block;margin-bottom:4px}
+.sigdoc .ln{display:flex;gap:10px;align-items:flex-end;height:118px}
+.sigdoc .ln>span:first-child{width:52px;color:#555;flex:none}
+.sigdoc .ln>span:last-child{flex:1;height:100%;border-bottom:1px dotted #999;position:relative}
+.sigdoc .ln img{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);max-width:92%;width:auto;height:auto}
+.sigdoc.check{background-color:#fff;background-image:linear-gradient(45deg,#eef1f5 25%,transparent 25%,transparent 75%,#eef1f5 75%),linear-gradient(45deg,#eef1f5 25%,transparent 25%,transparent 75%,#eef1f5 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.sliders{display:grid;gap:12px}
+.sliders label{display:flex;justify-content:space-between;font-size:14px;font-weight:600;color:var(--muted)}
+.sliders input[type=range]{width:100%;accent-color:var(--brand)}
+.sliders .chk{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);justify-content:flex-start;cursor:pointer}
+.sliders .chk input{width:18px;height:18px;accent-color:var(--brand)}
+.sliders [disabled]{opacity:.45}
 .totals .gt{font-family:var(--ui);font-weight:800;color:var(--brand)}
 .stickybar{background:linear-gradient(to top,var(--surface) 70%,transparent)}
 .facts .big{font-family:var(--ui);font-weight:800;color:var(--brand)}
@@ -1288,6 +1302,7 @@ async function footIcons(){
 const dnSigns = d => { const g = d.signs || {}, dl = d.delivered || {};
   return {byName: g.byName ?? '', byDate: g.byDate ?? (dl.date || ''), toName: g.toName ?? (dl.name || ''), toDate: g.toDate ?? (dl.date || '')}; };
 const signImg = () => S.settings.signImage || SIGN;
+const signScale = (st = S.settings) => Math.min(1.5, Math.max(0.5, num(st.signScale) || 1));
 let SIGN_INFO = null;   // {src, w, h} of the current signature, for the PDF
 function loadSignInfo(){
   const src = signImg();
@@ -1337,7 +1352,7 @@ function sheetHTML(d){
     ${isDN ? `<div class="msg">${d.message ? `<p>${nl(d.message)}</p>` : ''}${s.deliveryNote ? `<p>${nl(s.deliveryNote)}</p>` : ''}</div>
       <div class="signs">
         ${[['Delivered by:', sg.byName, sg.byDate, s.signDelivery && signImg()], ['Received by:', sg.toName, sg.toDate, '']].map(([t, nm, dt, img]) =>
-          `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
+          `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="" style="--sc:${signScale()}">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>› ${esc(t)}</p>`).join('')}</div>` : ''}
        <div class="bank"><b>Bank Details</b>Bank Name: ${esc(s.bankName)}<br>Acc no.: ${esc(s.accNo)}<br>Acc Name: ${esc(s.accName)}</div>`}
@@ -1519,7 +1534,7 @@ function drawPDF(pdf, d){
         font(9.75, false, GREY); pdf.text(k, x, by);
         pdf.setDrawColor(150,150,150); pdf.setLineWidth(0.2); pdf.setLineDashPattern([0.4,0.8], 0); pdf.line(x + LX, by + 0.8, x + LX + LW, by + 0.8); pdf.setLineDashPattern([], 0);
         if (i === 0 && sign){   // signature centred on the Sign line
-          const mw = LW * 0.9, mh = 15.5; let w = mw, h = w * sign.h / sign.w; if (h > mh){ h = mh; w = h * sign.w / sign.h; }
+          const mw = LW * 0.92, mh = 15.5 * signScale(); let w = mw, h = w * sign.h / sign.w; if (h > mh){ h = mh; w = h * sign.w / sign.h; }
           const fmt = /^data:image\/jpe?g/i.test(sign.src) ? 'JPEG' : 'PNG';
           pdf.addImage(sign.src, fmt, x + LX + LW/2 - w/2, by + 2 - h, w, h, 'sign', 'NONE');
         }
@@ -1683,7 +1698,7 @@ function productBox(p){
 
 /* ---------- signature image ---------- */
 // Shrinks the image, makes a white paper background transparent (uploads) and trims empty edges.
-function cleanSignature(url, knockWhite){
+function cleanSignature(url, knockWhite, cut = 200){
   return new Promise(res => {
     const im = new Image();
     im.onload = () => {
@@ -1693,7 +1708,7 @@ function cleanSignature(url, knockWhite){
       const px = x.getImageData(0, 0, w, h), a = px.data;
       let x0 = w, y0 = h, x1 = -1, y1 = -1;
       for (let i = 0; i < a.length; i += 4){
-        if (knockWhite){ const l = (a[i] + a[i+1] + a[i+2]) / 3; if (l > 200) a[i+3] = 0; else if (l > 150) a[i+3] = Math.round(a[i+3] * (200 - l) / 50); }
+        if (knockWhite){ const l = (a[i] + a[i+1] + a[i+2]) / 3; if (l > cut) a[i+3] = 0; else if (l > cut - 50) a[i+3] = Math.round(a[i+3] * (cut - l) / 50); }
         if (a[i+3] > 24){ const p = i / 4, px_ = p % w, py = (p - px_) / w; if (px_ < x0) x0 = px_; if (px_ > x1) x1 = px_; if (py < y0) y0 = py; if (py > y1) y1 = py; }
       }
       if (x1 < 0) return res(null);
@@ -1705,6 +1720,33 @@ function cleanSignature(url, knockWhite){
     };
     im.onerror = () => res(null); im.src = url;
   });
+}
+// Adjust a signature before using it: remove the paper background and choose the printed size.
+function signatureEditor(srcUrl, opts, done){
+  const o = {bg: opts.bg !== false, strength: opts.strength ?? 45, size: Math.round(signScale({signScale: opts.size}) * 100)};
+  let out = null, busy = 0;
+  const w = modal('Adjust signature', `<div class="sigedit">
+      <div class="sigdoc" id="se-doc"><b>Delivered by:</b><div class="ln"><span>Sign:</span><span id="se-line"></span></div></div>
+      <div class="sliders">
+        <label class="chk"><input type="checkbox" id="se-bg" ${o.bg ? 'checked' : ''}>Remove background</label>
+        <div><label for="se-st"><span>Background removal strength</span><span id="se-stv"></span></label><input type="range" id="se-st" min="0" max="100" value="${o.strength}"></div>
+        <div><label for="se-sz"><span>Size on the document</span><span id="se-szv"></span></label><input type="range" id="se-sz" min="50" max="150" step="5" value="${o.size}"></div>
+      </div>
+      <p class="dim" style="margin:0">The preview shows the Sign line at its real proportions. The checkered pattern shows where the background has been removed.</p></div>`,
+    'Use this signature', () => { if (!out){ toast('This image has no visible signature. Lower the strength or turn off background removal.'); return false; } done(out, o.size / 100); });
+  const bg = w.querySelector('#se-bg'), st = w.querySelector('#se-st'), sz = w.querySelector('#se-sz');
+  const cut = () => Math.round(250 - o.strength * 1.1);     // 0 → keeps almost everything, 100 → removes light greys too
+  const paint = () => {
+    w.querySelector('#se-stv').textContent = o.bg ? (o.strength < 30 ? 'Light' : o.strength < 70 ? 'Medium' : 'Strong') : 'Off';
+    w.querySelector('#se-szv').textContent = o.size + '%';
+    st.disabled = !o.bg; w.querySelector('#se-doc').classList.toggle('check', o.bg);
+    w.querySelector('#se-line').innerHTML = out ? `<img src="${out}" alt="Signature preview" style="max-height:${Math.round(90 * o.size / 100)}px">` : '<span class="dim" style="position:absolute;left:0;right:0;bottom:30px;text-align:center">Nothing left to show</span>';
+  };
+  const run = async () => { const n = ++busy; const r = await cleanSignature(srcUrl, o.bg, cut()); if (n === busy){ out = r; paint(); } };
+  bg.addEventListener('change', () => { o.bg = bg.checked; run(); });
+  st.addEventListener('input', () => { o.strength = +st.value; run(); });
+  sz.addEventListener('input', () => { o.size = +sz.value; paint(); });
+  paint(); run();
 }
 function signaturePad(done){
   const w = modal('Draw your signature', `<canvas id="pad" width="900" height="340" style="width:100%;height:auto;aspect-ratio:900/340;background:#fff;border:1px solid var(--line);border-radius:12px;touch-action:none;cursor:crosshair"></canvas>
@@ -1739,7 +1781,7 @@ function viewSettings(main){
       </div></section>
       <section class="panel"><h2>Signature</h2><div class="fgrid two">
         <div class="fld"><span class="lbl2">Your signature</span><div class="sigbox" id="sig-prev"></div>
-          <div class="row"><button type="button" class="btn sm" id="sig-draw">Draw signature</button><button type="button" class="btn sm" id="sig-up">Upload image…</button><button type="button" class="btn sm danger" id="sig-rm">Use default</button><input type="file" id="sig-file" accept="image/*" hidden></div>
+          <div class="row"><button type="button" class="btn sm" id="sig-draw">Draw signature</button><button type="button" class="btn sm" id="sig-up">Upload image…</button><button type="button" class="btn sm" id="sig-adj">Adjust size &amp; background</button><button type="button" class="btn sm danger" id="sig-rm">Use default</button><input type="file" id="sig-file" accept="image/*" hidden></div>
           <span class="hint">Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save settings to keep it.</span></div>
         <div style="display:grid;gap:14px;align-content:start">
           <div class="fld"><label for="s-sign">Signature on delivery notes</label><select id="s-sign" data-s="signDelivery"><option value="1" ${s.signDelivery?'selected':''}>Place on the "Delivered by" line</option><option value="" ${!s.signDelivery?'selected':''}>Leave blank to sign by hand</option></select></div>
@@ -1759,18 +1801,19 @@ function viewSettings(main){
       <div class="stickybar"><button type="button" class="btn primary" id="ss">Save settings</button></div>
     </form>`;
   $('#sf').addEventListener('input', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
-  const sigShow = () => { $('#sig-prev').innerHTML = `<img src="${s.signImage || SIGN}" alt="Signature">`; $('#sig-rm').hidden = !s.signImage; };
+  const sigShow = () => { $('#sig-prev').innerHTML = `<img src="${s.signImage || SIGN}" alt="Signature" style="max-height:${Math.round(78 * signScale(s))}px">`; $('#sig-rm').hidden = !s.signImage; };
   sigShow();
   $('#sig-up').addEventListener('click', () => $('#sig-file').click());
   $('#sig-file').addEventListener('change', async e => {
     const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
     const url = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(null); fr.readAsDataURL(f); });
-    const out = url && await cleanSignature(url, true);
-    if (!out) return toast('That image could not be used. Try a PNG or JPG.');
-    s.signImage = out; sigShow(); toast('Signature added. Click Save settings to keep it.');
+    if (!url || !await cleanSignature(url, false)) return toast('That image could not be used. Try a PNG or JPG.');
+    signatureEditor(url, {bg:true, size:s.signScale}, useSig);
   });
-  $('#sig-rm').addEventListener('click', () => { s.signImage = ''; sigShow(); toast('Back to the default signature. Click Save settings to keep it.'); });
-  $('#sig-draw').addEventListener('click', () => signaturePad(async url => { const out = await cleanSignature(url, false); if (out){ s.signImage = out; sigShow(); toast('Signature added. Click Save settings to keep it.'); } }));
+  $('#sig-rm').addEventListener('click', () => { s.signImage = ''; s.signScale = 1; sigShow(); toast('Back to the default signature. Click Save settings to keep it.'); });
+  const useSig = (img, scale) => { s.signImage = img; s.signScale = scale; sigShow(); toast('Signature ready. Click Save settings to keep it.'); };
+  $('#sig-draw').addEventListener('click', () => signaturePad(url => setTimeout(() => signatureEditor(url, {bg:false, size:s.signScale}, useSig), 0)));
+  $('#sig-adj').addEventListener('click', () => signatureEditor(s.signImage || SIGN, {bg:false, size:s.signScale}, useSig));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
   $('#bk-exp').addEventListener('click', () => {
     const data = {app:'evershine-portal', version:1, exportedAt:new Date().toISOString(), settings:S.settings, customers:S.customers, docs:S.docs};
