@@ -778,30 +778,14 @@ const ROLES = {owner:['Owner','Everything, including Settings, Team, Products an
 const canEdit = () => S.role === 'owner' || S.role === 'staff';
 const isOwnerRole = () => S.role === 'owner';
 function applyRole(){ document.body.dataset.role = S.role || 'none'; }
-async function resolveRole(email){
-  const e = String(email || '').trim().toLowerCase();
-  if (e === OWNER_EMAIL) return 'owner';
-  try {
-    const snap = await db.doc('team/' + e).get();
-    if (snap.exists){ const r = (snap.data() || {}).role; return ROLES[r] ? r : 'viewer'; }
-    return null;
-  } catch(err){
-    // the old rules don't allow reading the team list yet: keep the access this account had before
-    if (err && err.code === 'invalid_argument'){ S.legacyRules = true; return 'owner'; }
-    return 'viewer';
-  }
-}
 async function boot(){
   renderSide();
   if (window.FIREBASE_CONFIG){
-    const slow = setTimeout(() => { if (!db) $('#main').innerHTML = '<div class="loading">Still connecting to the database… Check your internet connection. If this page was just set up, check the Firebase config in index.html.</div>'; }, 15000);
-    const fb = await window.__fbReady; clearTimeout(slow);
+    const fb = await window.__fbReady;   // resolves only after sign-in and the team check
     db = fb.db; S.mode = 'cloud'; S.user = fb.email; window.__signOut = fb.signOut;
-    S.role = await resolveRole(fb.email); applyRole();
-    if (!S.role){
-      try { sessionStorage.setItem('ev-login-msg', `${fb.email} isn't on the team yet. Ask the owner to add this email under Settings → Team.`); } catch(e){}
-      fb.signOut(); return;
-    }
+    S.role = fb.role; S.legacyRules = !!fb.legacy; applyRole();
+    const slow = setTimeout(() => { if (!S.ready) $('#main').innerHTML = '<div class="loading">Still loading your documents… Check your internet connection.</div>'; }, 15000);
+    const wait = setInterval(() => { if (S.ready){ clearTimeout(slow); clearInterval(wait); } }, 500);
     subscribe(); return;
   }
   S.role = 'owner'; applyRole();   // no sign-in outside Firebase: this browser has full access
@@ -2316,7 +2300,15 @@ boot();
 .login .lg{display:flex;align-items:center;gap:12px}
 .login .lg img{width:64px;height:auto;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--line)}
 .login h1{margin:0;font-family:var(--ui);font-weight:800;font-size:22px;line-height:1.15}
-.login .err{color:var(--bad);font-size:14px;min-height:1em;margin:0}
+.login .alert{margin:0;padding:12px 14px;border-radius:10px;font-size:14.5px;line-height:1.4;background:#fdf0dc;color:#9a5b00;border:1px solid #f6dcb0}
+.login .alert b{display:block;margin-bottom:2px}
+.login .alert.info{background:var(--brand-soft);color:var(--brand);border-color:transparent}
+.login .alert[hidden]{display:none}
+.login .busy{display:none;align-items:center;gap:10px;color:var(--muted);font-weight:600;padding:8px 0}
+.login .busy i{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--line);border-top-color:var(--brand);animation:lspin .8s linear infinite}
+@keyframes lspin{to{transform:rotate(360deg)}}
+.login.checking .busy{display:flex}
+.login.checking form>*:not(.lg):not(.busy){display:none!important}
 .login .lnk{background:none;border:0;color:var(--brand);cursor:pointer;padding:0;font-size:14px;justify-self:start}
 .login .gbtn{justify-content:center;gap:10px;padding:11px 16px;font-size:15px}
 .login .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
@@ -2333,22 +2325,30 @@ const cfg = window.FIREBASE_CONFIG;
 const configured = cfg && cfg.apiKey && !String(cfg.apiKey).startsWith('PASTE');
 
 const box = document.createElement('div');
-box.className = 'login'; box.hidden = true;
+box.className = 'login checking';   // covers the portal until we know who is signed in and that they're on the team
 box.innerHTML = `<form id="lf" novalidate>
   <div class="lg"><img src="${LOGO}" alt=""><h1>${esc(DEFAULTS.name)}<br><span class="dim" style="font-size:17px;font-weight:500">Document portal</span></h1></div>
+  <div class="busy" id="lbusy"><i></i><span>Checking sign-in…</span></div>
+  <div class="alert" id="lerr" role="alert" hidden></div>
   <button class="btn gbtn" id="lg" type="button"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>Sign in with Google</button>
   <div class="or"><span>or with email and password</span></div>
   <div class="fld"><label for="le">Email</label><input id="le" type="email" autocomplete="username" required></div>
   <div class="fld"><label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required></div>
-  <p class="err" id="lerr" role="alert"></p>
   <button class="btn primary" id="lb" type="submit" style="justify-content:center">Sign in</button>
   <button class="lnk" id="lr" type="button">Forgot password?</button>
 </form>`;
 document.body.appendChild(box);
 const $e = id => box.querySelector('#' + id);
-const showLogin = msg => {
-  let m = msg || ''; try { const k = sessionStorage.getItem('ev-login-msg'); if (k){ m = k; sessionStorage.removeItem('ev-login-msg'); } } catch(e){}
-  box.hidden = false; $e('lerr').textContent = m; $e('lb').disabled = false; $e('lg').disabled = false;
+// message box above the sign-in buttons: kind 'err' (amber, "Login failed!") or 'info'
+const setMsg = (msg, kind = 'err', title) => {
+  const a = $e('lerr'); a.hidden = !msg; a.className = 'alert' + (kind === 'info' ? ' info' : '');
+  a.innerHTML = msg ? `<b>${esc(title || (kind === 'info' ? '' : 'Login failed!'))}</b>${esc(msg)}` : '';
+  if (kind === 'info' && !title) a.querySelector('b').remove();
+};
+const busy = text => { box.hidden = false; box.classList.add('checking'); box.querySelector('#lbusy span').textContent = text || 'Checking sign-in…'; };
+const showLogin = (msg, kind, title) => {
+  box.hidden = false; box.classList.remove('checking'); setMsg(msg, kind, title);
+  $e('lb').disabled = false; $e('lg').disabled = false;
 };
 
 if (!configured){
@@ -2366,7 +2366,7 @@ if (!configured){
     p.then(() => { if (!late){ clearTimeout(t); res(); } })
      .catch(e => { const m = mapErr(e); if (!late){ clearTimeout(t); rej(m); } else if (window.dbErr) window.dbErr(m); });
   });
-  const denied = () => showLogin('This account is not allowed to use the portal. Ask the owner to add your email under Settings → Team.');
+  const denied = () => showLogin('This account is not allowed to use the portal. Ask the owner to add your email under Settings → Team.', 'err', 'No access');
   const docRef = path => { const r = doc(fs, path); return {
     set: body => soft(setDoc(r, body)),
     delete: () => soft(deleteDoc(r)),
@@ -2383,27 +2383,55 @@ if (!configured){
   });
   const adapter = { collection: name => colRef(name), doc: path => docRef(path) };
 
-  let started = false;
-  onAuthStateChanged(auth, user => {
+  // Who may use the portal: the main owner, or anyone in the `team` collection (Settings → Team).
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
+  const checkAccess = async user => {
+    const e = String(user.email || '').trim().toLowerCase();
+    if (e === OWNER_EMAIL) return { role: 'owner' };
+    try {
+      const s = await withTimeout(getDoc(doc(fs, 'team/' + e)), 12000);
+      if (!s.exists()) return { role: null };
+      const r = (s.data() || {}).role; return { role: ROLES[r] ? r : 'viewer' };
+    } catch(err){
+      if (err.code === 'permission-denied'){
+        // Older rules that don't know about the team list: keep this account's previous access if it can still read the data
+        try { await withTimeout(getDoc(doc(fs, 'settings/company')), 12000); return { role: 'owner', legacy: true }; }
+        catch(e2){ return { role: null, why: e2.code === 'permission-denied' ? 'denied' : 'offline' }; }
+      }
+      return { role: null, why: 'offline' };
+    }
+  };
+  let started = false, pendingMsg = null;
+  onAuthStateChanged(auth, async user => {
     if (user){
-      box.hidden = true;
-      if (!started){ started = true; window.__fbResolve({ db: adapter, email: user.email, signOut: () => signOut(auth) }); }
+      if (started) return;
+      busy('Checking access…');
+      const acc = await checkAccess(user);
+      if (!acc.role){
+        pendingMsg = acc.why === 'offline'
+          ? ['Couldn\'t check your access. Check your internet connection and try again.', 'Connection problem']
+          : [`${user.email} isn't on the Evershine team yet. Ask the owner to add this email under Settings → Team.`, 'No access'];
+        await signOut(auth); return;
+      }
+      started = true; box.hidden = true;
+      window.__fbResolve({ db: adapter, email: user.email, role: acc.role, legacy: !!acc.legacy, signOut: () => signOut(auth) });
     } else {
-      if (started) location.reload(); else showLogin('');
+      if (started) location.reload();
+      else { const m = pendingMsg; pendingMsg = null; m ? showLogin(m[0], 'err', m[1]) : showLogin(''); }
     }
   });
 
   $e('lf').addEventListener('submit', async ev => {
     ev.preventDefault();
     const email = $e('le').value.trim(), pw = $e('lp').value;
-    if (!email || !pw){ $e('lerr').textContent = 'Enter your email and password.'; return; }
-    $e('lb').disabled = true; $e('lerr').textContent = '';
+    if (!email || !pw){ setMsg('Enter your email and password.'); return; }
+    $e('lb').disabled = true; setMsg('');
     try { await signInWithEmailAndPassword(auth, email, pw); }
     catch(e){
       $e('lb').disabled = false;
-      $e('lerr').textContent = e.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes and try again.'
+      setMsg(e.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes and try again.'
         : e.code === 'auth/network-request-failed' ? 'No internet connection. Check your connection and try again.'
-        : 'Email or password is incorrect.';
+        : 'Check your email and password.');
     }
   });
   const gErr = e => e.code === 'auth/unauthorized-domain' ? 'Google sign-in isn\'t allowed on this web address yet. Add it in Firebase → Authentication → Settings → Authorized domains.'
@@ -2413,20 +2441,20 @@ if (!configured){
     : 'Google sign-in didn\'t finish. Try again.';
   getRedirectResult(auth).catch(e => showLogin(gErr(e)));
   $e('lg').addEventListener('click', async () => {
-    $e('lg').disabled = true; $e('lerr').textContent = '';
+    $e('lg').disabled = true; setMsg('');
     const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' });
     try { await signInWithPopup(auth, provider); }
     catch(e){
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment'){ try { await signInWithRedirect(auth, provider); return; } catch(e2){ e = e2; } }
       $e('lg').disabled = false;
-      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') $e('lerr').textContent = gErr(e);
+      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') setMsg(gErr(e));
     }
   });
   $e('lr').addEventListener('click', async () => {
     const email = $e('le').value.trim();
-    if (!email){ $e('lerr').textContent = 'Type your email above first, then click Forgot password.'; return; }
-    try { await sendPasswordResetEmail(auth, email); $e('lerr').textContent = 'If that email has an account, a reset link is on its way.'; }
-    catch(e){ $e('lerr').textContent = 'Could not send the reset email. Check the address and try again.'; }
+    if (!email){ setMsg('Type your email above first, then click Forgot password.', 'info'); return; }
+    try { await sendPasswordResetEmail(auth, email); setMsg('If that email has an account, a reset link is on its way.', 'info'); }
+    catch(e){ setMsg('Could not send the reset email. Check the address and try again.'); }
   });
 }
 </script>
