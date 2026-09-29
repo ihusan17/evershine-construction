@@ -1844,19 +1844,40 @@ async function shareTelegram(d, btn){
 }
 
 /* ---------- customers ---------- */
+const custState = {q:'', f:'all', sort:'name'};
 function viewCustomers(main){
-  const list = custList();
+  const st = custState, all = custList();
   const stats = id => { const ds = Object.values(S.docs).filter(d => d.customerId === id); const inv = ds.filter(d => d.type === 'invoice' && d.status !== 'cancelled');
-    return {n:ds.length, billed:inv.reduce((s,d)=>s+total(d),0), due:inv.reduce((s,d)=>s+Math.max(0,balance(d)),0)}; };
+    return {n:ds.length, billed:inv.reduce((s,d)=>s+total(d),0), due:inv.reduce((s,d)=>s+Math.max(0,balance(d)),0), last:ds.reduce((m,d) => (d.date||'') > m ? d.date : m, '')}; };
+  const X = {}; all.forEach(c => X[c.id] = stats(c.id));
+  const FL = [['all','All', () => true, ''], ['owing','Owes money', c => X[c.id].due > 0.005, 'bad'], ['active','Has documents', c => X[c.id].n > 0, ''], ['none','No documents', c => X[c.id].n === 0, 'neutral']];
   main.innerHTML = `
-    <div class="pagehead"><div><h1>Customers</h1><p>${list.length} saved. Customers are added automatically when you create a document for someone new.</p></div>
-      <div class="row"><button class="btn primary" id="addc">Add customer</button></div></div>
-    <section class="panel"><div class="tablewrap"><table class="list custs"><thead><tr><th>Name</th><th>Contact</th><th class="num">Documents</th><th class="num">Invoiced (MVR)</th><th class="num">Owed (MVR)</th></tr></thead><tbody>
-      ${list.length ? list.map(c => { const x = stats(c.id); return `<tr data-c="${esc(c.id)}"><td class="c-name"><div class="cust">${esc(c.name)}</div><div class="dim">${esc((c.address||'').split('\n')[0])}</div></td><td class="dim c-contact">${esc([c.phone, c.email].filter(Boolean).join(' · '))}</td><td class="num c-docs" data-n="${x.n === 1 ? ' document' : ' documents'}">${x.n}</td><td class="num c-bill" data-l="Invoiced ">${money(x.billed)}</td><td class="num c-owed ${x.due > 0 ? '' : 'zero'}" data-l="Owes " style="${x.due>0?'color:var(--bad);font-weight:600':''}">${money(x.due)}</td></tr>`; }).join('')
-        : `<tr><td colspan="5" class="empty">No customers yet.</td></tr>`}
-    </tbody></table></div></section>`;
+    <div class="pagehead"><div><h1>Customers</h1><p id="csum"></p></div>
+      <div class="row"><button class="btn primary" id="addc">${icon('plus',18)}Add customer</button></div></div>
+    <section class="panel">
+      <div class="filters"><label class="search">${icon('search',18)}<input id="cq" type="search" placeholder="Search name, phone, email or address" value="${esc(st.q)}" aria-label="Search customers"></label>
+        <select id="csort" aria-label="Sort"><option value="name">Name A–Z</option><option value="owed">Owes most</option><option value="billed">Invoiced most</option><option value="recent">Most recent</option></select>
+        <div class="chips" id="cchips">${FL.map(([k,l,fn,tone]) => { const n = all.filter(fn).length; return `<button class="chip ${st.f===k?'on':''}" data-f="${k}">${l}${n ? `<span class="n ${tone}">${n}</span>` : ''}</button>`; }).join('')}</div></div>
+      <div class="tablewrap"><table class="list custs"><thead><tr><th>Name</th><th>Contact</th><th class="num">Documents</th><th class="num">Invoiced (MVR)</th><th class="num">Owed (MVR)</th></tr></thead><tbody id="crows"></tbody></table></div>
+    </section>`;
+  $('#csort').value = st.sort;
+  const draw = () => {
+    const q = st.q.trim().toLowerCase(), fn = (FL.find(f => f[0] === st.f) || FL[0])[2];
+    const qd = q.replace(/\D/g, '');
+    const list = all.filter(c => fn(c) && (!q || [c.name, c.email, c.address].join(' ').toLowerCase().includes(q) || (qd.length >= 3 && (c.phone||'').replace(/\D/g,'').includes(qd)) || (c.phone||'').toLowerCase().includes(q)));
+    const by = {owed:(a,b) => X[b.id].due - X[a.id].due, billed:(a,b) => X[b.id].billed - X[a.id].billed, recent:(a,b) => X[b.id].last.localeCompare(X[a.id].last)}[st.sort];
+    if (by) list.sort((a,b) => by(a,b) || (a.name||'').localeCompare(b.name||''));
+    $('#crows').innerHTML = list.length ? list.map(c => { const x = X[c.id]; return `<tr data-c="${esc(c.id)}"><td class="c-name"><div class="cust">${esc(c.name)}</div><div class="dim">${esc((c.address||'').split('\n')[0])}</div></td><td class="dim c-contact">${esc([c.phone, c.email].filter(Boolean).join(' · '))}</td><td class="num c-docs" data-n="${x.n === 1 ? ' document' : ' documents'}">${x.n}</td><td class="num c-bill" data-l="Invoiced ">${money(x.billed)}</td><td class="num c-owed ${x.due > 0 ? '' : 'zero'}" data-l="Owes " style="${x.due>0?'color:var(--bad);font-weight:600':''}">${money(x.due)}</td></tr>`; }).join('')
+      : `<tr><td colspan="5" class="empty">${all.length ? 'No customers match. Try a different search or filter.' : 'No customers yet.'}</td></tr>`;
+    $('#crows').querySelectorAll('[data-c]').forEach(r => r.addEventListener('click', () => customerBox(S.customers[r.dataset.c])));
+    const owed = list.reduce((s,c) => s + X[c.id].due, 0);
+    $('#csum').textContent = (list.length === all.length ? `${all.length} saved` : `${list.length} of ${all.length} shown`) + (owed > 0.005 ? ` · MVR ${money(owed)} owed` : '') + '. Customers are added automatically when you create a document for someone new.';
+  };
+  $('#cq').addEventListener('input', e => { st.q = e.target.value; draw(); });
+  $('#csort').addEventListener('change', e => { st.sort = e.target.value; draw(); });
+  $('#cchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; main.querySelectorAll('#cchips .chip').forEach(c => c.classList.toggle('on', c === b)); draw(); });
   $('#addc').addEventListener('click', () => customerBox(null));
-  main.querySelectorAll('[data-c]').forEach(r => r.addEventListener('click', () => customerBox(S.customers[r.dataset.c])));
+  draw();
 }
 function customerBox(c){
   const isNew = !c; c = c || {name:'', address:'', phone:'', email:''};
