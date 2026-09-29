@@ -6,3 +6,7 @@
   away, then tell the owner it is live (they refresh with Ctrl+Shift+R).
 - Printed documents and PDFs (`.sheet` styles and `drawPDF`) have a fixed layout; do not change
   them unless asked.
+- Access: roles owner / staff / viewer. Team members live in the Firestore `team` collection
+  (doc id = lowercase email); the main owner email is hard-coded as OWNER_EMAIL. The server-side
+  limits are the Firestore rules in `firestore.rules` (same text as FIRESTORE_RULES in index.html,
+  shown in Settings → Team). Keep the two in sync; the owner pastes them into the Firebase console.

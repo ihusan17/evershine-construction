@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Evershine document portal: owner / staff / viewer (managed in Settings → Team)
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null
+        && (request.auth.token.email_verified == true || request.auth.token.email.lower() == 'mhmd.ihsn80@gmail.com');
+    }
+    function me() { return request.auth.token.email.lower(); }
+    function onTeam() { return exists(/databases/$(database)/documents/team/$(me())); }
+    function teamRole() { return get(/databases/$(database)/documents/team/$(me())).data.role; }
+    function isOwner() { return signedIn() && (me() == 'mhmd.ihsn80@gmail.com' || (onTeam() && teamRole() == 'owner')); }
+    function canRead() { return isOwner() || (signedIn() && onTeam() && teamRole() in ['staff', 'viewer']); }
+    function canWrite() { return isOwner() || (signedIn() && onTeam() && teamRole() == 'staff'); }
+    function isVoid(data) { return data.get('status', '') in ['void', 'cancelled']; }
+
+    match /team/{email} {
+      allow read: if isOwner() || (signedIn() && email == me());
+      allow write: if isOwner();
+    }
+    match /settings/{id} {
+      allow read: if canRead();
+      allow write: if isOwner();
+    }
+    match /customers/{id} {
+      allow read: if canRead();
+      allow create, update: if canWrite();
+      allow delete: if isOwner();
+    }
+    match /docs/{id} {
+      allow read: if canRead();
+      allow create: if canWrite() && !isVoid(request.resource.data);
+      allow update: if isOwner() || (canWrite() && !isVoid(resource.data) && !isVoid(request.resource.data));
+      allow delete: if false;   // documents are voided, never deleted
+    }
+  }
+}
