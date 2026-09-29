@@ -421,6 +421,13 @@ table.items th{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
 .sigdoc .ln img{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);max-width:92%;width:auto;height:auto}
 .sigdoc.check{background-color:#fff;background-image:linear-gradient(45deg,#eef1f5 25%,transparent 25%,transparent 75%,#eef1f5 75%),linear-gradient(45deg,#eef1f5 25%,transparent 25%,transparent 75%,#eef1f5 75%);background-size:16px 16px;background-position:0 0,8px 8px}
 .sliders{display:grid;gap:12px}
+.sliders[hidden],#se-view[hidden],#se-cropper[hidden]{display:none}
+.cropstage{position:relative;width:fit-content;max-width:100%;margin:0 auto;overflow:hidden;border-radius:10px;user-select:none;-webkit-user-select:none;background:#fff;background-image:linear-gradient(45deg,#eef1f5 25%,transparent 25%,transparent 75%,#eef1f5 75%),linear-gradient(45deg,#eef1f5 25%,transparent 25%,transparent 75%,#eef1f5 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.cropstage img{display:block;max-width:100%;max-height:300px;pointer-events:none}
+.cropbox{position:absolute;border:2px solid #fff;outline:1px solid var(--brand);box-shadow:0 0 0 9999px rgba(10,15,20,.5);cursor:move;touch-action:none}
+.cropbox i{position:absolute;width:18px;height:18px;background:#fff;border:2px solid var(--brand);border-radius:4px}
+.cropbox i[data-h=nw]{left:-10px;top:-10px;cursor:nwse-resize} .cropbox i[data-h=ne]{right:-10px;top:-10px;cursor:nesw-resize}
+.cropbox i[data-h=sw]{left:-10px;bottom:-10px;cursor:nesw-resize} .cropbox i[data-h=se]{right:-10px;bottom:-10px;cursor:nwse-resize}
 .sliders label{display:flex;justify-content:space-between;font-size:14px;font-weight:600;color:var(--muted)}
 .sliders input[type=range]{width:100%;accent-color:var(--brand)}
 .sliders .chk{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);justify-content:flex-start;cursor:pointer}
@@ -749,6 +756,7 @@ const ICONS = {
   calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
   check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   hourglass:'<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22"/><path d="M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>',
+  crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   monitor:'<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
@@ -1698,13 +1706,15 @@ function productBox(p){
 
 /* ---------- signature image ---------- */
 // Shrinks the image, makes a white paper background transparent (uploads) and trims empty edges.
-function cleanSignature(url, knockWhite, cut = 200){
+function cleanSignature(url, knockWhite, cut = 200, crop = null){
   return new Promise(res => {
     const im = new Image();
     im.onload = () => {
-      const sc = Math.min(1, 900 / im.naturalWidth, 400 / im.naturalHeight);
-      const w = Math.max(1, Math.round(im.naturalWidth * sc)), h = Math.max(1, Math.round(im.naturalHeight * sc));
-      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(im, 0, 0, w, h);
+      const k = crop || {x:0, y:0, w:1, h:1};   // crop box as fractions of the image
+      const sx = k.x * im.naturalWidth, sy = k.y * im.naturalHeight, sw = Math.max(1, k.w * im.naturalWidth), sh = Math.max(1, k.h * im.naturalHeight);
+      const sc = Math.min(1, 900 / sw, 400 / sh);
+      const w = Math.max(1, Math.round(sw * sc)), h = Math.max(1, Math.round(sh * sc));
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(im, sx, sy, sw, sh, 0, 0, w, h);
       const px = x.getImageData(0, 0, w, h), a = px.data;
       let x0 = w, y0 = h, x1 = -1, y1 = -1;
       for (let i = 0; i < a.length; i += 4){
@@ -1723,11 +1733,17 @@ function cleanSignature(url, knockWhite, cut = 200){
 }
 // Adjust a signature before using it: remove the paper background and choose the printed size.
 function signatureEditor(srcUrl, opts, done){
-  const o = {bg: opts.bg !== false, strength: opts.strength ?? 45, size: Math.round(signScale({signScale: opts.size}) * 100)};
+  const o = {bg: opts.bg !== false, strength: opts.strength ?? 45, size: Math.round(signScale({signScale: opts.size}) * 100), crop:{x:0, y:0, w:1, h:1}};
   let out = null, busy = 0;
   const w = modal('Adjust signature', `<div class="sigedit">
-      <div class="sigdoc" id="se-doc"><b>Delivered by:</b><div class="ln"><span>Sign:</span><span id="se-line"></span></div></div>
-      <div class="sliders">
+      <div id="se-view"><div class="sigdoc" id="se-doc"><b>Delivered by:</b><div class="ln"><span>Sign:</span><span id="se-line"></span></div></div>
+        <div class="row" style="margin-top:10px"><button type="button" class="btn sm" id="se-crop">${icon('crop',16)}Crop</button><span class="dim" id="se-cropinfo"></span></div></div>
+      <div id="se-cropper" hidden>
+        <div class="cropstage" id="se-stage"><img id="se-cimg" src="${srcUrl}" alt="" draggable="false"><div class="cropbox" id="se-box"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div></div>
+        <div class="row" style="justify-content:space-between;margin-top:10px"><span class="dim">Drag the box, or its corners, around the signature.</span>
+          <span class="row"><button type="button" class="btn sm" id="se-creset">Reset</button><button type="button" class="btn sm primary" id="se-cdone">Apply crop</button></span></div>
+      </div>
+      <div class="sliders" id="se-sliders">
         <label class="chk"><input type="checkbox" id="se-bg" ${o.bg ? 'checked' : ''}>Remove background</label>
         <div><label for="se-st"><span>Background removal strength</span><span id="se-stv"></span></label><input type="range" id="se-st" min="0" max="100" value="${o.strength}"></div>
         <div><label for="se-sz"><span>Size on the document</span><span id="se-szv"></span></label><input type="range" id="se-sz" min="50" max="150" step="5" value="${o.size}"></div>
@@ -1742,7 +1758,37 @@ function signatureEditor(srcUrl, opts, done){
     st.disabled = !o.bg; w.querySelector('#se-doc').classList.toggle('check', o.bg);
     w.querySelector('#se-line').innerHTML = out ? `<img src="${out}" alt="Signature preview" style="max-height:${Math.round(90 * o.size / 100)}px">` : '<span class="dim" style="position:absolute;left:0;right:0;bottom:30px;text-align:center">Nothing left to show</span>';
   };
-  const run = async () => { const n = ++busy; const r = await cleanSignature(srcUrl, o.bg, cut()); if (n === busy){ out = r; paint(); } };
+  const run = async () => { const n = ++busy; const r = await cleanSignature(srcUrl, o.bg, cut(), o.crop); if (n === busy){ out = r; paint(); } };
+  // crop box: move by dragging inside it, resize by dragging a corner
+  const stage = w.querySelector('#se-stage'), box = w.querySelector('#se-box'), okBtn = w.querySelector('[data-ok]');
+  let cr = {...o.crop}, drag = null;
+  const drawBox = () => Object.assign(box.style, {left: cr.x * 100 + '%', top: cr.y * 100 + '%', width: cr.w * 100 + '%', height: cr.h * 100 + '%'});
+  const cropMode = on => {
+    w.querySelector('#se-cropper').hidden = !on; w.querySelector('#se-view').hidden = on; w.querySelector('#se-sliders').hidden = on; okBtn.style.display = on ? 'none' : '';
+    if (on){ cr = {...o.crop}; drawBox(); }
+  };
+  const cropInfo = () => { const full = o.crop.w > 0.999 && o.crop.h > 0.999; w.querySelector('#se-cropinfo').textContent = full ? '' : 'Cropped'; };
+  box.addEventListener('pointerdown', e => {
+    e.preventDefault(); box.setPointerCapture(e.pointerId);
+    drag = {h: e.target.dataset.h || 'move', px: e.clientX, py: e.clientY, c: {...cr}};
+  });
+  box.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const r = stage.getBoundingClientRect(), dx = (e.clientX - drag.px) / r.width, dy = (e.clientY - drag.py) / r.height, c = drag.c, MIN = 0.06;
+    const cl = (v, a, b) => Math.min(b, Math.max(a, v));
+    if (drag.h === 'move'){ cr.x = cl(c.x + dx, 0, 1 - c.w); cr.y = cl(c.y + dy, 0, 1 - c.h); }
+    else {
+      if (drag.h.includes('w')){ cr.x = cl(c.x + dx, 0, c.x + c.w - MIN); cr.w = c.x + c.w - cr.x; }
+      if (drag.h.includes('e')){ cr.w = cl(c.w + dx, MIN, 1 - c.x); }
+      if (drag.h.includes('n')){ cr.y = cl(c.y + dy, 0, c.y + c.h - MIN); cr.h = c.y + c.h - cr.y; }
+      if (drag.h.includes('s')){ cr.h = cl(c.h + dy, MIN, 1 - c.y); }
+    }
+    drawBox();
+  });
+  const end = () => { drag = null; }; box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+  w.querySelector('#se-crop').addEventListener('click', () => cropMode(true));
+  w.querySelector('#se-creset').addEventListener('click', () => { cr = {x:0, y:0, w:1, h:1}; drawBox(); });
+  w.querySelector('#se-cdone').addEventListener('click', () => { o.crop = {...cr}; cropMode(false); cropInfo(); run(); });
   bg.addEventListener('change', () => { o.bg = bg.checked; run(); });
   st.addEventListener('input', () => { o.strength = +st.value; run(); });
   sz.addEventListener('input', () => { o.size = +sz.value; paint(); });
