@@ -363,6 +363,20 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+body[data-role=viewer] [data-need=edit],body:not([data-role=owner]) [data-need=owner]{display:none!important}
+body[data-role=viewer] .stbtn{cursor:default} body[data-role=viewer] .stbtn svg{display:none}
+.rolechip{display:inline-block;margin:4px 0 2px;padding:1px 9px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-size:12px;font-weight:700}
+.team{list-style:none;margin:0;padding:0}
+.team li{display:flex;align-items:center;gap:10px;padding:10px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.team li:first-child{border-top:0}
+.team .who{flex:1;min-width:180px;overflow-wrap:anywhere}
+.team .who small{display:block;color:var(--muted);font-size:12.5px}
+.team select,#tm-r{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.rules{display:grid;gap:10px;padding:14px 18px;border-top:1px solid var(--line)}
+.rules ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.rules>*{min-width:0}
+.rules textarea{box-sizing:border-box;max-width:100%;width:100%;height:170px;font:12px/1.45 ui-monospace,Consolas,monospace;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);resize:vertical}
+.warnbox{margin:14px 18px 0;padding:12px 14px;border-radius:12px;background:var(--warn-soft);color:var(--ink);font-size:14px}
 /* phones: customers and products as compact cards */
 @media (max-width:640px){
   table.list.custs thead,table.list.prods thead{display:none}
@@ -702,7 +716,7 @@ function statusOf(d){
 const badge = st => { const [l,t] = STATUS[st] || [st,'neutral']; return `<span class="badge b-${t}">${esc(l)}</span>`; };
 
 /* ---------- store ---------- */
-const S = { docs:{}, customers:{}, settings:{...DEFAULTS}, ready:false, mode:'loading' };
+const S = { docs:{}, customers:{}, settings:{...DEFAULTS}, ready:false, mode:'loading', role:null };
 let db = null, downloads = null;
 const LSKEY = 'evershine-portal-v1';
 
@@ -756,14 +770,41 @@ function subscribe(){
   }, fail('s'));
 }
 
+/* ---------- team roles ----------
+   owner: everything · staff: create and edit documents, customers, payments · viewer: look and download only.
+   The Firestore rules (FIRESTORE_RULES below) enforce the same limits on the server. */
+const OWNER_EMAIL = 'mhmd.ihsn80@gmail.com';
+const ROLES = {owner:['Owner','Everything, including Settings, Team, Products and voiding'], staff:['Staff','Create and edit quotations, invoices, delivery notes and customers; record payments'], viewer:['Viewer','See, print, download and share documents only']};
+const canEdit = () => S.role === 'owner' || S.role === 'staff';
+const isOwnerRole = () => S.role === 'owner';
+function applyRole(){ document.body.dataset.role = S.role || 'none'; }
+async function resolveRole(email){
+  const e = String(email || '').trim().toLowerCase();
+  if (e === OWNER_EMAIL) return 'owner';
+  try {
+    const snap = await db.doc('team/' + e).get();
+    if (snap.exists){ const r = (snap.data() || {}).role; return ROLES[r] ? r : 'viewer'; }
+    return null;
+  } catch(err){
+    // the old rules don't allow reading the team list yet: keep the access this account had before
+    if (err && err.code === 'invalid_argument'){ S.legacyRules = true; return 'owner'; }
+    return 'viewer';
+  }
+}
 async function boot(){
   renderSide();
   if (window.FIREBASE_CONFIG){
     const slow = setTimeout(() => { if (!db) $('#main').innerHTML = '<div class="loading">Still connecting to the database… Check your internet connection. If this page was just set up, check the Firebase config in index.html.</div>'; }, 15000);
     const fb = await window.__fbReady; clearTimeout(slow);
     db = fb.db; S.mode = 'cloud'; S.user = fb.email; window.__signOut = fb.signOut;
+    S.role = await resolveRole(fb.email); applyRole();
+    if (!S.role){
+      try { sessionStorage.setItem('ev-login-msg', `${fb.email} isn't on the team yet. Ask the owner to add this email under Settings → Team.`); } catch(e){}
+      fb.signOut(); return;
+    }
     subscribe(); return;
   }
+  S.role = 'owner'; applyRole();   // no sign-in outside Firebase: this browser has full access
   const c = window.claude;
   let got = null;
   if (c && typeof c.use === 'function'){ try { got = await c.use('db'); } catch(e){} }
@@ -821,6 +862,7 @@ function render(force, keepScroll){
   if (r.a === 'dashboard') viewDashboard(main);
   else if (ROUTE_TYPE[r.a]) viewList(main, ROUTE_TYPE[r.a]);
   else if (r.a === 'doc' && S.docs[r.b]) viewDoc(main, S.docs[r.b]);
+  else if ((['new','edit','convert'].includes(r.a) && !canEdit()) || ((r.a === 'settings') && !isOwnerRole())) main.innerHTML = `<div class="empty">Your role (${esc((ROLES[S.role]||['No access'])[0])}) can't open this page. Ask the owner if you need access. <a href="#/dashboard">Go to the overview</a></div>`;
   else if (r.a === 'new' && TYPES[r.b]) viewEditor(main, newDraft(r.b, r.c), false);
   else if (r.a === 'edit' && S.docs[r.b]) viewEditor(main, clone(S.docs[r.b]), true);
   else if (r.a === 'convert' && S.docs[r.b] && TYPES[r.c]) viewEditor(main, convertDraft(S.docs[r.b], r.c), false);
@@ -896,7 +938,7 @@ function renderSide(){
       ${link('delivery','truck','Delivery', pend)}
       ${link('customers','users','Customers',0,false,'Clients')}
       ${link('products','box','Products',0,false,'Items')}
-      ${link('settings','gear','Settings')}
+      ${isOwnerRole() ? link('settings','gear','Settings') : ''}
     </nav>`;
   if ($('#side').innerHTML !== side) $('#side').innerHTML = side;
   const who = S.user || '';
@@ -904,14 +946,14 @@ function renderSide(){
   const top = `
     <a class="brand" href="#/dashboard"><span class="tile"><img src="${LOGO}" alt="Evershine Construction"></span><span><b>${esc(S.settings.name || 'Evershine')}</b><small>Document portal</small></span></a>
     <div class="tools">
-      <details class="menu"><summary class="ibtn primary" title="Create" aria-label="Create a document">${icon('plus',22)}</summary>
+      <details class="menu" data-need="edit"><summary class="ibtn primary" title="Create" aria-label="Create a document">${icon('plus',22)}</summary>
         <div class="pop"><a href="#/new/quotation">${icon('file')}New quotation</a><a href="#/new/invoice">${icon('receipt')}New invoice</a><a href="#/new/delivery">${icon('truck')}New delivery note</a></div></details>
       <button type="button" class="ibtn" data-theme-set="toggle" title="${themeNow() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}" aria-label="${themeNow() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}">${icon(themeNow() === 'dark' ? 'sun' : 'moon', 20)}</button>
       <a class="ibtn bell" href="#/dashboard" title="${overdue ? overdue + ' overdue invoice' + (overdue===1?'':'s') : 'Nothing overdue'}" aria-label="Needs attention">${icon('bell',21)}${overdue ? '<span class="dot"></span>' : ''}</a>
       <details class="menu acct"><summary class="avatar" title="Account" aria-label="Account">${esc((who || S.settings.name || 'E').trim().charAt(0).toUpperCase())}</summary>
-        <div class="pop"><div class="who">${who ? `<b>${esc(who)}</b>` : `<b>${esc(S.settings.name || 'Evershine')}</b>`}<i class="${S.mode}"></i>${modeText}</div>
+        <div class="pop"><div class="who">${who ? `<b>${esc(who)}</b>` : `<b>${esc(S.settings.name || 'Evershine')}</b>`}${S.role && S.mode === 'cloud' ? `<span class="rolechip">${esc(ROLES[S.role][0])}</span><br>` : ''}<i class="${S.mode}"></i>${modeText}</div>
           <div class="thm"><span>Theme</span><div class="seg" role="radiogroup" aria-label="Theme">${[['light','sun','Light'],['dark','moon','Dark'],['auto','monitor','Auto']].map(([k,ic,l]) => `<button type="button" role="radio" aria-checked="${themePref()===k}" class="${themePref()===k?'on':''}" data-theme-set="${k}" title="${k==='auto' ? 'Follow this device' : l + ' theme'}">${icon(ic,15)}${l}</button>`).join('')}</div></div>
-          <a href="#/settings">${icon('gear')}Settings</a>${who ? `<button type="button" id="signout">${icon('out')}Sign out</button>` : ''}</div></details>
+          ${isOwnerRole() ? `<a href="#/settings">${icon('gear')}Settings</a>` : ''}${who ? `<button type="button" id="signout">${icon('out')}Sign out</button>` : ''}</div></details>
     </div>`;
   const t = $('#top');
   if (t.dataset.v !== top){ t.dataset.v = top; t.innerHTML = top; }
@@ -939,7 +981,7 @@ function viewDashboard(main){
   const hello = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
   main.innerHTML = `
     <div class="pagehead"><div><h1>Overview</h1><p>${esc(hello)}</p></div>
-      <div class="row"><a class="btn" href="#/new/quotation">New quotation</a><a class="btn" href="#/new/delivery">New delivery note</a><a class="btn primary" href="#/new/invoice">New invoice</a></div></div>
+      <div class="row" data-need="edit"><a class="btn" href="#/new/quotation">New quotation</a><a class="btn" href="#/new/delivery">New delivery note</a><a class="btn primary" href="#/new/invoice">New invoice</a></div></div>
     <div class="board">
       ${stat('wallet', money0(open.reduce((s,d)=>s+balance(d),0)), 'MVR', 'Awaiting payment', `${open.length} invoice${open.length===1?'':'s'}`)}
       ${stat('clock', money0(over.reduce((s,d)=>s+balance(d),0)), 'MVR', 'Overdue', `${over.length} invoice${over.length===1?'':'s'}`, over.length ? 'bad' : '')}
@@ -994,7 +1036,7 @@ function viewList(main, type){
   const T = TYPES[type], st = listState[type];
   main.innerHTML = `
     <div class="pagehead"><div><h1>${T.plural}</h1><p id="lsum"></p></div>
-      <div class="row"><button class="btn" id="csv">Export CSV</button><a class="btn primary" href="#/new/${type}">${icon('plus',18)}New ${T.label.toLowerCase()}</a></div></div>
+      <div class="row"><button class="btn" id="csv">Export CSV</button><a class="btn primary" data-need="edit" href="#/new/${type}">${icon('plus',18)}New ${T.label.toLowerCase()}</a></div></div>
     <div class="stats">${listStats(type)}</div>
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="q" type="search" placeholder="Search number, customer, project, PO, item or island" value="${esc(st.q)}" aria-label="Search"></label>${type !== 'delivery' ? `<select id="kf" aria-label="Type"><option value="all">All types</option><option value="goods" ${st.k==='goods'?'selected':''}>Goods &amp; materials</option><option value="hire" ${st.k==='hire'?'selected':''}>Boat hire</option></select>` : ''}
@@ -1049,26 +1091,27 @@ document.addEventListener('change', e => {
 
 /* ---------- quick status change from the lists ---------- */
 function statusMenu(btn){
+  if (!canEdit()) return;
   const old = document.querySelector('.stmenu'); if (old){ const same = old.dataset.for === btn.dataset.stm; old._close(); if (same) return; }
   const d = S.docs[btn.dataset.stm]; if (!d) return;
   const st = statusOf(d), items = [];
   const it = (act, label, on, tone) => items.push(`<button type="button" role="menuitem" data-sa="${act}" class="${on ? 'on' : ''}" ${on ? 'aria-current="true"' : ''}><i class="b-${tone}"></i>${label}${on ? '<span class="ck">✓</span>' : ''}</button>`);
   if (st === 'void'){
     items.push(`<div class="note">Voided${d.voided?.date ? ' on ' + fmtDate(d.voided.date) : ''}${d.voided?.reason ? ': ' + esc(d.voided.reason) : ''}. It stays on record but doesn't count in totals.</div>`);
-    it('unvoid', 'Restore', false, 'brand');
+    if (isOwnerRole()) it('unvoid', 'Restore', false, 'brand');
   } else if (d.type === 'quotation'){
     it('draft', 'Draft', d.status === 'draft' || !d.status, 'neutral'); it('sent', 'Sent', d.status === 'sent', 'brand');
     it('accepted', 'Accepted', st === 'accepted', 'ok'); it('rejected', 'Rejected', st === 'rejected', 'bad');
     if (st === 'expired') items.push('<div class="note">Past its valid-until date, so it shows as Expired until accepted or rejected.</div>');
-    it('void', 'Void…', false, 'neutral');
+    if (isOwnerRole()) it('void', 'Void…', false, 'neutral');
   } else if (d.type === 'invoice'){
     if (st !== 'paid'){ it('paidFull', `Mark as paid (MVR ${money(balance(d))})`, false, 'ok'); it('pay', 'Record a payment…', false, 'warn'); }
     else items.push(`<div class="note">Paid in full. Remove payments on the invoice page to reopen it.</div>`);
-    it('void', 'Void…', false, 'neutral');
+    if (isOwnerRole()) it('void', 'Void…', false, 'neutral');
   } else {
     it('deliver', st === 'delivered' ? 'Delivered – edit details…' : 'Mark as delivered…', st === 'delivered', 'ok');
     it('undeliver', 'To deliver', st === 'pending', 'warn');
-    it('void', 'Void…', false, 'neutral');
+    if (isOwnerRole()) it('void', 'Void…', false, 'neutral');
   }
   const m = document.createElement('div'); m.className = 'stmenu'; m.setAttribute('role', 'menu'); m.dataset.for = d.id;
   m.innerHTML = `<div class="hd">${esc(d.number)}</div>${items.join('')}`;
@@ -1106,7 +1149,7 @@ function previewDoc(id, ids){
     <div class="pvhead"><div class="pvtitle"></div>
       <div class="row pvnav"><button type="button" class="ibtn" data-step="-1" title="Previous (←)" aria-label="Previous document">‹</button><span class="dim pvcount"></span><button type="button" class="ibtn" data-step="1" title="Next (→)" aria-label="Next document">›</button><button type="button" class="ibtn" data-close title="Close (Esc)" aria-label="Close">×</button></div></div>
     <div class="pvbody"><div class="sheet-fit"></div></div>
-    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit>Edit</a><button type="button" class="btn tg" data-tg>${icon('send',17)}Telegram</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
+    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit data-need="edit">Edit</a><button type="button" class="btn tg" data-tg>${icon('send',17)}Telegram</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
   document.body.appendChild(w);
   const show = () => {
     const d = S.docs[ids[i]]; if (!d) return close();
@@ -1392,7 +1435,7 @@ function viewDoc(main, d){
   const A = (id, label, cls='') => `<button class="btn ${cls}" data-act="${id}">${label}</button>`;
   let acts = '';
   if (st === 'void'){
-    acts += A('unvoid','Restore ' + T.label.toLowerCase(),'primary');
+    if (isOwnerRole()) acts += A('unvoid','Restore ' + T.label.toLowerCase(),'primary');
   } else if (d.type === 'quotation'){
     acts += A('toInvoice','Convert to invoice','primary') + A('toDN','Create delivery note');
     if (st !== 'sent' && st !== 'accepted') acts += A('sent','Mark as sent');
@@ -1408,14 +1451,14 @@ function viewDoc(main, d){
   }
   main.innerHTML = `
     <div class="pagehead"><div><div class="row"><span class="tag">${T.label}${kindOf(d) ? ' · ' + KINDS[kindOf(d)].short : ''}</span>${badge(st)}</div><h1 style="margin-top:6px">${esc(d.number)}</h1><p>${esc(d.customer?.name)} · ${fmtDate(d.date)}</p></div>
-      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn tg" id="tg" title="Share the PDF on Telegram">${icon('send',17)}Telegram</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
+      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" data-need="edit" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn tg" id="tg" title="Share the PDF on Telegram">${icon('send',17)}Telegram</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
     <div class="docview">
       <div class="sheet-fit">${sheetHTML(d)}</div>
       <div class="sidecol">
-        <section class="panel"><div class="facts">${facts}</div><div class="acts">${acts}</div></section>
-        ${d.type === 'invoice' ? `<section class="panel"><h2>Payments</h2>${(d.payments||[]).length ? `<ul class="plist">${d.payments.map((p,i) => `<li><span><b>${money(p.amount)}</b><br><span class="dim">${fmtDate(p.date)} · ${esc(p.method||'')}${p.ref ? ' · '+esc(p.ref) : ''}</span></span><button class="x" data-rmpay="${i}" aria-label="Remove payment" title="Remove payment">×</button></li>`).join('')}</ul>` : `<div class="empty" style="padding:16px">No payments recorded yet.</div>`}</section>` : ''}
+        <section class="panel"><div class="facts">${facts}</div><div class="acts" data-need="edit">${acts}</div></section>
+        ${d.type === 'invoice' ? `<section class="panel"><h2>Payments</h2>${(d.payments||[]).length ? `<ul class="plist">${d.payments.map((p,i) => `<li><span><b>${money(p.amount)}</b><br><span class="dim">${fmtDate(p.date)} · ${esc(p.method||'')}${p.ref ? ' · '+esc(p.ref) : ''}</span></span><button class="x" data-rmpay="${i}" data-need="edit" aria-label="Remove payment" title="Remove payment">×</button></li>`).join('')}</ul>` : `<div class="empty" style="padding:16px">No payments recorded yet.</div>`}</section>` : ''}
         ${src || kids.length ? `<section class="panel"><h2>Linked documents</h2><div class="links">${src ? `<a href="#/doc/${src.id}"><span class="dim">Created from</span><br><b>${TYPES[src.type].label} ${esc(src.number)}</b></a>` : ''}${kids.map(k => `<a href="#/doc/${k.id}"><span class="dim">${TYPES[k.type].label}</span><br><b>${esc(k.number)}</b> ${badge(statusOf(k))}</a>`).join('')}</div></section>` : ''}
-        <section class="panel"><div class="acts" style="padding-top:18px">${A('dup','Duplicate')}${st === 'void' ? '' : A('void','Void ' + T.label.toLowerCase(),'danger')}</div>${st === 'void' ? `<p class="dim" style="margin:0;padding:0 18px 16px">Voided${d.voided?.date ? ' on ' + fmtDate(d.voided.date) : ''}${d.voided?.reason ? ': ' + esc(d.voided.reason) : ''}. It stays on record and in the list, but doesn't count in any totals.</p>` : `<p class="dim" style="margin:0;padding:0 18px 16px">Documents can't be deleted. Void it instead to keep the record.</p>`}</section>
+        <section class="panel" data-need="edit"><div class="acts" style="padding-top:18px">${A('dup','Duplicate')}${st === 'void' || !isOwnerRole() ? '' : A('void','Void ' + T.label.toLowerCase(),'danger')}</div>${st === 'void' ? `<p class="dim" style="margin:0;padding:0 18px 16px">Voided${d.voided?.date ? ' on ' + fmtDate(d.voided.date) : ''}${d.voided?.reason ? ': ' + esc(d.voided.reason) : ''}. It stays on record and in the list, but doesn't count in any totals.</p>` : `<p class="dim" style="margin:0;padding:0 18px 16px">Documents can't be deleted. Void it instead to keep the record.</p>`}</section>
       </div>
     </div>`;
   $('#print').addEventListener('click', () => { try { window.print(); } catch(e){ toast('Printing isn\'t available here. Use Download PDF instead.'); } });
@@ -1432,6 +1475,7 @@ function viewDoc(main, d){
 
 async function setStatus(d, status, msg){ await put('docs', d.id, {...clone(d), status, updatedAt:new Date().toISOString()}); toast(msg); }
 function docAction(d, act){
+  if (!canEdit() || ((act === 'void' || act === 'unvoid') && !isOwnerRole())) return toast('Your role can\'t do that.');
   const T = TYPES[d.type];
   if (act === 'toInvoice') location.hash = `#/convert/${d.id}/invoice`;
   else if (act === 'toDN') location.hash = `#/convert/${d.id}/delivery`;
@@ -1870,7 +1914,7 @@ function viewCustomers(main){
   const FL = [['all','All', () => true, ''], ['owing','Owes money', c => X[c.id].due > 0.005, 'bad'], ['active','Has documents', c => X[c.id].n > 0, ''], ['none','No documents', c => X[c.id].n === 0, 'neutral']];
   main.innerHTML = `
     <div class="pagehead"><div><h1>Customers</h1><p id="csum"></p></div>
-      <div class="row"><button class="btn primary" id="addc">${icon('plus',18)}Add customer</button></div></div>
+      <div class="row"><button class="btn primary" id="addc" data-need="edit">${icon('plus',18)}Add customer</button></div></div>
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="cq" type="search" placeholder="Search name, phone, email or address" value="${esc(st.q)}" aria-label="Search customers"></label>
         <select id="csort" aria-label="Sort"><option value="name">Name A–Z</option><option value="owed">Owes most</option><option value="billed">Invoiced most</option><option value="recent">Most recent</option></select>
@@ -1898,14 +1942,16 @@ function viewCustomers(main){
 }
 function customerBox(c){
   const isNew = !c; c = c || {name:'', address:'', phone:'', email:''};
+  if (isNew && !canEdit()) return;
   const ds = isNew ? [] : Object.values(S.docs).filter(d => d.customerId === c.id).sort((a,b) => (b.date||'').localeCompare(a.date||''));
-  const w = modal(isNew ? 'Add customer' : c.name, `
+  const w = modal(isNew ? 'Add customer' : c.name, `${canEdit() ? '' : '<p class="dim" style="margin:0">View only</p>'}
     <div class="fld"><label for="c-n">Name</label><input id="c-n" value="${esc(c.name)}"></div>
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
     ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
-    ${isNew ? '' : `<div class="row"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a><button class="btn sm danger" data-delc>Delete customer</button></div>`}`,
+    ${isNew ? '' : `<div class="row" data-need="edit"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a>${isOwnerRole() ? '<button class="btn sm danger" data-delc>Delete customer</button>' : ''}</div>`}`,
     'Save customer', async w => {
+      if (!canEdit()){ toast('Your role can only view customers.'); return false; }
       const name = w.querySelector('#c-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
       const id = c.id || uid();
       await put('customers', id, {...c, name, address:w.querySelector('#c-a').value.trim(), phone:w.querySelector('#c-p').value.trim(), email:w.querySelector('#c-e').value.trim(), createdAt:c.createdAt || new Date().toISOString()});
@@ -1914,6 +1960,7 @@ function customerBox(c){
   const pvIds = ds.slice(0,12).map(d => d.id);
   const pv = e => { const b = e.target.closest('[data-pv]'); if (!b || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')) return; e.preventDefault(); e.stopPropagation(); previewDoc(b.dataset.pv, pvIds); };
   w.addEventListener('click', pv, true); w.addEventListener('keydown', pv, true);
+  if (!canEdit()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('[data-ok]').style.display = 'none'; }
   w.querySelectorAll('[data-new]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault(); w.remove(); const d = newDraft(a.dataset.new); d.customerId = c.id; d.customer = {name:c.name, address:c.address||'', phone:c.phone||''};
     history.pushState(null, '', '#/new/' + a.dataset.new); lastKey = 'new/' + a.dataset.new; renderSide(); viewEditor($('#main'), d, false); window.scrollTo(0,0);
@@ -1928,7 +1975,7 @@ function viewProducts(main){
   const list = products();
   main.innerHTML = `
     <div class="pagehead"><div><h1>Products</h1><p>${list.length} saved. Click a product in the quotation, invoice or delivery note editor to add it as a line.</p></div>
-      <div class="row"><button class="btn" id="impp">Import from past documents</button><button class="btn primary" id="addp">Add product</button></div></div>
+      <div class="row"><button class="btn" id="impp" data-need="owner">Import from past documents</button><button class="btn primary" id="addp" data-need="owner">Add product</button></div></div>
     <section class="panel">
       <div class="filters"><input id="pq2" type="search" placeholder="Search products" value="${esc(prodQ)}" aria-label="Search products"></div>
       <div class="tablewrap"><table class="list prods"><thead><tr><th>Product</th><th>Unit</th><th class="num">Rate (MVR)</th></tr></thead><tbody id="prows"></tbody></table></div>
@@ -1968,6 +2015,7 @@ function productBox(p){
     <datalist id="punits">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>
     ${isNew ? '' : '<div class="row"><button class="btn sm danger" data-delp>Delete product</button></div>'}`,
     'Save product', async w => {
+      if (!isOwnerRole()){ toast('Only the owner can change products.'); return false; }
       const name = w.querySelector('#p-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
       const all = S.settings.products || [];
       if (all.some(x => x.id !== p.id && (x.name||'').trim().toLowerCase() === name.toLowerCase())){ toast('A product with that name already exists.'); return false; }
@@ -1976,8 +2024,79 @@ function productBox(p){
       await saveProducts(isNew ? all.concat(item) : all.map(x => x.id === p.id ? item : x));
       toast('Product saved');
     });
+  if (!isOwnerRole()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('[data-ok]').style.display = 'none'; const dl = w.querySelector('[data-delp]'); if (dl) dl.remove(); }
   const dp = w.querySelector('[data-delp]');
   if (dp) dp.addEventListener('click', () => { w.remove(); confirmBox(`Delete ${p.name}?`, 'The product is removed from your list. Existing documents are not changed.', 'Delete product', async () => { await saveProducts((S.settings.products || []).filter(x => x.id !== p.id)); toast('Product deleted'); }); });
+}
+
+/* ---------- team (Settings) ---------- */
+const FIRESTORE_RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Evershine document portal: owner / staff / viewer (managed in Settings → Team)
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null
+        && (request.auth.token.email_verified == true || request.auth.token.email.lower() == '${OWNER_EMAIL}');
+    }
+    function me() { return request.auth.token.email.lower(); }
+    function onTeam() { return exists(/databases/$(database)/documents/team/$(me())); }
+    function teamRole() { return get(/databases/$(database)/documents/team/$(me())).data.role; }
+    function isOwner() { return signedIn() && (me() == '${OWNER_EMAIL}' || (onTeam() && teamRole() == 'owner')); }
+    function canRead() { return isOwner() || (signedIn() && onTeam() && teamRole() in ['staff', 'viewer']); }
+    function canWrite() { return isOwner() || (signedIn() && onTeam() && teamRole() == 'staff'); }
+    function isVoid(data) { return data.get('status', '') in ['void', 'cancelled']; }
+
+    match /team/{email} {
+      allow read: if isOwner() || (signedIn() && email == me());
+      allow write: if isOwner();
+    }
+    match /settings/{id} {
+      allow read: if canRead();
+      allow write: if isOwner();
+    }
+    match /customers/{id} {
+      allow read: if canRead();
+      allow create, update: if canWrite();
+      allow delete: if isOwner();
+    }
+    match /docs/{id} {
+      allow read: if canRead();
+      allow create: if canWrite() && !isVoid(request.resource.data);
+      allow update: if isOwner() || (canWrite() && !isVoid(resource.data) && !isVoid(request.resource.data));
+      allow delete: if false;   // documents are voided, never deleted
+    }
+  }
+}`;
+function teamPanel(){
+  const list = $('#teamlist'); if (!list) return;
+  let members = {};
+  const draw = () => {
+    const rows = Object.values(members).filter(m => m.email !== OWNER_EMAIL).sort((a,b) => (a.email||'').localeCompare(b.email||''));
+    list.innerHTML = `<li><span class="who">${esc(OWNER_EMAIL)}<small>Main owner (always has full access)</small></span><span class="rolechip">Owner</span></li>`
+      + rows.map(m => `<li><span class="who">${esc(m.email)}<small>Added ${m.addedAt ? fmtDate(m.addedAt.slice(0,10)) : ''}</small></span>
+          <select data-tm-role="${esc(m.email)}" aria-label="Role for ${esc(m.email)}">${Object.keys(ROLES).map(r => `<option value="${r}" ${m.role === r ? 'selected' : ''}>${ROLES[r][0]}</option>`).join('')}</select>
+          <button type="button" class="btn sm danger" data-tm-rm="${esc(m.email)}">Remove</button></li>`).join('')
+      + (rows.length ? '' : '<li class="dim">No one else yet. Add a Gmail address below.</li>');
+  };
+  const col = db.collection('team');
+  const unsub = col.onSnapshot(snap => { members = {}; snap.docs.forEach(x => members[x.id] = {...x.data(), email:x.id}); draw(); },
+    () => { list.innerHTML = '<li class="dim">The team list can\'t be loaded until the security rules below are published in Firebase.</li>'; });
+  window.addEventListener('hashchange', () => { if (typeof unsub === 'function') unsub(); }, {once:true});
+  const save = async (email, role) => { try { await col.doc(email).set({role, addedAt:(members[email] && members[email].addedAt) || new Date().toISOString(), addedBy:S.user || ''}); return true; } catch(e){ dbErr(e); return false; } };
+  $('#tm-add').addEventListener('click', async () => {
+    const email = $('#tm-e').value.trim().toLowerCase(), role = $('#tm-r').value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Type a full email address, e.g. name@gmail.com');
+    if (email === OWNER_EMAIL) return toast('That is the main owner, who already has full access.');
+    if (await save(email, role)){ $('#tm-e').value = ''; toast(`${email} added as ${ROLES[role][0]}`); }
+  });
+  list.addEventListener('change', async e => { const sel = e.target.closest('[data-tm-role]'); if (sel && await save(sel.dataset.tmRole, sel.value)) toast(`${sel.dataset.tmRole} is now ${ROLES[sel.value][0]}`); });
+  list.addEventListener('click', e => {
+    const b = e.target.closest('[data-tm-rm]'); if (!b) return;
+    const email = b.dataset.tmRm;
+    confirmBox(`Remove ${email}?`, 'They will no longer be able to open the portal. Documents they made stay.', 'Remove', async () => { try { await col.doc(email).delete(); toast(`${email} removed`); } catch(e){ dbErr(e); } });
+  });
+  const cp = $('#rules-copy');
+  if (cp) cp.addEventListener('click', async () => { const t = $('#rules-text'); try { await navigator.clipboard.writeText(t.value); } catch(e){ t.select(); document.execCommand('copy'); } toast('Rules copied. Paste them in Firebase → Firestore Database → Rules, then Publish.'); });
 }
 
 /* ---------- signature image ---------- */
@@ -2116,6 +2235,18 @@ function viewSettings(main){
         ${F('deliveryMessage','Delivery note confirmation',{area:true})}${F('deliveryNote','Delivery note reminder',{area:true})}
         ${F('thanks','Footer line',{span:'span4'})}
       </div><p class="dim" style="padding:0 18px 16px;margin:0">Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p></section>
+      <section class="panel" id="teampanel"><h2>Team</h2>
+        ${S.mode !== 'cloud' ? '<p class="dim" style="padding:14px 18px;margin:0">The team list works when the portal is connected to Firebase.</p>' : `
+        ${S.legacyRules ? '<div class="warnbox"><b>One step left:</b> paste the security rules below into Firebase. Until then, the team list can\'t be saved and the roles are not enforced.</div>' : ''}
+        <p class="dim" style="padding:14px 18px 0;margin:0">Add the Google (Gmail) address of each person who should use the portal. They sign in with <b>Sign in with Google</b>. Anyone not on this list can't open the portal.</p>
+        <ul class="team" id="teamlist"><li class="dim">Loading…</li></ul>
+        <div class="row" style="padding:12px 18px;border-top:1px solid var(--line)"><input id="tm-e" type="email" placeholder="name@gmail.com" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)" aria-label="Email to add"><select id="tm-r" aria-label="Role">${['staff','viewer','owner'].map(r => `<option value="${r}">${ROLES[r][0]}</option>`).join('')}</select><button type="button" class="btn primary" id="tm-add">Add person</button></div>
+        <p class="dim" style="padding:0 18px 12px;margin:0">${Object.entries(ROLES).map(([k,[l,d]]) => `<b>${l}:</b> ${d}`).join('<br>')}</p>
+        <details class="rules"><summary><b>Security rules</b> (paste into Firebase once, and again if this text changes)</summary>
+          <ol><li>Open <b>console.firebase.google.com</b> → project <b>${esc((window.FIREBASE_CONFIG||{}).projectId || '')}</b>.</li><li>Go to <b>Firestore Database → Rules</b>.</li><li>Delete everything there, paste the text below, and click <b>Publish</b>.</li></ol>
+          <textarea id="rules-text" readonly>${esc(FIRESTORE_RULES)}</textarea>
+          <div class="row"><button type="button" class="btn" id="rules-copy">Copy rules</button></div></details>`}
+      </section>
       <section class="panel"><h2>Backup &amp; move</h2><div style="padding:16px 18px;display:grid;gap:12px">
         <p class="dim" style="margin:0">Download every quotation, invoice, delivery note, customer and setting as one file. Keep it as a backup, or restore it into another copy of this portal (for example your own website).</p>
         <div class="row"><button type="button" class="btn" id="bk-exp">Download backup</button><button type="button" class="btn" id="bk-imp">Restore from backup…</button><input type="file" id="bk-file" accept=".json,application/json" hidden>
@@ -2124,6 +2255,7 @@ function viewSettings(main){
       <div class="stickybar"><button type="button" class="btn primary" id="ss">Save settings</button></div>
     </form>`;
   $('#sf').addEventListener('input', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
+  if (S.mode === 'cloud') teamPanel();
   const sigShow = () => { $('#sig-prev').innerHTML = `<img src="${s.signImage || SIGN}" alt="Signature" style="max-height:${Math.round(78 * signScale(s))}px">`; $('#sig-rm').hidden = !s.signImage; };
   sigShow();
   $('#sig-up').addEventListener('click', () => $('#sig-file').click());
@@ -2186,12 +2318,15 @@ boot();
 .login h1{margin:0;font-family:var(--ui);font-weight:800;font-size:22px;line-height:1.15}
 .login .err{color:var(--bad);font-size:14px;min-height:1em;margin:0}
 .login .lnk{background:none;border:0;color:var(--brand);cursor:pointer;padding:0;font-size:14px;justify-self:start}
+.login .gbtn{justify-content:center;gap:10px;padding:11px 16px;font-size:15px}
+.login .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.login .or::before,.login .or::after{content:"";flex:1;height:1px;background:var(--line)}
 </style>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, deleteDoc, query, limit }
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail }
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const cfg = window.FIREBASE_CONFIG;
@@ -2201,6 +2336,8 @@ const box = document.createElement('div');
 box.className = 'login'; box.hidden = true;
 box.innerHTML = `<form id="lf" novalidate>
   <div class="lg"><img src="${LOGO}" alt=""><h1>${esc(DEFAULTS.name)}<br><span class="dim" style="font-size:17px;font-weight:500">Document portal</span></h1></div>
+  <button class="btn gbtn" id="lg" type="button"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>Sign in with Google</button>
+  <div class="or"><span>or with email and password</span></div>
   <div class="fld"><label for="le">Email</label><input id="le" type="email" autocomplete="username" required></div>
   <div class="fld"><label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required></div>
   <p class="err" id="lerr" role="alert"></p>
@@ -2209,11 +2346,14 @@ box.innerHTML = `<form id="lf" novalidate>
 </form>`;
 document.body.appendChild(box);
 const $e = id => box.querySelector('#' + id);
-const showLogin = msg => { box.hidden = false; $e('lerr').textContent = msg || ''; $e('lb').disabled = false; setTimeout(() => $e('le').focus(), 50); };
+const showLogin = msg => {
+  let m = msg || ''; try { const k = sessionStorage.getItem('ev-login-msg'); if (k){ m = k; sessionStorage.removeItem('ev-login-msg'); } } catch(e){}
+  box.hidden = false; $e('lerr').textContent = m; $e('lb').disabled = false; $e('lg').disabled = false;
+};
 
 if (!configured){
   showLogin('Firebase is not set up yet. Paste your Firebase config into index.html (see the setup guide).');
-  $e('lb').disabled = true;
+  $e('lb').disabled = true; $e('lg').disabled = true;
 } else {
   const app = initializeApp(cfg);
   const fs = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
@@ -2226,10 +2366,11 @@ if (!configured){
     p.then(() => { if (!late){ clearTimeout(t); res(); } })
      .catch(e => { const m = mapErr(e); if (!late){ clearTimeout(t); rej(m); } else if (window.dbErr) window.dbErr(m); });
   });
-  const denied = () => showLogin('This account is not allowed to use the portal. Ask the owner to add your email to the Firestore rules.');
+  const denied = () => showLogin('This account is not allowed to use the portal. Ask the owner to add your email under Settings → Team.');
   const docRef = path => { const r = doc(fs, path); return {
     set: body => soft(setDoc(r, body)),
     delete: () => soft(deleteDoc(r)),
+    get: () => getDoc(r).then(s => ({ exists: s.exists(), data: () => s.data() }), e => { throw mapErr(e); }),
     onSnapshot: (next, err) => onSnapshot(r, s => next({ exists: s.exists(), data: () => s.data() }),
       e => { if (e.code === 'permission-denied') denied(); err && err(mapErr(e)); })
   }; };
@@ -2263,6 +2404,22 @@ if (!configured){
       $e('lerr').textContent = e.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes and try again.'
         : e.code === 'auth/network-request-failed' ? 'No internet connection. Check your connection and try again.'
         : 'Email or password is incorrect.';
+    }
+  });
+  const gErr = e => e.code === 'auth/unauthorized-domain' ? 'Google sign-in isn\'t allowed on this web address yet. Add it in Firebase → Authentication → Settings → Authorized domains.'
+    : e.code === 'auth/operation-not-allowed' ? 'Google sign-in is not turned on yet in Firebase → Authentication → Sign-in method.'
+    : e.code === 'auth/network-request-failed' ? 'No internet connection. Check your connection and try again.'
+    : e.code === 'auth/account-exists-with-different-credential' ? 'This email already signs in another way. Use email and password.'
+    : 'Google sign-in didn\'t finish. Try again.';
+  getRedirectResult(auth).catch(e => showLogin(gErr(e)));
+  $e('lg').addEventListener('click', async () => {
+    $e('lg').disabled = true; $e('lerr').textContent = '';
+    const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' });
+    try { await signInWithPopup(auth, provider); }
+    catch(e){
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment'){ try { await signInWithRedirect(auth, provider); return; } catch(e2){ e = e2; } }
+      $e('lg').disabled = false;
+      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') $e('lerr').textContent = gErr(e);
     }
   });
   $e('lr').addEventListener('click', async () => {
