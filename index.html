@@ -359,6 +359,7 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.primary{box-shadow:0 4px 12px rgba(47,97,153,.28)}
 .btn.primary:hover{background:var(--brand-2);border-color:var(--brand-2)}
 .btn.ghost:hover{background:var(--surface-2)}
+.btn.tg svg{color:#229ED9}
 .btn.sm{padding:6px 12px;font-size:13.5px}
 .acts .btn{border-radius:12px}
 
@@ -757,6 +758,7 @@ const ICONS = {
   check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   hourglass:'<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22"/><path d="M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>',
   crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+  send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   monitor:'<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
@@ -1204,7 +1206,7 @@ function viewDoc(main, d){
   }
   main.innerHTML = `
     <div class="pagehead"><div><div class="row"><span class="tag">${T.label}${kindOf(d) ? ' · ' + KINDS[kindOf(d)].short : ''}</span>${badge(st)}</div><h1 style="margin-top:6px">${esc(d.number)}</h1><p>${esc(d.customer?.name)} · ${fmtDate(d.date)}</p></div>
-      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
+      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn tg" id="tg" title="Share the PDF on Telegram">${icon('send',17)}Telegram</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
     <div class="docview">
       <div class="sheet-fit">${sheetHTML(d)}</div>
       <div class="sidecol">
@@ -1216,6 +1218,7 @@ function viewDoc(main, d){
     </div>`;
   $('#print').addEventListener('click', () => { try { window.print(); } catch(e){ toast('Printing isn\'t available here. Use Download PDF instead.'); } });
   $('#pdf').addEventListener('click', e => makePDF(d, e.currentTarget));
+  $('#tg').addEventListener('click', e => shareTelegram(d, e.currentTarget));
   main.querySelectorAll('[data-rmpay]').forEach(b => b.addEventListener('click', () => {
     const i = +b.dataset.rmpay, p = d.payments[i];
     confirmBox('Remove this payment?', `MVR ${money(p.amount)} recorded on ${fmtDate(p.date)} will be removed from ${d.number}.`, 'Remove payment', async () => {
@@ -1593,20 +1596,54 @@ function drawPDF(pdf, d){
   if (n > 1) for (let p = 1; p <= n; p++){ pdf.setPage(p); font(8.5, false, GREY); pdf.text(`${d.number} · Page ${p} of ${n}`, R, H - 6, {align:'right'}); }
 }
 
+async function buildPDF(d){
+  await loadScript(JSPDF_URL);
+  const pdf = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
+  pdf.addFileToVFS('FS-Regular.ttf', PDF_FONT_R); pdf.addFont('FS-Regular.ttf', 'FS', 'normal');
+  pdf.addFileToVFS('FS-Bold.ttf', PDF_FONT_B); pdf.addFont('FS-Bold.ttf', 'FS', 'bold');
+  pdf.setProperties({title: `${TYPES[d.type].label} ${d.number}`, subject: d.customer?.name || '', author: S.settings.name, creator: S.settings.name});
+  await footIcons(); await loadSignInfo();
+  drawPDF(pdf, d);
+  const name = `${(d.number||'document').replace(/[\/\\]+/g,'-')} ${(d.customer?.name||'').replace(/[^\w .-]+/g,'').slice(0,40)}`.trim() + '.pdf';
+  return {name, blob: pdf.output('blob')};
+}
 async function makePDF(d, btn){
-  const label = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing PDF…';
+  const label = btn.innerHTML; btn.disabled = true; btn.textContent = 'Preparing PDF…';
+  try { const f = await buildPDF(d); await saveFile(f.name, f.blob); }
+  catch(e){ console.error(e); toast('The PDF could not be created. Try Print, and choose "Save as PDF".'); }
+  btn.disabled = false; btn.innerHTML = label;
+}
+// Short message that goes with the shared PDF
+function shareText(d){
+  const T = TYPES[d.type], s = S.settings, st = statusOf(d);
+  const lines = [`${T.label} ${d.number}`, d.customer?.name ? `Customer: ${d.customer.name}` : '', `Date: ${fmtDate(d.date)}`];
+  if (d.type === 'delivery') lines.push(`Total quantity: ${qfmt(qtyTotal(d))}`);
+  else lines.push(`Total: MVR ${money(total(d))}`);
+  if (d.type === 'invoice' && st !== 'paid' && st !== 'cancelled') lines.push(`Balance due: MVR ${money(balance(d))} by ${fmtDate(addDays(d.date, d.dueDays))}`);
+  if (d.type === 'quotation') lines.push(`Valid until: ${fmtDate(addDays(d.date, d.validDays))}`);
+  lines.push('', s.name || '', [s.phone, s.email].filter(Boolean).join(' · '));
+  return lines.filter((l, i) => l !== '' || i > 0).join('\n').trim();
+}
+let shareCache = null;   // the PDF from the last tap, reused if the browser needs a second tap
+async function shareTelegram(d, btn){
+  const key = d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length;
+  const label = btn.innerHTML; btn.disabled = true;
   try {
-    await loadScript(JSPDF_URL);
-    const pdf = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
-    pdf.addFileToVFS('FS-Regular.ttf', PDF_FONT_R); pdf.addFont('FS-Regular.ttf', 'FS', 'normal');
-    pdf.addFileToVFS('FS-Bold.ttf', PDF_FONT_B); pdf.addFont('FS-Bold.ttf', 'FS', 'bold');
-    pdf.setProperties({title: `${TYPES[d.type].label} ${d.number}`, subject: d.customer?.name || '', author: S.settings.name, creator: S.settings.name});
-    await footIcons(); await loadSignInfo();
-    drawPDF(pdf, d);
-    const name = `${(d.number||'document').replace(/[\/\\]+/g,'-')} ${(d.customer?.name||'').replace(/[^\w .-]+/g,'').slice(0,40)}`.trim() + '.pdf';
-    await saveFile(name, pdf.output('blob'));
-  } catch(e){ console.error(e); toast('The PDF could not be created. Try Print, and choose "Save as PDF".'); }
-  btn.disabled = false; btn.textContent = label;
+    let f = shareCache && shareCache.key === key ? shareCache : null;
+    if (!f){ btn.textContent = 'Preparing PDF…'; f = shareCache = {key, ...(await buildPDF(d))}; }
+    const file = new File([f.blob], f.name, {type:'application/pdf'}), text = shareText(d);
+    if (navigator.canShare && navigator.canShare({files:[file]})){
+      // phones and some computers: share sheet with the PDF attached, then pick Telegram
+      try { await navigator.share({files:[file], title: f.name, text}); }
+      catch(e){ if (e && e.name === 'NotAllowedError') toast('PDF is ready. Tap Telegram again to share it.'); else if (!e || e.name !== 'AbortError') throw e; }
+    } else {
+      // computers without file sharing: save the PDF and open Telegram with the message ready
+      await saveFile(f.name, f.blob);
+      window.open('https://t.me/share/url?url=' + encodeURIComponent(text), '_blank', 'noopener');
+      toast('PDF downloaded. In Telegram, pick the chat and attach the PDF with the 📎 button.');
+    }
+  } catch(e){ console.error(e); toast('Sharing didn\'t work here. Use Download PDF and send it in Telegram.'); }
+  btn.disabled = false; btn.innerHTML = label;
 }
 
 /* ---------- customers ---------- */
