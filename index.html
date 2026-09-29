@@ -247,8 +247,15 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .signs .ln span:first-child{width:46px;color:#555;flex:none}
 .sheet .signs .ln span:last-child{flex:1;border-bottom:1px dotted #999;min-height:20px}
 .sheet .signs img{height:44px;width:auto;display:block;margin-bottom:-6px}
-.sheet .foot{margin-top:auto;padding-top:26px;text-align:center;font-size:12px;color:#444}
-.sheet .foot b{display:block;font-size:13.5px;color:#33669b;letter-spacing:.04em;margin-bottom:2px}
+.sheet .foot{margin-top:auto;padding-top:22px;text-align:center}
+.sheet .foot b{display:block;font-size:13.5px;color:#33669b;letter-spacing:.04em;margin-bottom:8px}
+.sheet .foot .bar{display:flex;height:4px;margin-bottom:10px}
+.sheet .foot .bar i{flex:1;background:#333}
+.sheet .foot .bar i+i{background:#2f7fc1}
+.sheet .foot .q{font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#333;margin-bottom:6px}
+.sheet .foot .ct{display:flex;justify-content:center;align-items:center;gap:44px;font-size:14px;font-weight:700;color:#333}
+.sheet .foot .ct span{display:inline-flex;align-items:center;gap:10px}
+.sheet .foot .ct svg{width:28px;height:28px;flex:none}
 .sheet .sum{position:relative}
 .sheet .stamp{position:absolute;width:128px;right:24px;top:70px;opacity:.9;transform:rotate(-12deg);pointer-events:none}
 .sheet .void{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:700 110px/1 var(--serif);color:rgba(178,55,44,.14);transform:rotate(-24deg);letter-spacing:.08em}
@@ -1242,6 +1249,24 @@ function deliverBox(d){
 }
 
 /* ---------- printed sheet ---------- */
+const FOOT_BLUE = '#2f7fc1';
+const footIcon = inner => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="${FOOT_BLUE}"/><g transform="translate(7 7) scale(.75)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</g></svg>`;
+const FOOT_SVG = {
+  mail: footIcon('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'),
+  phone: footIcon('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>')
+};
+let FOOT_PNG = null;   // same icons as PNG for the PDF
+async function footIcons(){
+  if (FOOT_PNG) return FOOT_PNG;
+  const toPng = svg => new Promise(res => {
+    const img = new Image();
+    img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 128; c.getContext('2d').drawImage(img, 0, 0, 128, 128); try { res(c.toDataURL('image/png')); } catch(e){ res(null); } };
+    img.onerror = () => res(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  FOOT_PNG = {mail: await toPng(FOOT_SVG.mail), phone: await toPng(FOOT_SVG.phone)};
+  return FOOT_PNG;
+}
 function sheetHTML(d){
   const s = S.settings, T = TYPES[d.type], c = d.customer || {}, isDN = d.type === 'delivery', lump = d.layout === 'lump' && !isDN;
   const st = statusOf(d);
@@ -1289,7 +1314,9 @@ function sheetHTML(d){
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>› ${esc(t)}</p>`).join('')}</div>` : ''}
        <div class="bank"><b>Bank Details</b>Bank Name: ${esc(s.bankName)}<br>Acc no.: ${esc(s.accNo)}<br>Acc Name: ${esc(s.accName)}</div>`}
-    <div class="foot"><b>${esc(s.thanks)}</b>If you have any queries regarding this ${T.label.toLowerCase()}, please contact Phone: ${esc(s.phone)}, E-mail: ${esc(s.email)}</div>
+    <div class="foot">${s.thanks ? `<b>${esc(s.thanks)}</b>` : ''}<div class="bar"><i></i><i></i></div>
+      <div class="q">If you have any queries regarding this ${T.label.toLowerCase()}, please contact</div>
+      <div class="ct">${s.email ? `<span>${FOOT_SVG.mail}${esc(s.email)}</span>` : ''}${s.phone ? `<span>${FOOT_SVG.phone}${esc(s.phone)}</span>` : ''}</div></div>
   </div>`;
 }
 function fitSheets(){
@@ -1484,10 +1511,26 @@ function drawPDF(pdf, d){
     font(9.4, false); ['Bank Name: ' + (s.bankName||''), 'Acc no.: ' + (s.accNo||''), 'Acc Name: ' + (s.accName||'')].forEach(t => { txt(t, L, y); y += lh(9.4); });
   }
 
-  // footer on the last page
-  if (y > H - 26){ pdf.addPage(); }
-  font(10, true, BLUE); txt(s.thanks, W/2, H - 17, {align:'center'});
-  font(9, false, [68,68,68]); txt(`If you have any queries regarding this ${T.label.toLowerCase()}, please contact Phone: ${s.phone}, E-mail: ${s.email}`, W/2, H - 12.4, {align:'center'});
+  // footer on the last page: thank-you line, two-colour bar, contact line with icons
+  const fTop = s.thanks ? H - 34 : H - 28;
+  if (y > fTop - 3){ pdf.addPage(); }
+  if (s.thanks){ font(10, true, BLUE); txt(s.thanks, W/2, H - 29.5, {align:'center'}); }
+  pdf.setFillColor(51,51,51); pdf.rect(L, H - 26, CW/2, 1.1, 'F');
+  pdf.setFillColor(47,127,193); pdf.rect(L + CW/2, H - 26, CW/2, 1.1, 'F');
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(11); pdf.setTextColor(51,51,51);
+  pdf.text(`If you have any queries regarding this ${T.label.toLowerCase()}, please contact`, W/2, H - 19.5, {align:'center'});
+  const IC = 7.4, GAP = 2.6, SEP = 12, cyc = H - 11.6;
+  const parts = [['mail', s.email], ['phone', s.phone]].filter(p => p[1]);
+  font(10.5, true, [51,51,51]);
+  const widths = parts.map(p => IC + GAP + tw(p[1]));
+  let fx = W/2 - (widths.reduce((a,b) => a + b, 0) + SEP * (parts.length - 1)) / 2;
+  parts.forEach(([k, v], i) => {
+    const png = FOOT_PNG && FOOT_PNG[k];
+    if (png) pdf.addImage(png, 'PNG', fx, cyc - IC/2, IC, IC, 'foot-' + k, 'NONE');
+    else { pdf.setFillColor(47,127,193); pdf.circle(fx + IC/2, cyc, IC/2, 'F'); }
+    font(10.5, true, [51,51,51]); txt(v, fx + IC + GAP, cyc + 1.3);
+    fx += widths[i] + SEP;
+  });
   const n = pdf.getNumberOfPages();
   if (n > 1) for (let p = 1; p <= n; p++){ pdf.setPage(p); font(8.5, false, GREY); pdf.text(`${d.number} · Page ${p} of ${n}`, R, H - 6, {align:'right'}); }
 }
@@ -1500,6 +1543,7 @@ async function makePDF(d, btn){
     pdf.addFileToVFS('FS-Regular.ttf', PDF_FONT_R); pdf.addFont('FS-Regular.ttf', 'FS', 'normal');
     pdf.addFileToVFS('FS-Bold.ttf', PDF_FONT_B); pdf.addFont('FS-Bold.ttf', 'FS', 'bold');
     pdf.setProperties({title: `${TYPES[d.type].label} ${d.number}`, subject: d.customer?.name || '', author: S.settings.name, creator: S.settings.name});
+    await footIcons();
     drawPDF(pdf, d);
     const name = `${(d.number||'document').replace(/[\/\\]+/g,'-')} ${(d.customer?.name||'').replace(/[^\w .-]+/g,'').slice(0,40)}`.trim() + '.pdf';
     await saveFile(name, pdf.output('blob'));
