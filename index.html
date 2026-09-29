@@ -1113,14 +1113,14 @@ function previewDoc(id, ids){
     w.querySelector('[data-open]').href = '#/doc/' + d.id; w.querySelector('[data-edit]').href = '#/edit/' + d.id;
     w.querySelector('.sheet-fit').innerHTML = sheetHTML(d); fitSheets(); w.querySelector('.pvbody').scrollTop = 0;
   };
-  const close = () => { w.remove(); document.removeEventListener('keydown', key); onData(); };
+  const close = () => { w.remove(); document.removeEventListener('keydown', key, true); onData(); };
   const step = n => { const j = i + n; if (j >= 0 && j < ids.length){ i = j; show(); } };
-  const key = e => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1); };
-  document.addEventListener('keydown', key);
+  const key = e => { if (!['Escape','ArrowLeft','ArrowRight'].includes(e.key)) return; e.stopPropagation(); if (e.key === 'Escape') close(); else step(e.key === 'ArrowLeft' ? -1 : 1); };
+  document.addEventListener('keydown', key, true);   // capture, so Esc closes only the preview
   w.addEventListener('click', e => {
     if (e.target === w || e.target.closest('[data-close]')) return close();
     const st = e.target.closest('[data-step]'); if (st) return step(+st.dataset.step);
-    if (e.target.closest('[data-open],[data-edit]')) return close();
+    if (e.target.closest('[data-open],[data-edit]')){ document.querySelectorAll('.scrim').forEach(x => x !== w && x.remove()); return close(); }
     const d = S.docs[ids[i]];
     if (e.target.closest('[data-pdf]')) makePDF(d, e.target.closest('[data-pdf]'));
     else if (e.target.closest('[data-tg]')) shareTelegram(d, e.target.closest('[data-tg]'));
@@ -1865,7 +1865,7 @@ function customerBox(c){
     <div class="fld"><label for="c-n">Name</label><input id="c-n" value="${esc(c.name)}"></div>
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
-    ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b>${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
+    ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
     ${isNew ? '' : `<div class="row"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a><button class="btn sm danger" data-delc>Delete customer</button></div>`}`,
     'Save customer', async w => {
       const name = w.querySelector('#c-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
@@ -1873,6 +1873,9 @@ function customerBox(c){
       await put('customers', id, {...c, name, address:w.querySelector('#c-a').value.trim(), phone:w.querySelector('#c-p').value.trim(), email:w.querySelector('#c-e').value.trim(), createdAt:c.createdAt || new Date().toISOString()});
       toast('Customer saved');
     });
+  const pvIds = ds.slice(0,12).map(d => d.id);
+  const pv = e => { const b = e.target.closest('[data-pv]'); if (!b || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')) return; e.preventDefault(); e.stopPropagation(); previewDoc(b.dataset.pv, pvIds); };
+  w.addEventListener('click', pv, true); w.addEventListener('keydown', pv, true);
   w.querySelectorAll('[data-new]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault(); w.remove(); const d = newDraft(a.dataset.new); d.customerId = c.id; d.customer = {name:c.name, address:c.address||'', phone:c.phone||''};
     history.pushState(null, '', '#/new/' + a.dataset.new); lastKey = 'new/' + a.dataset.new; renderSide(); viewEditor($('#main'), d, false); window.scrollTo(0,0);
