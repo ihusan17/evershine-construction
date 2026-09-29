@@ -363,6 +363,10 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+.dpick{display:flex;gap:8px}
+.dpick select{flex:1;min-width:0}
+.dpick input{width:92px;flex:none}
+.dpick input[hidden]{display:none}
 .pvlink{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:zoom-in;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:color .15s,text-decoration-color .15s}
 .pvlink:hover,.pvlink:focus-visible{color:var(--brand);text-decoration-color:currentColor}
 .pvscrim{place-items:stretch center;padding:24px 16px}
@@ -991,6 +995,20 @@ function viewList(main, type){
   });
 }
 
+/* ---------- days picker: quick choices plus custom ---------- */
+const DAY_CHOICES = [1, 5, 10, 15, 20, 25, 30];
+function daysPick(id, attr, val){
+  const v = num(val), preset = String(val ?? '') !== '' && DAY_CHOICES.includes(v);
+  return `<div class="dpick"><select id="${id}-s" data-dp="${id}">${DAY_CHOICES.map(n => `<option value="${n}" ${preset && n === v ? 'selected' : ''}>${n} day${n === 1 ? '' : 's'}</option>`).join('')}<option value="custom" ${preset ? '' : 'selected'}>Custom…</option></select>`
+    + `<input id="${id}" type="number" min="0" step="1" inputmode="numeric" ${attr} value="${esc(val)}" placeholder="Days" aria-label="Number of days" ${preset ? 'hidden' : ''}></div>`;
+}
+document.addEventListener('change', e => {
+  const sel = e.target.closest && e.target.closest('select[data-dp]'); if (!sel) return;
+  const inp = document.getElementById(sel.dataset.dp); if (!inp) return;
+  if (sel.value === 'custom'){ inp.hidden = false; inp.focus(); inp.select(); return; }
+  inp.hidden = true; inp.value = sel.value; inp.dispatchEvent(new Event('input', {bubbles:true}));
+});
+
 /* ---------- quick preview ---------- */
 function previewDoc(id, ids){
   ids = ids && ids.length ? ids : [id];
@@ -1073,8 +1091,8 @@ function viewEditor(main, d, isEdit){
         <div class="fgrid">
           <div class="fld"><label for="f-number">${T.numLabel}</label><input id="f-number" data-f="number" value="${esc(d.number)}" required></div>
           <div class="fld"><label for="f-date">${T.dateLabel.replace(':','')}</label><input id="f-date" type="date" data-f="date" value="${esc(d.date)}" required></div>
-          ${d.type==='quotation' ? `<div class="fld"><label for="f-valid">Valid for (days)</label><input id="f-valid" type="number" min="0" data-f="validDays" value="${esc(d.validDays)}"><span class="hint" id="h-valid"></span></div>` : ''}
-          ${d.type==='invoice' ? `<div class="fld"><label for="f-due">Payment due in (days)</label><input id="f-due" type="number" min="0" data-f="dueDays" value="${esc(d.dueDays)}"><span class="hint" id="h-due"></span></div>` : ''}
+          ${d.type==='quotation' ? `<div class="fld"><label for="f-valid-s">Valid for</label>${daysPick('f-valid', 'data-f="validDays"', d.validDays)}<span class="hint" id="h-valid"></span></div>` : ''}
+          ${d.type==='invoice' ? `<div class="fld"><label for="f-due-s">Payment due in</label>${daysPick('f-due', 'data-f="dueDays"', d.dueDays)}<span class="hint" id="h-due"></span></div>` : ''}
           <div class="fld"><label for="f-po">P.O number</label><input id="f-po" data-f="po" value="${esc(d.po)}" placeholder="Optional"></div>
           ${!isDN ? `<div class="fld span4"><label for="f-project">Project</label><input id="f-project" data-f="project" value="${esc(d.project)}" placeholder="Optional, e.g. VESSEL HIRE (REHENDHI)"></div>` : ''}
         </div>
@@ -1956,7 +1974,8 @@ function viewSettings(main){
       <section class="panel"><h2>Numbering &amp; timing</h2><div class="fgrid">
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
         ${F('prefix','Number prefix',{hint:'Numbers look like ' + esc((s.prefix||'ESC')) + '/INV/' + todayISO().slice(2,4) + '/21'})}
-        ${F('quoteValidDays','Quotes valid for (days)',{type:'number'})}${F('invoiceDueDays','Invoices due in (days)',{type:'number'})}
+        <div class="fld"><label for="s-quoteValidDays-s">Quotes valid for</label>${daysPick('s-quoteValidDays', 'data-s="quoteValidDays"', s.quoteValidDays)}</div>
+        <div class="fld"><label for="s-invoiceDueDays-s">Invoices due in</label>${daysPick('s-invoiceDueDays', 'data-s="invoiceDueDays"', s.invoiceDueDays)}</div>
       </div></section>
       <section class="panel"><h2>Signature</h2><div class="fgrid two">
         <div class="fld"><span class="lbl2">Your signature</span><div class="sigbox" id="sig-prev"></div>
