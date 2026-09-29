@@ -243,10 +243,12 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .msg p{margin:0 0 8px}
 .sheet .signs{display:flex;justify-content:space-between;gap:40px;margin-top:30px;font-size:13px}
 .sheet .signs>div{flex:1;max-width:280px}
-.sheet .signs .ln{display:flex;gap:8px;margin-top:6px;min-height:22px;align-items:flex-end}
-.sheet .signs .ln span:first-child{width:46px;color:#555;flex:none}
-.sheet .signs .ln span:last-child{flex:1;border-bottom:1px dotted #999;min-height:20px}
-.sheet .signs img{height:44px;width:auto;display:block;margin-bottom:-6px}
+.sheet .signs .ln{display:flex;gap:8px;margin-top:8px;min-height:22px;align-items:flex-end}
+.sheet .signs .ln>span:first-child{width:46px;color:#555;flex:none}
+.sheet .signs .ln>span:last-child{flex:1;border-bottom:1px dotted #999;min-height:20px;padding-left:4px}
+.sheet .signs .ln.sg{height:78px;margin-top:0}
+.sheet .signs .ln.sg>span:last-child{position:relative;height:100%}
+.sheet .signs .ln.sg img{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);max-height:60px;max-width:92%;width:auto;height:auto}
 .sheet .foot{margin-top:auto;padding-top:22px;text-align:center}
 .sheet .foot b{display:block;font-size:13.5px;color:#33669b;letter-spacing:.04em;margin-bottom:8px}
 .sheet .foot .bar{display:flex;height:4px;margin-bottom:10px}
@@ -407,6 +409,9 @@ table.items th{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
 .kindpick button{border-radius:18px;padding:16px 18px}
 .kindpick button.on{padding:15px 17px}
 .pbtn{border-radius:14px}
+.lbl2{font-size:14px;font-weight:600;color:var(--muted)}
+.sigbox{height:120px;border:1px dashed var(--line);border-radius:14px;background:#fff;display:grid;place-items:center;padding:10px;margin-bottom:6px}
+.sigbox img{max-height:100%;max-width:100%}
 .totals .gt{font-family:var(--ui);font-weight:800;color:var(--brand)}
 .stickybar{background:linear-gradient(to top,var(--surface) 70%,transparent)}
 .facts .big{font-family:var(--ui);font-weight:800;color:var(--brand)}
@@ -916,7 +921,8 @@ function newDraft(type, kind){
     terms: type==='quotation' ? s.quoteTerms : type==='invoice' ? s.invoiceTerms : '',
     message: type==='delivery' ? s.deliveryMessage : '',
     status: type==='quotation' ? 'draft' : type==='delivery' ? 'pending' : 'issued',
-    payments:[], validDays:num(s.quoteValidDays)||20, dueDays:num(s.invoiceDueDays)||20, sourceId:null, createdAt:new Date().toISOString() };
+    payments:[], validDays:num(s.quoteValidDays)||20, dueDays:num(s.invoiceDueDays)||20, sourceId:null, createdAt:new Date().toISOString(),
+    ...(type === 'delivery' ? {signs:{byName:s.signName || '', byDate:'', toName:'', toDate:''}} : {}) };
 }
 function convertDraft(src, type){
   const d = newDraft(type);
@@ -974,6 +980,14 @@ function viewEditor(main, d, isEdit){
         <div style="padding:10px 12px"><button type="button" class="btn sm" id="add">Add line</button></div>
         <div id="tot"></div>
       </section>
+      ${isDN ? (() => { const g = dnSigns(d); return `<section class="panel"><h2>Signatures</h2>
+        <div class="fgrid">
+          <div class="fld"><label for="g-bn">Delivered by (name)</label><input id="g-bn" data-g="byName" value="${esc(g.byName)}" placeholder="Leave blank to write by hand"></div>
+          <div class="fld"><label for="g-bd">Delivered on</label><input id="g-bd" type="date" data-g="byDate" value="${esc(g.byDate)}"></div>
+          <div class="fld"><label for="g-tn">Received by (name)</label><input id="g-tn" data-g="toName" value="${esc(g.toName)}" placeholder="Leave blank to write by hand"></div>
+          <div class="fld"><label for="g-td">Received on</label><input id="g-td" type="date" data-g="toDate" value="${esc(g.toDate)}"></div>
+          <div class="fld span4 dim">${S.settings.signDelivery ? 'Your saved signature is placed on the "Delivered by" line. Change it in Settings → Signature.' : 'The "Delivered by" line is left blank to sign by hand. Turn on your saved signature in Settings → Signature.'}</div>
+        </div></section>`; })() : ''}
       <section class="panel"><h2>${isDN ? 'Delivery wording' : 'Terms & conditions'}</h2>
         <div class="fgrid two">
           ${isDN ? `<div class="fld span4"><label for="f-msg">Confirmation text</label><textarea id="f-msg" data-f="message" rows="3">${esc(d.message)}</textarea></div>`
@@ -1055,6 +1069,8 @@ function viewEditor(main, d, isEdit){
       if (el.dataset.f === 'date' && d._auto && !isEdit){ d.number = nextNumber(d.type, d.date); $('#f-number').value = d.number; }
       if (el.dataset.f === 'taxRate') drawTotals();
       hints();
+    } else if (el.dataset.g){
+      d.signs = {...dnSigns(d), [el.dataset.g]: el.value};
     } else if (el.dataset.c){
       d.customer[el.dataset.c] = el.value;
       if (el.dataset.c === 'name' && !$('#f-cust').value && el.value){ $('#f-cust').value = '__new'; }
@@ -1240,10 +1256,11 @@ function paymentBox(d){
 }
 function deliverBox(d){
   modal(`Mark ${d.number} as delivered`, `
-    <div class="fld"><label for="dv-n">Received by</label><input id="dv-n" placeholder="Name of the person who received it"></div>
+    <div class="fld"><label for="dv-n">Received by</label><input id="dv-n" placeholder="Name of the person who received it" value="${esc(dnSigns(d).toName)}"></div>
     <div class="fld"><label for="dv-d">Date delivered</label><input id="dv-d" type="date" value="${todayISO()}"></div>`,
     'Mark as delivered', async w => {
-      await put('docs', d.id, {...clone(d), status:'delivered', delivered:{name:w.querySelector('#dv-n').value.trim(), date:w.querySelector('#dv-d').value}, updatedAt:new Date().toISOString()});
+      const name = w.querySelector('#dv-n').value.trim(), date = w.querySelector('#dv-d').value, g = dnSigns(d);
+      await put('docs', d.id, {...clone(d), status:'delivered', delivered:{name, date}, signs:{...g, toName: name || g.toName, toDate: date || g.toDate, byDate: g.byDate || date}, updatedAt:new Date().toISOString()});
       toast('Marked as delivered');
     });
 }
@@ -1267,6 +1284,16 @@ async function footIcons(){
   FOOT_PNG = {mail: await toPng(FOOT_SVG.mail), phone: await toPng(FOOT_SVG.phone)};
   return FOOT_PNG;
 }
+// names and dates printed in the delivery note signature boxes (older notes only have `delivered`)
+const dnSigns = d => { const g = d.signs || {}, dl = d.delivered || {};
+  return {byName: g.byName ?? '', byDate: g.byDate ?? (dl.date || ''), toName: g.toName ?? (dl.name || ''), toDate: g.toDate ?? (dl.date || '')}; };
+const signImg = () => S.settings.signImage || SIGN;
+let SIGN_INFO = null;   // {src, w, h} of the current signature, for the PDF
+function loadSignInfo(){
+  const src = signImg();
+  if (SIGN_INFO && SIGN_INFO.src === src) return Promise.resolve(SIGN_INFO);
+  return new Promise(res => { const im = new Image(); im.onload = () => res(SIGN_INFO = {src, w:im.naturalWidth, h:im.naturalHeight}); im.onerror = () => res(SIGN_INFO = null); im.src = src; });
+}
 function sheetHTML(d){
   const s = S.settings, T = TYPES[d.type], c = d.customer || {}, isDN = d.type === 'delivery', lump = d.layout === 'lump' && !isDN;
   const st = statusOf(d);
@@ -1285,7 +1312,7 @@ function sheetHTML(d){
   if (d.type === 'invoice') meta.push(['Due date:', fmtDate(addDays(d.date, d.dueDays))]);
   meta.push(['P.O Number:', d.po || '-']);
   const terms = (d.terms || '').split('\n').map(x => x.trim()).filter(Boolean);
-  const paidNow = paidOf(d);
+  const paidNow = paidOf(d), sg = dnSigns(d);
   let sum = '';
   if (isDN) sum = `<div class="sum"><div class="w"></div><table><tr class="gt"><td>Total</td><td>${qfmt(qtyTotal(d))}</td></tr></table></div>`;
   else sum = `<div class="sum"><div class="w"><b>Amount in words (MVR):</b> ${esc(amountWords(total(d)))}</div><table>
@@ -1309,8 +1336,8 @@ function sheetHTML(d){
     ${sum.replace('<div class="sum">', `<div class="sum">${d.type === 'invoice' && st === 'paid' ? `<img class="stamp" src="${STAMP}" alt="Paid">` : ''}`)}
     ${isDN ? `<div class="msg">${d.message ? `<p>${nl(d.message)}</p>` : ''}${s.deliveryNote ? `<p>${nl(s.deliveryNote)}</p>` : ''}</div>
       <div class="signs">
-        <div><b>Delivered by:</b>${s.signDelivery && SIGN ? `<img src="${SIGN}" alt="">` : ''}<div class="ln"><span>Name:</span><span></span></div><div class="ln"><span>Sign:</span><span></span></div><div class="ln"><span>Date:</span><span>${d.delivered?.date ? fmtDate(d.delivered.date) : ''}</span></div></div>
-        <div><b>Received by:</b><div class="ln"><span>Name:</span><span>${esc(d.delivered?.name || '')}</span></div><div class="ln"><span>Sign:</span><span></span></div><div class="ln"><span>Date:</span><span>${d.delivered?.date ? fmtDate(d.delivered.date) : ''}</span></div></div>
+        ${[['Delivered by:', sg.byName, sg.byDate, s.signDelivery && signImg()], ['Received by:', sg.toName, sg.toDate, '']].map(([t, nm, dt, img]) =>
+          `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>› ${esc(t)}</p>`).join('')}</div>` : ''}
        <div class="bank"><b>Bank Details</b>Bank Name: ${esc(s.bankName)}<br>Acc no.: ${esc(s.accNo)}<br>Acc Name: ${esc(s.accName)}</div>`}
@@ -1484,19 +1511,26 @@ function drawPDF(pdf, d){
     font(9.75, false);
     [d.message, s.deliveryNote].filter(Boolean).forEach(p => { const ls = wrap(p, CW); ensure(ls.length * lh(9.75) + 2); ls.forEach(t => { pdf.text(t, L, y); y += lh(9.75); }); y += 2; });
     y += 6; ensure(40);
+    const LX = 13, LW = 61;   // line starts 13mm after the label and is 61mm long
     const block = (x, title, rows, sign) => {
-      let by = y; font(9.75, true); pdf.text(title, x, by); by += 2;
-      if (sign){ pdf.addImage(SIGN, 'PNG', x, by, 18.1, 11.6, 'sign', 'NONE'); by += 11; } else by += 11;
-      rows.forEach(([k, v]) => {
-        by += 6.2; font(9.75, false, GREY); pdf.text(k, x, by);
-        pdf.setDrawColor(150,150,150); pdf.setLineWidth(0.2); pdf.setLineDashPattern([0.4,0.8], 0); pdf.line(x + 13, by + 0.8, x + 74, by + 0.8); pdf.setLineDashPattern([], 0);
-        if (v){ font(9.75, false); txt(v, x + 14, by); }
+      let by = y; font(9.75, true); pdf.text(title, x, by);
+      rows.forEach(([k, v], i) => {
+        by += i === 0 ? 21 : 7;   // tall gap above the Sign line leaves room to sign by hand
+        font(9.75, false, GREY); pdf.text(k, x, by);
+        pdf.setDrawColor(150,150,150); pdf.setLineWidth(0.2); pdf.setLineDashPattern([0.4,0.8], 0); pdf.line(x + LX, by + 0.8, x + LX + LW, by + 0.8); pdf.setLineDashPattern([], 0);
+        if (i === 0 && sign){   // signature centred on the Sign line
+          const mw = LW * 0.9, mh = 15.5; let w = mw, h = w * sign.h / sign.w; if (h > mh){ h = mh; w = h * sign.w / sign.h; }
+          const fmt = /^data:image\/jpe?g/i.test(sign.src) ? 'JPEG' : 'PNG';
+          pdf.addImage(sign.src, fmt, x + LX + LW/2 - w/2, by + 2 - h, w, h, 'sign', 'NONE');
+        }
+        if (v){ font(9.75, false); txt(v, x + LX + 1.5, by); }
       });
       return by;
     };
-    const dd = d.delivered?.date ? fmtDate(d.delivered.date) : '';
-    const b1 = block(L, 'Delivered by:', [['Name:',''],['Sign:',''],['Date:',dd]], s.signDelivery && SIGN);
-    const b2 = block(L + CW/2 + 8, 'Received by:', [['Name:', d.delivered?.name || ''],['Sign:',''],['Date:',dd]], false);
+    const sg = dnSigns(d);
+    y += 2; ensure(46);
+    const b1 = block(L, 'Delivered by:', [['Sign:',''],['Name:', sg.byName],['Date:', sg.byDate ? fmtDate(sg.byDate) : '']], s.signDelivery && SIGN_INFO);
+    const b2 = block(L + CW/2 + 8, 'Received by:', [['Sign:',''],['Name:', sg.toName],['Date:', sg.toDate ? fmtDate(sg.toDate) : '']], null);
     y = Math.max(b1, b2) + 4;
   } else {
     y += 10;
@@ -1543,7 +1577,7 @@ async function makePDF(d, btn){
     pdf.addFileToVFS('FS-Regular.ttf', PDF_FONT_R); pdf.addFont('FS-Regular.ttf', 'FS', 'normal');
     pdf.addFileToVFS('FS-Bold.ttf', PDF_FONT_B); pdf.addFont('FS-Bold.ttf', 'FS', 'bold');
     pdf.setProperties({title: `${TYPES[d.type].label} ${d.number}`, subject: d.customer?.name || '', author: S.settings.name, creator: S.settings.name});
-    await footIcons();
+    await footIcons(); await loadSignInfo();
     drawPDF(pdf, d);
     const name = `${(d.number||'document').replace(/[\/\\]+/g,'-')} ${(d.customer?.name||'').replace(/[^\w .-]+/g,'').slice(0,40)}`.trim() + '.pdf';
     await saveFile(name, pdf.output('blob'));
@@ -1647,6 +1681,44 @@ function productBox(p){
   if (dp) dp.addEventListener('click', () => { w.remove(); confirmBox(`Delete ${p.name}?`, 'The product is removed from your list. Existing documents are not changed.', 'Delete product', async () => { await saveProducts((S.settings.products || []).filter(x => x.id !== p.id)); toast('Product deleted'); }); });
 }
 
+/* ---------- signature image ---------- */
+// Shrinks the image, makes a white paper background transparent (uploads) and trims empty edges.
+function cleanSignature(url, knockWhite){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      const sc = Math.min(1, 900 / im.naturalWidth, 400 / im.naturalHeight);
+      const w = Math.max(1, Math.round(im.naturalWidth * sc)), h = Math.max(1, Math.round(im.naturalHeight * sc));
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(im, 0, 0, w, h);
+      const px = x.getImageData(0, 0, w, h), a = px.data;
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let i = 0; i < a.length; i += 4){
+        if (knockWhite){ const l = (a[i] + a[i+1] + a[i+2]) / 3; if (l > 200) a[i+3] = 0; else if (l > 150) a[i+3] = Math.round(a[i+3] * (200 - l) / 50); }
+        if (a[i+3] > 24){ const p = i / 4, px_ = p % w, py = (p - px_) / w; if (px_ < x0) x0 = px_; if (px_ > x1) x1 = px_; if (py < y0) y0 = py; if (py > y1) y1 = py; }
+      }
+      if (x1 < 0) return res(null);
+      x.putImageData(px, 0, 0);
+      const pad = 6; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+      const o = document.createElement('canvas'); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
+      o.getContext('2d').drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+      res(o.toDataURL('image/png'));
+    };
+    im.onerror = () => res(null); im.src = url;
+  });
+}
+function signaturePad(done){
+  const w = modal('Draw your signature', `<canvas id="pad" width="900" height="340" style="width:100%;height:auto;aspect-ratio:900/340;background:#fff;border:1px solid var(--line);border-radius:12px;touch-action:none;cursor:crosshair"></canvas>
+    <div class="row" style="justify-content:space-between"><span class="dim">Sign inside the box with your finger or mouse.</span><button type="button" class="btn sm" id="pad-clr">Clear</button></div>`,
+    'Use this signature', async () => { if (!drawn){ toast('Draw your signature first.'); return false; } done(cv.toDataURL('image/png')); });
+  const cv = w.querySelector('#pad'), g = cv.getContext('2d'); let drawn = false, last = null;
+  g.lineWidth = 4.5; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#1b2a4a';
+  const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); last = pt(e); g.beginPath(); g.arc(last[0], last[1], 2, 0, 7); g.fillStyle = g.strokeStyle; g.fill(); drawn = true; });
+  cv.addEventListener('pointermove', e => { if (!last) return; const p = pt(e); g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; });
+  const up = () => { last = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  w.querySelector('#pad-clr').addEventListener('click', () => { g.clearRect(0, 0, cv.width, cv.height); drawn = false; });
+}
+
 /* ---------- settings ---------- */
 function viewSettings(main){
   const s = {...S.settings};
@@ -1664,7 +1736,15 @@ function viewSettings(main){
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
         ${F('prefix','Number prefix',{hint:'Numbers look like ' + esc((s.prefix||'ESC')) + '/INV/' + todayISO().slice(2,4) + '/21'})}
         ${F('quoteValidDays','Quotes valid for (days)',{type:'number'})}${F('invoiceDueDays','Invoices due in (days)',{type:'number'})}
-        <div class="fld"><label for="s-sign">Signature on delivery notes</label><select id="s-sign" data-s="signDelivery"><option value="1" ${s.signDelivery?'selected':''}>Show under "Delivered by"</option><option value="" ${!s.signDelivery?'selected':''}>Leave blank to sign by hand</option></select></div>
+      </div></section>
+      <section class="panel"><h2>Signature</h2><div class="fgrid two">
+        <div class="fld"><span class="lbl2">Your signature</span><div class="sigbox" id="sig-prev"></div>
+          <div class="row"><button type="button" class="btn sm" id="sig-draw">Draw signature</button><button type="button" class="btn sm" id="sig-up">Upload image…</button><button type="button" class="btn sm danger" id="sig-rm">Use default</button><input type="file" id="sig-file" accept="image/*" hidden></div>
+          <span class="hint">Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save settings to keep it.</span></div>
+        <div style="display:grid;gap:14px;align-content:start">
+          <div class="fld"><label for="s-sign">Signature on delivery notes</label><select id="s-sign" data-s="signDelivery"><option value="1" ${s.signDelivery?'selected':''}>Place on the "Delivered by" line</option><option value="" ${!s.signDelivery?'selected':''}>Leave blank to sign by hand</option></select></div>
+          ${F('signName','"Delivered by" name',{hint:'Filled in automatically on new delivery notes. You can change it on each note.'})}
+        </div>
       </div></section>
       <section class="panel"><h2>Default wording</h2><div class="fgrid two">
         ${F('quoteTerms','Quotation terms (one per line)',{area:true,rows:4})}${F('invoiceTerms','Invoice terms (one per line)',{area:true,rows:4})}
@@ -1679,6 +1759,18 @@ function viewSettings(main){
       <div class="stickybar"><button type="button" class="btn primary" id="ss">Save settings</button></div>
     </form>`;
   $('#sf').addEventListener('input', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
+  const sigShow = () => { $('#sig-prev').innerHTML = `<img src="${s.signImage || SIGN}" alt="Signature">`; $('#sig-rm').hidden = !s.signImage; };
+  sigShow();
+  $('#sig-up').addEventListener('click', () => $('#sig-file').click());
+  $('#sig-file').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+    const url = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(null); fr.readAsDataURL(f); });
+    const out = url && await cleanSignature(url, true);
+    if (!out) return toast('That image could not be used. Try a PNG or JPG.');
+    s.signImage = out; sigShow(); toast('Signature added. Click Save settings to keep it.');
+  });
+  $('#sig-rm').addEventListener('click', () => { s.signImage = ''; sigShow(); toast('Back to the default signature. Click Save settings to keep it.'); });
+  $('#sig-draw').addEventListener('click', () => signaturePad(async url => { const out = await cleanSignature(url, false); if (out){ s.signImage = out; sigShow(); toast('Signature added. Click Save settings to keep it.'); } }));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
   $('#bk-exp').addEventListener('click', () => {
     const data = {app:'evershine-portal', version:1, exportedAt:new Date().toISOString(), settings:S.settings, customers:S.customers, docs:S.docs};
