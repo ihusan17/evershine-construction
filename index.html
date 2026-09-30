@@ -610,6 +610,10 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "1056474781403",
   appId: "1:1056474781403:web:98f7117a761db7d1b5defe"
 };
+/* Google "Web client ID" (Firebase console → Authentication → Sign-in method → Google →
+   Web SDK configuration). When set, the login uses Google's own button, which opens Google's
+   account picker directly instead of the blank firebaseapp.com helper page. Leave "" to use the helper. */
+window.GOOGLE_CLIENT_ID = "";
 window.__fbReady = new Promise(r => { window.__fbResolve = r; });
 </script>
 <script>
@@ -2311,6 +2315,8 @@ boot();
 .login.checking form>*:not(.lg):not(.busy){display:none!important}
 .login .lnk{background:none;border:0;color:var(--brand);cursor:pointer;padding:0;font-size:14px;justify-self:start}
 .login .gbtn{justify-content:center;gap:10px;padding:11px 16px;font-size:15px}
+.login #gsi{display:flex;justify-content:center;min-height:44px}
+.login #gsi[hidden],.login .gbtn[hidden]{display:none}
 .login .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
 .login .or::before,.login .or::after{content:"";flex:1;height:1px;background:var(--line)}
 </style>
@@ -2318,7 +2324,7 @@ boot();
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult }
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const cfg = window.FIREBASE_CONFIG;
@@ -2330,6 +2336,7 @@ box.innerHTML = `<form id="lf" novalidate>
   <div class="lg"><img src="${LOGO}" alt=""><h1>${esc(DEFAULTS.name)}<br><span class="dim" style="font-size:17px;font-weight:500">Document portal</span></h1></div>
   <div class="busy" id="lbusy"><i></i><span>Checking sign-in…</span></div>
   <div class="alert" id="lerr" role="alert" hidden></div>
+  <div id="gsi" hidden></div>
   <button class="btn gbtn" id="lg" type="button"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>Sign in with Google</button>
   <div class="or"><span>or with email and password</span></div>
   <div class="fld"><label for="le">Email</label><input id="le" type="email" autocomplete="username" required></div>
@@ -2350,6 +2357,7 @@ const showLogin = (msg, kind, title) => {
   box.hidden = false; box.classList.remove('checking'); setMsg(msg, kind, title);
   $e('lb').disabled = false; $e('lg').disabled = false;
 };
+
 
 if (!configured){
   showLogin('Firebase is not set up yet. Paste your Firebase config into index.html (see the setup guide).');
@@ -2440,6 +2448,23 @@ if (!configured){
     : e.code === 'auth/account-exists-with-different-credential' ? 'This email already signs in another way. Use email and password.'
     : 'Google sign-in didn\'t finish. Try again.';
   getRedirectResult(auth).catch(e => showLogin(gErr(e)));
+  // Google's own button (Google Identity Services): the account picker opens straight from accounts.google.com
+  if (window.GOOGLE_CLIENT_ID){
+    const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = () => {
+      const g = window.google && google.accounts && google.accounts.id; if (!g) return;
+      g.initialize({ client_id: window.GOOGLE_CLIENT_ID, ux_mode: 'popup', itp_support: true, auto_select: false, cancel_on_tap_outside: true,
+        callback: async res => {
+          busy('Signing in…');
+          try { await signInWithCredential(auth, GoogleAuthProvider.credential(res.credential)); }
+          catch(e){ showLogin(gErr(e)); }
+        } });
+      const holder = $e('gsi'), w = Math.min(400, Math.max(220, $e('lf').clientWidth - 64 || 320));
+      g.renderButton(holder, { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', logo_alignment: 'center', width: w });
+      holder.hidden = false; $e('lg').hidden = true;   // the Firebase helper button stays as the fallback if Google's script can't load
+    };
+    document.head.appendChild(sc);
+  }
   $e('lg').addEventListener('click', async () => {
     $e('lg').disabled = true; setMsg('');
     const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' });
