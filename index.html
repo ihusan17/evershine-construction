@@ -239,8 +239,9 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .terms{margin-top:26px;font-size:12.5px}
 .sheet .terms b{display:block;margin-bottom:3px;font-size:13px}
 .sheet .terms p{margin:0 0 2px;padding-left:12px;text-indent:-12px}
-.sheet .bank{margin-top:16px;font-size:12.5px}
-.sheet .bank b{display:block;margin-bottom:3px;font-size:13px}
+.sheet .bank{margin-top:16px;font-size:12.5px;border-left:3px solid #33669b;padding:3px 0 3px 12px;display:grid;grid-template-columns:auto 1fr;column-gap:14px;row-gap:1px;width:fit-content}
+.sheet .bank b{grid-column:1/-1;margin-bottom:3px;font-size:13px;color:#33669b;letter-spacing:.02em}
+.sheet .bank span{color:#555}
 .sheet .msg{margin-top:22px;font-size:13px}
 .sheet .msg p{margin:0 0 8px}
 .sheet .signs{display:flex;justify-content:space-between;gap:40px;margin-top:30px;font-size:13px}
@@ -1613,7 +1614,7 @@ function sheetHTML(d){
           `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="" style="--sc:${signScale()}">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>› ${esc(t)}</p>`).join('')}</div>` : ''}
-       <div class="bank"><b>Bank Details</b>Bank Name: ${esc(s.bankName)}<br>Acc no.: ${esc(s.accNo)}<br>Acc Name: ${esc(s.accName)}</div>`}
+       <div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(s.bankName)}</div><span>Acc no.</span><div>${esc(s.accNo)}</div><span>Acc Name</span><div>${esc(s.accName)}</div></div>`}
     <div class="foot">${s.thanks ? `<b>${esc(s.thanks)}</b>` : ''}<div class="bar"><i></i><i></i></div>
       <div class="q">If you have any queries regarding this ${T.label.toLowerCase()}, please contact</div>
       <div class="ct">${s.email ? `<span>${FOOT_SVG.mail}${esc(s.email)}</span>` : ''}${s.phone ? `<span>${FOOT_SVG.phone}${esc(s.phone)}</span>` : ''}</div></div>
@@ -1814,8 +1815,13 @@ function drawPDF(pdf, d){
       terms.forEach(t => { const ls = wrap(t, CW - 48); ensure(ls.length * lh(9.4)); ls.forEach((l, i) => { if (!i) pdf.text('›', L, y); pdf.text(l, L + 3.4, y); y += lh(9.4); }); });
       y += 4;
     }
-    ensure(20); font(9.75, true); pdf.text('Bank Details', L, y); y += lh(9.75) + 0.6;
-    font(9.4, false); ['Bank Name: ' + (s.bankName||''), 'Acc no.: ' + (s.accNo||''), 'Acc Name: ' + (s.accName||'')].forEach(t => { txt(t, L, y); y += lh(9.4); });
+    // Bank Details: blue bar on the left, labels in grey and values lined up
+    ensure(22); const bTop = y - 3.6, BX = L + 4.2;
+    font(9.75, true, BLUE); pdf.text('Bank Details', BX, y); y += lh(9.75) + 0.6;
+    const bRows = [['Bank Name', s.bankName], ['Acc no.', s.accNo], ['Acc Name', s.accName]];
+    font(9.4, false); const bLab = Math.max(...bRows.map(r => tw(r[0]))) + 4.5;
+    bRows.forEach(([k, v]) => { font(9.4, false, GREY); txt(k, BX, y); font(9.4, false); txt(v || '', BX + bLab, y); y += lh(9.4); });
+    pdf.setFillColor(...BLUE); pdf.rect(L, bTop, 1.05, y - bTop - 2.4, 'F');
   }
 
   // footer on the last page: thank-you line, two-colour bar, contact line with icons
