@@ -3085,7 +3085,7 @@ if (!configured){
     doc: id => docRef(name + '/' + id),
     onSnapshot: (next, err) => onSnapshot(n ? query(collection(fs, name), limit(n)) : collection(fs, name),
       s => next({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data() })) }),
-      e => { if (e.code === 'permission-denied' && !['expenses','team'].includes(name)) denied(); err && err(mapErr(e)); })
+      e => { if (e.code === 'permission-denied' && !['expenses','team','places'].includes(name)) denied(); err && err(mapErr(e)); })
   });
   const adapter = { collection: name => colRef(name), doc: path => docRef(path) };
 
