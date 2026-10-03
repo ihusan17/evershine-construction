@@ -155,12 +155,20 @@ table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px sol
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
 /* island picker (From / Stops / To on boat trips) */
-.ipop{position:absolute;z-index:90;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.2);max-height:min(340px,60vh);display:flex;flex-direction:column;overflow:hidden;font-size:14px}
-.ipop .ip-list{overflow:auto;padding:4px;flex:1;min-height:0}
-.ipop .ip-list button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:6px;color:var(--ink);cursor:pointer;font:inherit}
-.ipop .ip-list button:hover,.ipop .ip-list button.act{background:var(--brand-soft)}
-.ipop .ip-list button.new{color:var(--brand);font-weight:600}
-.ipop .tick{color:var(--brand);font-weight:700}
+.ipop{position:absolute;z-index:90;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.2);max-height:min(460px,70vh);display:flex;flex-direction:column;overflow:hidden;font-size:14px}
+.ipop .ip-list{overflow:auto;padding:4px;flex:1;min-height:0;position:relative}
+.ipop .ip-list .opt,.ipop .ip-list .grp{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border-radius:6px;cursor:pointer}
+.ipop .ip-list .opt:hover,.ipop .ip-list .act{background:var(--brand-soft)}
+.ipop .ip-list .grp{font-weight:600}
+.ipop .ip-list .grp.on{color:var(--brand)}
+.ipop .ip-list .grp .chev{font-style:normal;color:var(--muted);margin-left:6px;font-size:12px}
+.ipop .ip-list .kids{margin:0 0 4px 12px;padding-left:6px;border-left:2px solid var(--brand-soft)}
+.ipop .ip-list .opt small{font-size:11.5px}
+.ipop .ip-list .new{color:var(--brand);font-weight:600}
+.ipop .ip-list .del{margin-left:auto;padding:0 6px;font-size:18px;line-height:1;color:var(--muted)}
+.ipop .ip-list .del:hover{color:var(--bad)}
+.ipop .cnt{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font-size:11px;display:inline-grid;place-items:center}
+.ipop .ip-hint{padding:6px 10px 2px;font-size:11.5px}
 .ipop .ord{display:inline-flex;gap:3px}
 .ipop .ord b,.ipop .ip-h .s b{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font-size:11px;display:inline-grid;place-items:center}
 .ipop .ip-h{padding:8px 10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:5px 6px;font-size:13px}
@@ -874,15 +882,15 @@ function stampPNG(d){
 const badge = st => { const [l,t] = STATUS[st] || [st,'neutral']; return `<span class="badge b-${t}">${esc(l)}</span>`; };
 
 /* ---------- store ---------- */
-const S = { docs:{}, customers:{}, expenses:{}, settings:{...DEFAULTS}, ready:false, mode:'loading', role:null };
+const S = { docs:{}, customers:{}, expenses:{}, places:{}, settings:{...DEFAULTS}, ready:false, mode:'loading', role:null };
 let db = null, downloads = null;
 const LSKEY = 'evershine-portal-v1';
 
 function loadLocal(){
-  try { const o = JSON.parse(localStorage.getItem(LSKEY) || '{}'); S.docs = o.docs || {}; S.customers = o.customers || {}; S.expenses = o.expenses || {}; S.settings = {...DEFAULTS, ...(o.settings||{})}; } catch(e){}
+  try { const o = JSON.parse(localStorage.getItem(LSKEY) || '{}'); S.docs = o.docs || {}; S.customers = o.customers || {}; S.expenses = o.expenses || {}; S.places = o.places || {}; S.settings = {...DEFAULTS, ...(o.settings||{})}; } catch(e){}
 }
 function saveLocal(){
-  try { localStorage.setItem(LSKEY, JSON.stringify({docs:S.docs, customers:S.customers, expenses:S.expenses, settings:S.settings})); } catch(e){ toast('This browser could not save the change.'); }
+  try { localStorage.setItem(LSKEY, JSON.stringify({docs:S.docs, customers:S.customers, expenses:S.expenses, places:S.places, settings:S.settings})); } catch(e){ toast('This browser could not save the change.'); }
 }
 function dbErr(e){
   const c = e && e.code;
@@ -893,14 +901,14 @@ function dbErr(e){
 }
 async function put(col, id, data){
   const body = clone(data); delete body.id;
-  const bucket = col === 'docs' ? S.docs : col === 'expenses' ? S.expenses : S.customers;
+  const bucket = col === 'docs' ? S.docs : col === 'expenses' ? S.expenses : col === 'places' ? S.places : S.customers;
   bucket[id] = {...body, id};
   if (db){ try { await db.collection(col).doc(id).set(body); } catch(e){ dbErr(e); throw e; } }
   else saveLocal();
   onData();
 }
 async function del(col, id){
-  const bucket = col === 'docs' ? S.docs : col === 'expenses' ? S.expenses : S.customers;
+  const bucket = col === 'docs' ? S.docs : col === 'expenses' ? S.expenses : col === 'places' ? S.places : S.customers;
   delete bucket[id];
   if (db){ try { await db.collection(col).doc(id).delete(); } catch(e){ dbErr(e); throw e; } }
   else saveLocal();
@@ -937,6 +945,10 @@ function subscribe(){
   if (canEdit()) db.collection('expenses').limit(2000).onSnapshot(snap => {
     const m = {}; snap.docs.forEach(x => m[x.id] = {...x.data(), id:x.id}); S.expenses = m; S.expensesBlocked = false; onData();
   }, e => { S.expensesBlocked = e && e.code === 'invalid_argument'; onData(); });
+  // custom trip places (resorts…); until the rules include "places" the list is simply empty
+  db.collection('places').limit(1000).onSnapshot(snap => {
+    const m = {}; snap.docs.forEach(x => m[x.id] = {...x.data(), id:x.id}); S.places = m;
+  }, () => {});
 }
 
 /* ---------- team roles ----------
@@ -979,17 +991,22 @@ function nextNumber(type, date){
   Object.values(S.docs).forEach(d => { if (d.type === type && (d.number||'').startsWith(pre)){ const n = parseInt(d.number.slice(pre.length),10); if (n > max) max = n; } });
   return pre + String(max+1).padStart(T.pad,'0');
 }
-// Islands for the trip pickers: names already used on documents first, then the islands of Shaviyani atoll
-const ISLANDS = ['Milandhoo','Funadhoo','Lhaimagu','Maaungoodhoo','Komandoo','Narudhoo','Maroshi','Foakaidhoo','Bileffahi','Feevah','Feydhoo','Goidhoo','Noomaraa','Kanditheemu'];
-function islandList(){
-  const seen = new Map(), add = v => { v = String(v || '').trim(); if (v && v.length <= 40 && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v); };
-  Object.values(S.docs).forEach(d => (d.items || []).forEach(it => { add(it.from); viaList(it.via).forEach(add); add(it.to); }));
-  ISLANDS.forEach(add);
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
-}
-// Dropdown for From / Stops / To: tap an island to fill the box. In Stops every tap adds the next stop (1st, 2nd, …).
+// Inhabited islands of the northern atolls, north to south; shown as "Sh.Milandhoo"
+const ATOLLS = [
+  ['HA', 'Haa Alif', ['Baarah','Dhidhdhoo','Filladhoo','Hathifushi','Hoarafushi','Ihavandhoo','Kelaa','Maarandhoo','Molhadhoo','Muraidhoo','Thakandhoo','Thuraakunu','Uligamu','Utheemu','Vashafaru']],
+  ['HDh', 'Haa Dhaalu', ['Faridhoo','Finey','Hanimaadhoo','Hirimaradhoo','Kulhudhuffushi','Kumundhoo','Kunburudhoo','Kurinbi','Maavaidhoo','Makunudhoo','Naivaadhoo','Nellaidhoo','Neykurendhoo','Nolhivaram','Nolhivaranfaru','Vaikaradhoo']],
+  ['Sh', 'Shaviyani', ['Bileffahi','Feevah','Feydhoo','Foakaidhoo','Funadhoo','Goidhoo','Kanditheemu','Komandoo','Lhaimagu','Maaungoodhoo','Maroshi','Milandhoo','Narudhoo','Noomaraa']],
+  ['N', 'Noonu', ['Fodhdhoo','Henbandhoo','Holhudhoo','Kendhikulhudhoo','Kudafari','Landhoo','Lhohi','Maafaru','Maalhendhoo','Magoodhoo','Manadhoo','Miladhoo','Velidhoo']],
+  ['R', 'Raa', ['Agolhitheemu','Alifushi','Dhuvaafaru','Fainu','Hulhudhuffaaru','Iguraidhoo','Innamaadhoo','Kinolhas','Maakurathu','Maduvvari','Meedhoo','Rasgetheemu','Rasmaadhoo','Ungoofaaru','Vaadhoo']],
+  ['B', 'Baa', ['Dharavandhoo','Dhonfanu','Eydhafushi','Fehendhoo','Fulhadhoo','Goidhoo','Hithaadhoo','Kamadhoo','Kendhoo','Kihaadhoo','Kudarikilu','Maalhos','Thulhaadhoo']],
+].map(([code, name, isl]) => ({code, name, islands: isl.map(i => code + '.' + i)}));
+// Custom places (resorts, harbours…) saved by the team in the "places" collection
+const customPlaces = () => Object.values(S.places || {}).filter(p => p && p.name).sort((a, b) => a.name.localeCompare(b.name));
+const placeId = n => 'p-' + (n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || Date.now().toString(36));
+// Dropdown for From / Stops / To: islands grouped under their atoll (tap the atoll to open it), saved custom places,
+// and typing searches everything or saves a new custom name. In Stops every tap adds the next stop (1st, 2nd, …).
 function islandPicker(box){
-  let pop = null, inp = null, names = [], act = 0;
+  let pop = null, inp = null, act = 0, openG = null;
   const SEP = /(?:,|;|→|->|–|—|-|\n)\s*$/;
   const multi = () => inp.dataset.k === 'via';
   const parts = () => { const v = inp.value, ps = viaList(v); let q = '';
@@ -999,58 +1016,89 @@ function islandPicker(box){
   const close = () => {
     if (inp && multi()){ const v = viaList(inp.value).join(', '); if (v !== inp.value) set(v); }
     if (pop) pop.remove(); pop = null; inp = null; };
-  const place = () => { const r = inp.getBoundingClientRect(), w = Math.min(Math.max(r.width, 240), innerWidth - 16);
+  const place = () => { const r = inp.getBoundingClientRect(), w = Math.min(Math.max(r.width, 300), innerWidth - 16);
     pop.style.width = w + 'px'; pop.style.left = (Math.max(8, Math.min(r.left, innerWidth - w - 8)) + scrollX) + 'px'; pop.style.top = (r.bottom + scrollY + 4) + 'px'; };
-  const draw = () => {
-    const {ps, q} = parts(), ql = q.toLowerCase();
-    const list = names.filter(n => !ql || n.toLowerCase().includes(ql));
-    const opts = [...list.map(v => ({v})), ...(q && !names.some(n => n.toLowerCase() === ql) ? [{v:q, add:true}] : [])];
-    act = Math.min(act, Math.max(opts.length - 1, 0));
-    const cur = inp.value.trim().toLowerCase();
+  const atollOf = v => { const c = String(v || '').split('.')[0].toLowerCase(); const a = ATOLLS.find(x => x.code.toLowerCase() === c); return a ? a.code : null; };
+  // kb: follow the keyboard highlight; top: scroll this atoll to the top of the list; otherwise keep the list where it was
+  const draw = (kb, top) => {
+    const keep = pop.querySelector('.ip-list'), st = keep ? keep.scrollTop : 0;
+    const {ps, q} = parts(), ql = q.toLowerCase(), cur = inp.value.trim().toLowerCase(), custom = customPlaces();
+    const nums = v => ps.map((p, i) => p.toLowerCase() === v.toLowerCase() ? i + 1 : 0).filter(Boolean);
     const mark = v => { if (!multi()) return cur === v.toLowerCase() ? '<span class="tick">✓</span>' : '';
-      const nums = ps.map((p, i) => p.toLowerCase() === v.toLowerCase() ? i + 1 : 0).filter(Boolean);
-      return nums.length ? `<span class="ord">${nums.map(n => `<b>${n}</b>`).join('')}</span>` : ''; };
+      const n = nums(v); return n.length ? `<span class="ord">${n.map(x => `<b>${x}</b>`).join('')}</span>` : ''; };
+    let nav = 0;
+    const opt = (v, extra = '') => `<div class="opt${nav++ === act ? ' act' : ''}" role="option" data-nav data-v="${esc(v)}"><span>${esc(v)}</span>${mark(v)}${extra}</div>`;
+    const delBtn = p => canEdit() ? `<span class="del" data-del="${esc(p.id)}" title="Remove this saved place" aria-label="Remove ${esc(p.name)}">×</span>` : '';
+    let html = '';
+    if (q){
+      const all = [...custom.map(p => ({v:p.name, p})), ...ATOLLS.flatMap(a => a.islands.map(v => ({v, a})))];
+      const hits = all.filter(o => o.v.toLowerCase().includes(ql));
+      html = hits.map(o => opt(o.v, o.p ? '<small class="dim">saved</small>' : `<small class="dim">${esc(o.a.name)}</small>`)).join('');
+      if (!all.some(o => o.v.toLowerCase() === ql)) html += `<div class="opt new${nav++ === act ? ' act' : ''}" data-nav data-new="${esc(q)}">+ Save “${esc(q)}” as a custom place</div>`;
+    } else {
+      const grp = (key, label, sub, items) => { const on = openG === key, sel = multi() ? items.reduce((n, it) => n + nums(it.v).length, 0) : items.some(it => it.v.toLowerCase() === cur) ? 1 : 0;
+        return `<div class="grp${on ? ' on' : ''}${nav++ === act ? ' act' : ''}" data-nav data-g="${esc(key)}"><span>${esc(label)} <small class="dim">${esc(sub)}</small></span><span>${sel ? `<b class="cnt">${sel}</b>` : ''}<i class="chev">${on ? '▾' : '▸'}</i></span></div>`
+          + (on ? `<div class="kids">${items.map(it => opt(it.v, it.p ? delBtn(it.p) : '')).join('') || '<div class="dim" style="padding:8px 10px">No saved places yet. Type a name above to add one.</div>'}</div>` : ''); };
+      html = grp('★', 'Custom places', 'resorts etc.', custom.map(p => ({v:p.name, p})))
+        + ATOLLS.map(a => grp(a.code, a.name, a.code + '.', a.islands.map(v => ({v})))).join('');
+    }
     pop.innerHTML = (multi() ? `<div class="ip-h">${ps.length ? ps.map((p, i) => `<span class="s"><b>${i + 1}</b>${esc(p)}</span>`).join('') : '<span class="dim">Tap islands in order: 1st stop, 2nd stop…</span>'}</div>` : '')
-      + `<div class="ip-list" role="listbox">${opts.length ? opts.map((o, i) => `<button type="button" role="option" class="${o.add ? 'new' : ''}${i === act ? ' act' : ''}" data-v="${esc(o.v)}">${o.add ? `+ Use “${esc(o.v)}”` : `<span>${esc(o.v)}</span>${mark(o.v)}`}</button>`).join('') : '<div class="dim" style="padding:10px">Type an island name</div>'}</div>`
+      + `<div class="ip-hint dim">${q ? 'Search results' : 'Tap an atoll to see its islands, or type to search / add a name'}</div>`
+      + `<div class="ip-list" role="listbox">${html || '<div class="dim" style="padding:10px">No match</div>'}</div>`
       + (multi() ? `<div class="ip-act"><button type="button" data-a="undo"${ps.length ? '' : ' disabled'}>Undo last</button><button type="button" data-a="clear"${ps.length ? '' : ' disabled'}>Clear</button><button type="button" class="pri" data-a="done">Done</button></div>` : '');
-    const a = pop.querySelector('.ip-list .act'); if (a) a.scrollIntoView({block:'nearest'});
+    const list = pop.querySelector('.ip-list'); list.scrollTop = st;
+    if (top){ const g = list.querySelector(`[data-g="${CSS.escape(top)}"]`); if (g) list.scrollTop = g.offsetTop - 4; }
+    else if (kb){ const a = list.querySelector('.act'); if (a) a.scrollIntoView({block:'nearest'}); }
   };
   const pick = v => {
-    if (multi()){ const {ps} = parts(); ps.push(v); set(ps.join(', ') + ', '); act = 0; draw(); }
+    if (multi()){ const {ps} = parts(); ps.push(v); set(ps.join(', ') + ', '); draw(); }
     else { set(v); const el = inp; close(); el.blur(); }
+  };
+  const saveCustom = async name => {
+    name = name.trim().slice(0, 60); if (!name) return;
+    if (!customPlaces().some(p => p.name.toLowerCase() === name.toLowerCase())){
+      const id = placeId(name);
+      put('places', id, {name, by: S.user || '', at: new Date().toISOString()}).catch(() => toast('The custom place was used but not saved. The owner needs to update the security rules (Settings → Team).'));
+    }
+    pick(name);
   };
   const open = el => {
     if (pop && inp === el) return; close();
-    inp = el; names = islandList(); act = 0;
-    // Stops: the next island is added after the ones already there, so open with the list ready for the next pick
-    if (multi()){ const ps = viaList(el.value); if (ps.length && !SEP.test(el.value)) set(ps.join(', ') + ', '); }
+    inp = el; act = 0;
+    if (multi()){ const ps = viaList(el.value); if (ps.length && !SEP.test(el.value)) set(ps.join(', ') + ', '); openG = atollOf(ps[ps.length - 1]) || openG; }
+    else openG = atollOf(el.value) || (customPlaces().some(p => p.name.toLowerCase() === el.value.trim().toLowerCase()) ? '★' : openG);
     pop = document.createElement('div'); pop.className = 'ipop'; document.body.appendChild(pop);
     pop.addEventListener('mousedown', e => e.preventDefault());   // keep the cursor in the box
     pop.addEventListener('click', e => {
-      const b = e.target.closest('button'); if (!b || !inp) return;
-      if (b.dataset.v != null) return pick(b.dataset.v);
+      if (!inp) return;
+      const d = e.target.closest('[data-del]');
+      if (d){ const p = (S.places || {})[d.dataset.del]; if (p && confirm(`Remove “${p.name}” from the saved places?`)) del('places', p.id).then(draw, () => {}); return; }
+      const g = e.target.closest('[data-g]'); if (g){ openG = openG === g.dataset.g ? null : g.dataset.g; act = [...pop.querySelectorAll('[data-nav]')].indexOf(g); draw(false, openG); return; }
+      const n = e.target.closest('[data-new]'); if (n) return saveCustom(n.dataset.new);
+      const o = e.target.closest('[data-v]'); if (o){ act = [...pop.querySelectorAll('[data-nav]')].indexOf(o); return pick(o.dataset.v); }
+      const b = e.target.closest('[data-a]'); if (!b) return;
       const {ps} = parts();
       if (b.dataset.a === 'undo'){ ps.pop(); set(ps.length ? ps.join(', ') + ', ' : ''); draw(); }
       else if (b.dataset.a === 'clear'){ set(''); draw(); }
       else if (b.dataset.a === 'done'){ const el = inp; close(); el.blur(); }
     });
-    draw(); place(); caret(el);
+    draw(false, openG); place(); caret(el);
     // the browser places the cursor where the box was tapped after it gets focus, so set it again once the tap ends
     const again = () => { if (inp === el) caret(el); };
     setTimeout(again, 0); document.addEventListener('mouseup', () => setTimeout(again, 0), {once:true}); document.addEventListener('touchend', () => setTimeout(again, 0), {once:true});
   };
   const isTrip = el => el && el.matches && el.matches('input[data-k="from"],input[data-k="via"],input[data-k="to"]');
-  box.addEventListener('focusin', e => { if (isTrip(e.target)) open(e.target); });
   // Stops: keep the cursor at the end so a tap adds the next stop; From / To: select the name so typing replaces it
   const caret = el => { try { if (el.dataset.k === 'via'){ const n = el.value.length; el.setSelectionRange(n, n); } else el.select(); } catch(e){} };
+  box.addEventListener('focusin', e => { if (isTrip(e.target)) open(e.target); });
   box.addEventListener('click', e => { if (!isTrip(e.target)) return; if (!pop) open(e.target); if (inp === e.target) caret(e.target); });
   box.addEventListener('focusout', e => { if (e.target === inp) setTimeout(() => { if (inp && document.activeElement !== inp) close(); }, 120); });
-  box.addEventListener('input', e => { if (pop && e.target === inp && e.isTrusted){ act = 0; draw(); } });
+  box.addEventListener('input', e => { if (pop && e.target === inp && e.isTrusted){ act = 0; draw(true); } });
   box.addEventListener('keydown', e => {
     if (!pop || e.target !== inp) return;
-    const bs = [...pop.querySelectorAll('.ip-list button')];
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); act = (act + (e.key === 'ArrowDown' ? 1 : bs.length - 1)) % Math.max(bs.length, 1); draw(); }
-    else if (e.key === 'Enter'){ e.preventDefault(); if (bs[act]) pick(bs[act].dataset.v); else if (multi()){ const el = inp; close(); el.blur(); } }
+    const bs = [...pop.querySelectorAll('[data-nav]')];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); act = (act + (e.key === 'ArrowDown' ? 1 : bs.length - 1)) % Math.max(bs.length, 1); draw(true); }
+    else if (e.key === 'Enter'){ e.preventDefault(); if (bs[act]) bs[act].click(); else if (multi()){ const el = inp; close(); el.blur(); } }
     else if (e.key === 'Escape'){ e.preventDefault(); const el = inp; close(); el.blur(); }
   });
   addEventListener('resize', () => { if (pop) place(); });
@@ -2691,6 +2739,10 @@ service cloud.firestore {
     match /expenses/{id} {
       allow read, create, update: if canWrite();   // owner and staff; viewers don't see costs
       allow delete: if isOwner();
+    }
+    match /places/{id} {
+      allow read: if canRead();
+      allow create, update, delete: if canWrite();   // custom trip places (resorts…) for the island picker
     }
   }
 }`;
