@@ -229,6 +229,16 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet table.it .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .sheet table.it .c{text-align:center;white-space:nowrap}
 .sheet table.it tr.fill td{height:var(--fill,0px);background:none;border-bottom:1px solid #dde3ea}
+.sheet .itbox{flex:1;display:flex;flex-direction:column;min-height:0}
+.sheet .itfill{flex:1;min-height:24px;border-bottom:1px solid #dde3ea}
+.sheet .botrow{display:flex;justify-content:space-between;align-items:flex-end;gap:28px;margin-top:16px}
+.sheet .botrow .bank{margin-top:0}
+.sheet .auth{width:230px;text-align:center;font-size:12.5px;flex:none}
+.sheet .auth .for{font-weight:700;font-size:12px;letter-spacing:.02em}
+.sheet .auth .sl{height:64px;border-bottom:1px solid #9aa3ad;position:relative}
+.sheet .auth .sl img{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);mix-blend-mode:multiply;max-width:92%;width:auto;height:auto}
+.sheet .auth .cap{color:#555;margin-top:4px}
+.sheet .auth .nm{font-weight:600}
 .sheet .sum{display:flex;justify-content:space-between;gap:24px;margin-top:10px;align-items:flex-start}
 .sheet .sum .w{font-size:12.5px;padding-top:32px;max-width:440px}
 .sheet .sum table{border-collapse:collapse;min-width:250px}
@@ -642,8 +652,8 @@ const UNITS = ['Nos','Bags','CUFT','CUM','Trip','Lot','Kg','Ton','Ltr','Sqft','S
 const DEFAULTS = {
   name:'EVERSHINE CONSTRUCTION', address:'Ever Shine, Zikura Magu\nSh. Milandhoo', phone:'+960 7714133', email:'mhmd.ihsn80@gmail.com',
   prefix:'ESC', bankName:'Bank of Maldives', accNo:'773 0000382 938 (MVR)', accName:'Ali Ibrahim',
-  quoteValidDays:20, invoiceDueDays:20, signDelivery:true,
-  quoteTerms:'This quotation remain valid for 20 days from the date of issue.\nUnless otherwise agreed, payment shall be made in full within 30 days from the date of invoice.\nTransport schedules are subject to weather and maritime conditions. We are not liable for delays caused by unforeseen sea conditions.',
+  quoteValidDays:20, invoiceDueDays:20, signDelivery:true, signDocs:true,
+  quoteTerms:'This quotation remains valid for 20 days from the date of issue.\nUnless otherwise agreed, payment shall be made in full within 30 days from the date of invoice.\nTransport schedules are subject to weather and maritime conditions. We are not liable for delays caused by unforeseen sea conditions.',
   invoiceTerms:'Payment is due within 20 days from the invoice date\nAccepted payment methods: Cash & Bank Transfer\nForward payment receipt to 7714133 via viber or email once payment has been processed',
   deliveryMessage:'This delivery note serves as confirmation that the items listed above have been delivered as per the requirements provided, with the items received in good condition.',
   deliveryNote:'Any discrepancies in the delivery must be reported within 24 hours.',
@@ -760,6 +770,13 @@ async function saveSettings(s){
   onData();
 }
 
+// Fix "remain valid" in the saved quotation wording once (only the default wording in Settings; saved documents keep theirs)
+let wordingFixed = false;
+function fixWording(){
+  if (wordingFixed || !isOwnerRole() || !S.ready) return; wordingFixed = true;
+  const q = S.settings.quoteTerms || '';
+  if (/This quotation remain valid/.test(q)) saveSettings({...S.settings, quoteTerms: q.replace(/This quotation remain valid/g, 'This quotation remains valid')}).catch(() => {});
+}
 function subscribe(){
   let waiting = 3; const seen = {};
   const ready = k => { if (!seen[k]){ seen[k] = 1; if (--waiting === 0){ S.ready = true; render(true); } } };
@@ -834,7 +851,7 @@ function route(){
   return {a:p[0], b:p[1], c:p[2], key:h};
 }
 function onData(){
-  renderSide();
+  renderSide(); fixWording();
   const r = route();
   if (!S.ready) return;
   if (FORM_VIEWS.includes(r.a)) return;           // never wipe a form someone is typing in
@@ -1127,6 +1144,82 @@ function statusMenu(btn){
     else docAction(d, a);
   });
   (m.querySelector('[data-sa]:not(.on)') || m.querySelector('[data-sa]'))?.focus({preventScroll:true});
+}
+
+/* ---------- customer statement ---------- */
+function statementData(c){
+  const inv = Object.values(S.docs).filter(d => d.type === 'invoice' && d.customerId === c.id && !isVoid(d)).sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.number||'').localeCompare(b.number||''));
+  const rows = [];
+  inv.forEach(d => {
+    rows.push({date:d.date, ref:d.number, what:'Invoice' + (d.project ? ' · ' + d.project : ''), debit:total(d), credit:0, o:0});
+    (d.payments || []).forEach(p => rows.push({date:p.date || d.date, ref:d.number, what:'Payment received' + (p.method ? ' · ' + p.method : '') + (p.ref ? ' · ' + p.ref : ''), debit:0, credit:num(p.amount), o:1}));
+  });
+  rows.sort((a,b) => (a.date||'').localeCompare(b.date||'') || a.o - b.o);
+  let bal = 0; rows.forEach(r => { bal = r2(bal + r.debit - r.credit); r.bal = bal; });
+  const billed = r2(inv.reduce((s,d) => s + total(d), 0)), paid = r2(inv.reduce((s,d) => s + paidOf(d), 0));
+  const open = inv.filter(d => balance(d) > 0.005);
+  return {inv, rows, billed, paid, due: r2(billed - paid), open};
+}
+function drawStatement(pdf, c){
+  const k = pdfKit(pdf), {BLUE, INK, GREY, LINE, ZEBRA, WHITE, L, R, CW, BOTTOM, font, lh, txt, wrap} = k;
+  const t = todayISO(), sd = statementData(c);
+  let y = pdfHeader(pdf, k, 'STATEMENT', [['Statement date:', fmtDate(t)], ['Period:', sd.rows.length ? `${fmtDate(sd.rows[0].date)} – ${fmtDate(t)}` : '-'], ['Invoices:', String(sd.inv.length)]]);
+  font(8.6, true, BLUE); pdf.text('STATEMENT FOR', L, y); y += lh(9.5);
+  font(10.8, true); wrap(c.name, 110).forEach(l => { txt(l, L, y); y += lh(10.8); });
+  font(9.75, false); (String(c.address||'').trim() ? wrap(c.address, 110) : []).concat([c.phone, c.email].filter(Boolean)).forEach(l => { txt(l, L, y); y += lh(9.75); });
+  y += 4;
+  // three summary boxes
+  const BW = (CW - 8) / 3, BH = 17;
+  [['Total invoiced', sd.billed, false], ['Total received', sd.paid, false], ['Balance due (MVR)', sd.due, true]].forEach(([label, v, hot], i) => {
+    const x = L + i * (BW + 4);
+    if (hot){ pdf.setFillColor(...BLUE); pdf.rect(x, y, BW, BH, 'F'); } else { pdf.setFillColor(...ZEBRA); pdf.rect(x, y, BW, BH, 'F'); pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.rect(x, y, BW, BH); }
+    font(8.6, false, hot ? WHITE : GREY); pdf.text(label, x + 4, y + 6);
+    font(13.5, true, hot ? WHITE : INK); pdf.text(money(v), x + 4, y + 13.2);
+  });
+  y += BH + 9;
+  const table = (title, cols, data, fmtRow) => {
+    const fixed = cols.reduce((a,c2) => a + c2.w, 0); cols.forEach(c2 => { if (!c2.w) c2.w = CW - fixed; });
+    let x0 = L; cols.forEach(c2 => { c2.x = x0; x0 += c2.w; });
+    const PAD = 2.4, cx = c2 => c2.a === 'right' ? c2.x + c2.w - PAD : c2.x + PAD;
+    const head = () => { pdf.setFillColor(...BLUE); pdf.rect(L, y, CW, 7.2, 'F'); font(9, true, WHITE); cols.forEach(c2 => pdf.text(c2.h, cx(c2), y + 4.9, {align:c2.a})); y += 7.2; };
+    if (y + 20 > BOTTOM){ pdf.addPage(); y = 16; }
+    font(10, true, BLUE); pdf.text(title, L, y); y += 3; head();
+    data.forEach((row, i) => {
+      const vals = fmtRow(row); font(9.2, false);
+      const di = cols.findIndex(c2 => c2.wrap), lines = di >= 0 ? wrap(vals[di], cols[di].w - PAD*2) : [''];
+      const rh = Math.max(1, lines.length) * lh(9.2) + 3.4;
+      if (y + rh > BOTTOM){ pdf.addPage(); y = 16; head(); }
+      if (i % 2){ pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, rh, 'F'); }
+      cols.forEach((c2, ci) => {
+        font(9.2, !!c2.bold, c2.col ? c2.col(row) : INK);
+        if (ci === di) lines.forEach((l, li) => pdf.text(l, cx(c2), y + 4.9 + li * lh(9.2)));
+        else txt(vals[ci], cx(c2), y + 4.9, {align:c2.a});
+      });
+      y += rh; pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y);
+    });
+    y += 8;
+  };
+  table('Account activity', [{h:'Date', w:24, a:'left'}, {h:'Reference', w:30, a:'left'}, {h:'Details', w:0, a:'left', wrap:true}, {h:'Debit', w:26, a:'right'}, {h:'Credit', w:26, a:'right'}, {h:'Balance', w:28, a:'right', bold:true}],
+    sd.rows.length ? sd.rows : [{empty:true}],
+    r => r.empty ? ['', '', 'No invoices yet.', '', '', ''] : [fmtDate(r.date), r.ref, r.what, r.debit ? money(r.debit) : '', r.credit ? money(r.credit) : '', money(r.bal)]);
+  if (sd.open.length){
+    table('Unpaid invoices', [{h:'Invoice', w:34, a:'left'}, {h:'Date', w:28, a:'left'}, {h:'Due date', w:28, a:'left'}, {h:'Status', w:0, a:'left', wrap:true, col: d => statusOf(d) === 'overdue' ? [138,42,32] : INK}, {h:'Balance (MVR)', w:34, a:'right', bold:true}],
+      sd.open, d => { const due = addDays(d.date, d.dueDays), late = daysBetween(due, t);
+        return [d.number, fmtDate(d.date), fmtDate(due), late > 0 ? `Overdue by ${late} day${late === 1 ? '' : 's'}` : late === 0 ? 'Due today' : `Due in ${-late} day${late === -1 ? '' : 's'}`, money(balance(d))]; });
+  }
+  if (y + 24 > BOTTOM){ pdf.addPage(); y = 16; }
+  y = pdfBank(pdf, k, y + 2).y;
+  return pdfFooter(pdf, k, y, 'statement', 'Statement · ' + (c.name || ''));
+}
+async function buildStatement(c){
+  await loadScript(JSPDF_URL); await footIcons();
+  const pdf = newPDF('Statement ' + (c.name || ''), c.name);
+  drawStatement(pdf, c);
+  return {name: `Statement ${(c.name || 'customer').replace(/[^\w .-]+/g,'').slice(0,40).trim()} ${todayISO()}.pdf`, blob: pdf.output('blob')};
+}
+function statementText(c){
+  const sd = statementData(c), s = S.settings;
+  return [`Statement of account – ${c.name}`, `Date: ${fmtDate(todayISO())}`, `Total invoiced: MVR ${money(sd.billed)}`, `Total received: MVR ${money(sd.paid)}`, `Balance due: MVR ${money(sd.due)}`, '', s.name || '', [s.phone, s.email].filter(Boolean).join(' · ')].join('\n').trim();
 }
 
 /* ---------- quick preview ---------- */
@@ -1580,7 +1673,6 @@ function sheetHTML(d){
     rows = items.map(it => `<tr>${td(kindOf(d) === 'hire' ? hireLines(it) : it.desc)}<td class="r">${money(lineAmt(d,it))}</td></tr>`); }
   else { cols = 5; head = `<th>Description</th><th style="width:70px" class="c">Unit</th><th style="width:80px" class="r">Qty</th><th style="width:90px" class="r">Rate</th><th style="width:120px" class="r">Amt. (MVR)</th>`;
     rows = items.map(it => `<tr>${td(it.desc)}<td class="c">${esc(it.unit)}</td><td class="r">${qfmt(it.qty)}</td><td class="r">${money(it.rate)}</td><td class="r">${money(lineAmt(d,it))}</td></tr>`); }
-  const fillH = Math.max(0, (6 - items.length) * 30);
   const meta = [[T.numLabel, d.number], [T.dateLabel + ':', fmtDate(d.date)]];
   if (d.type === 'quotation') meta.push(['Valid until:', fmtDate(addDays(d.date, d.validDays))]);
   if (d.type === 'invoice') meta.push(['Due date:', fmtDate(addDays(d.date, d.dueDays))]);
@@ -1606,7 +1698,7 @@ function sheetHTML(d){
       ${isDN && d.deliveryAddress ? `<div style="text-align:right"><div class="lab">DELIVERY ADDRESS</div><div>${nl(d.deliveryAddress)}</div></div>` : ''}
     </div>
     ${d.project ? `<div class="project">PROJECT: ${esc(d.project)}</div>` : ''}
-    <table class="it"><thead><tr>${head}</tr></thead><tbody>${rows.join('')}${fillH ? `<tr class="fill" style="--fill:${fillH}px">${'<td></td>'.repeat(cols)}</tr>` : ''}</tbody></table>
+    <div class="itbox"><table class="it"><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table><div class="itfill"></div></div>
     ${sum.replace('<div class="sum">', `<div class="sum">${d.type === 'invoice' && st === 'paid' ? `<img class="stamp" src="${STAMP}" alt="Paid">` : ''}`)}
     ${isDN ? `<div class="msg">${d.message ? `<p>${nl(d.message)}</p>` : ''}${s.deliveryNote ? `<p>${nl(s.deliveryNote)}</p>` : ''}</div>
       <div class="signs">
@@ -1614,7 +1706,8 @@ function sheetHTML(d){
           `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="" style="--sc:${signScale()}">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>${esc(t)}</p>`).join('')}</div>` : ''}
-       <div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(s.bankName)}</div><span>Acc no.</span><div>${esc(s.accNo)}</div><span>Acc Name</span><div>${esc(s.accName)}</div></div>`}
+       <div class="botrow"><div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(s.bankName)}</div><span>Acc no.</span><div>${esc(s.accNo)}</div><span>Acc Name</span><div>${esc(s.accName)}</div></div>
+       <div class="auth"><div class="for">For ${esc(s.name)}</div><div class="sl">${s.signDocs !== false && signImg() ? `<img src="${signImg()}" alt="" style="max-height:${Math.round(56 * signScale())}px">` : ''}</div><div class="cap">Authorised signature</div>${s.signName ? `<div class="nm">${esc(s.signName)}</div>` : ''}</div></div>`}
     <div class="foot">${s.thanks ? `<b>${esc(s.thanks)}</b>` : ''}<div class="bar"><i></i><i></i></div>
       <div class="q">If you have any queries regarding this ${T.label.toLowerCase()}, please contact</div>
       <div class="ct">${s.email ? `<span>${FOOT_SVG.mail}${esc(s.email)}</span>` : ''}${s.phone ? `<span>${FOOT_SVG.phone}${esc(s.phone)}</span>` : ''}</div></div>
@@ -1653,38 +1746,101 @@ const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.
 // Thaana is right-to-left: reverse each Thaana run so it reads correctly when drawn left to right
 const vis = s => String(s ?? '').replace(/[\u0780-\u07BF]+(?:[ \u00A0]+[\u0780-\u07BF]+)*/g, m => [...m].reverse().join(''));
 
-function drawPDF(pdf, d){
+// Page geometry, colours and text helpers shared by every PDF (documents and statements)
+function pdfKit(pdf){
+  const k = {BLUE:[51,102,155], INK:[27,27,27], GREY:[85,85,85], LINE:[221,227,234], ZEBRA:[245,248,251], WHITE:[255,255,255], W:210, H:297, L:14.3};
+  k.R = k.W - 14.3; k.CW = k.R - k.L; k.BOTTOM = k.H - 22;
+  k.font = (sz, bold, col = k.INK) => { pdf.setFont('FS', bold ? 'bold' : 'normal'); pdf.setFontSize(sz); pdf.setTextColor(...col); };
+  k.lh = sz => sz * 0.3528 * 1.38;
+  k.txt = (t, x, y, o) => pdf.text(vis(t), x, y, o);
+  k.wrap = (t, w) => String(t ?? '').split('\n').flatMap(p => p.trim() === '' ? [''] : pdf.splitTextToSize(vis(p), w));
+  k.tw = t => pdf.getTextWidth(vis(t));
+  return k;
+}
+// Logo + company on the left, title + meta lines on the right. Returns the y below it.
+function pdfHeader(pdf, k, title, meta){
+  const s = S.settings, {L, R, BLUE, GREY, font, lh, txt, tw} = k;
+  pdf.addImage(LOGO, 'JPEG', L, 11, 27.5, 21.1, 'logo', 'NONE');
+  let cy = 15.2, cx = L + 31;
+  font(11, true); txt(s.name, cx, cy); cy += lh(11);
+  font(9.4, false, [51,51,51]);
+  [...String(s.address||'').split('\n'), 'Phone: ' + (s.phone||''), 'Email: ' + (s.email||'')].forEach(t => { txt(t, cx, cy); cy += lh(9.4); });
+  font(22.5, true, BLUE); txt(title, R, 18.5, {align:'right'});
+  font(9.75, true); const vw = Math.max(...meta.map(m => tw(m[1])));
+  let my = 26.5;
+  meta.forEach(([a,v]) => { font(9.75, false, GREY); txt(a, R - vw - 3.2, my, {align:'right'}); font(9.75, true); txt(v, R, my, {align:'right'}); my += lh(9.75); });
+  return Math.max(cy, my, 33) + 7;
+}
+// Bank Details block with the blue bar. Returns {top, y}.
+function pdfBank(pdf, k, y){
+  const s = S.settings, {L, BLUE, GREY, font, lh, txt, tw} = k;
+  const top = y - 3.6, BX = L + 4.2;
+  font(9.75, true, BLUE); pdf.text('Bank Details', BX, y); y += lh(9.75) + 0.6;
+  const rows = [['Bank Name', s.bankName], ['Acc no.', s.accNo], ['Acc Name', s.accName]];
+  font(9.4, false); const lab = Math.max(...rows.map(r => tw(r[0]))) + 4.5;
+  rows.forEach(([a, v]) => { font(9.4, false, GREY); txt(a, BX, y); font(9.4, false); txt(v || '', BX + lab, y); y += lh(9.4); });
+  pdf.setFillColor(...BLUE); pdf.rect(L, top, 1.05, y - top - 2.4, 'F');
+  return {top, y};
+}
+// "For <company> / signature / Authorised signature / name" on the right. Returns the y below it.
+function pdfAuthSign(pdf, k, top){
+  const s = S.settings, {R, GREY, font, lh, txt} = k, BW = 62, x = R - BW, cx = x + BW / 2;
+  font(9, true); txt('For ' + (s.name || ''), cx, top + 3, {align:'center'});
+  const ly = top + 24;
+  const sign = s.signDocs !== false && SIGN_INFO;
+  if (sign){
+    const mw = BW * 0.9, mh = 15.5 * signScale(); let w = mw, h = w * sign.h / sign.w; if (h > mh){ h = mh; w = h * sign.w / sign.h; }
+    pdf.addImage(sign.src, /^data:image\/jpe?g/i.test(sign.src) ? 'JPEG' : 'PNG', cx - w/2, ly + 1.6 - h, w, h, 'sign', 'NONE');
+  }
+  pdf.setDrawColor(154,163,173); pdf.setLineWidth(0.25); pdf.line(x, ly, R, ly);
+  font(9, false, GREY); txt('Authorised signature', cx, ly + 4.4, {align:'center'});
+  let yy = ly + 4.4;
+  if (s.signName){ yy += lh(9); font(9.2, true); txt(s.signName, cx, yy, {align:'center'}); }
+  return yy + 2;
+}
+// Thank-you line, two-colour bar and contact line on the last page; page numbers when there are several.
+function pdfFooter(pdf, k, y, label, ref){
+  const s = S.settings, {W, H, L, R, CW, BLUE, GREY, font, txt, tw} = k;
+  const fTop = s.thanks ? H - 34 : H - 28;
+  if (y > fTop - 3){ pdf.addPage(); }
+  if (s.thanks){ font(10, true, BLUE); txt(s.thanks, W/2, H - 29.5, {align:'center'}); }
+  pdf.setFillColor(51,51,51); pdf.rect(L, H - 26, CW/2, 1.1, 'F');
+  pdf.setFillColor(47,127,193); pdf.rect(L + CW/2, H - 26, CW/2, 1.1, 'F');
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(11); pdf.setTextColor(51,51,51);
+  pdf.text(`If you have any queries regarding this ${label}, please contact`, W/2, H - 19.5, {align:'center'});
+  const IC = 7.4, GAP = 2.6, SEP = 12, cyc = H - 11.6;
+  const parts = [['mail', s.email], ['phone', s.phone]].filter(p => p[1]);
+  font(10.5, true, [51,51,51]);
+  const widths = parts.map(p => IC + GAP + tw(p[1]));
+  let fx = W/2 - (widths.reduce((a,b) => a + b, 0) + SEP * (parts.length - 1)) / 2;
+  parts.forEach(([key, v], i) => {
+    const png = FOOT_PNG && FOOT_PNG[key];
+    if (png) pdf.addImage(png, 'PNG', fx, cyc - IC/2, IC, IC, 'foot-' + key, 'NONE');
+    else { pdf.setFillColor(47,127,193); pdf.circle(fx + IC/2, cyc, IC/2, 'F'); }
+    font(10.5, true, [51,51,51]); txt(v, fx + IC + GAP, cyc + 1.3);
+    fx += widths[i] + SEP;
+  });
+  const n = pdf.getNumberOfPages();
+  if (n > 1) for (let p = 1; p <= n; p++){ pdf.setPage(p); font(8.5, false, GREY); pdf.text(`${ref} · Page ${p} of ${n}`, R, H - 6, {align:'right'}); }
+  return fTop;
+}
+// fill: extra mm added below the item lines so the page reaches the footer (worked out by buildPDF).
+// Returns where the content ended, for that measurement.
+function drawPDF(pdf, d, fill){
   const s = S.settings, T = TYPES[d.type], c = d.customer || {}, isDN = d.type === 'delivery', lump = d.layout === 'lump' && !isDN, st = statusOf(d);
-  const BLUE = [51,102,155], INK = [27,27,27], GREY = [85,85,85], LINE = [221,227,234], ZEBRA = [245,248,251], WHITE = [255,255,255];
-  const W = 210, H = 297, L = 14.3, R = W - 14.3, CW = R - L, BOTTOM = H - 22;
-  const font = (sz, bold, col = INK) => { pdf.setFont('FS', bold ? 'bold' : 'normal'); pdf.setFontSize(sz); pdf.setTextColor(...col); };
-  const lh = sz => sz * 0.3528 * 1.38;
-  const txt = (t, x, y, o) => pdf.text(vis(t), x, y, o);
-  const wrap = (t, w) => String(t ?? '').split('\n').flatMap(p => p.trim() === '' ? [''] : pdf.splitTextToSize(vis(p), w));
-  const tw = t => pdf.getTextWidth(vis(t));
+  const k = pdfKit(pdf), {BLUE, INK, GREY, LINE, ZEBRA, WHITE, W, H, L, R, CW, BOTTOM, font, lh, txt, wrap, tw} = k;
   let y;
 
   if (st === 'void'){
     font(150, true, [248,224,221]); pdf.text('VOID', 52, 225, {angle:28});
   }
 
-  // header: logo + company
-  pdf.addImage(LOGO, 'JPEG', L, 11, 27.5, 21.1, 'logo', 'NONE');
-  let cy = 15.2, cx = L + 31;
-  font(11, true); txt(s.name, cx, cy); cy += lh(11);
-  font(9.4, false, [51,51,51]);
-  [...String(s.address||'').split('\n'), 'Phone: ' + (s.phone||''), 'Email: ' + (s.email||'')].forEach(t => { txt(t, cx, cy); cy += lh(9.4); });
-
-  // title + meta
-  font(22.5, true, BLUE); txt(T.title, R, 18.5, {align:'right'});
+  // header: logo + company, title + meta
   const meta = [[T.numLabel, d.number], [T.dateLabel + ':', fmtDate(d.date)]];
   if (d.type === 'quotation') meta.push(['Valid until:', fmtDate(addDays(d.date, d.validDays))]);
   if (d.type === 'invoice') meta.push(['Due date:', fmtDate(addDays(d.date, d.dueDays))]);
   meta.push(['P.O Number:', d.po || '-']);
-  font(9.75, true); const vw = Math.max(...meta.map(m => tw(m[1])));
-  let my = 26.5;
-  meta.forEach(([k,v]) => { font(9.75, false, GREY); txt(k, R - vw - 3.2, my, {align:'right'}); font(9.75, true); txt(v, R, my, {align:'right'}); my += lh(9.75); });
-  y = Math.max(cy, my, 33) + 7;
+  y = pdfHeader(pdf, k, T.title, meta);
 
   // customer / delivery address
   const top = y;
@@ -1733,7 +1889,7 @@ function drawPDF(pdf, d){
     });
     y += rh; pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y);
   });
-  if (items.length < 6){ const fh = (6 - items.length) * 8; if (y + fh < BOTTOM - 40){ y += fh; pdf.setDrawColor(...LINE); pdf.line(L, y, R, y); } }
+  if (fill > 0.5){ y += fill; pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y); }   // stretch the table down to the footer
 
   // totals
   const tRows = [];
@@ -1821,47 +1977,32 @@ function drawPDF(pdf, d){
       });
       y += 3;
     }
-    // Bank Details: blue bar on the left, labels in grey and values lined up
-    ensure(22); const bTop = y - 3.6, BX = L + 4.2;
-    font(9.75, true, BLUE); pdf.text('Bank Details', BX, y); y += lh(9.75) + 0.6;
-    const bRows = [['Bank Name', s.bankName], ['Acc no.', s.accNo], ['Acc Name', s.accName]];
-    font(9.4, false); const bLab = Math.max(...bRows.map(r => tw(r[0]))) + 4.5;
-    bRows.forEach(([k, v]) => { font(9.4, false, GREY); txt(k, BX, y); font(9.4, false); txt(v || '', BX + bLab, y); y += lh(9.4); });
-    pdf.setFillColor(...BLUE); pdf.rect(L, bTop, 1.05, y - bTop - 2.4, 'F');
+    // Bank Details on the left, authorised signature on the right
+    ensure(36); const bank = pdfBank(pdf, k, y);
+    y = Math.max(bank.y, pdfAuthSign(pdf, k, bank.top));
   }
 
-  // footer on the last page: thank-you line, two-colour bar, contact line with icons
-  const fTop = s.thanks ? H - 34 : H - 28;
-  if (y > fTop - 3){ pdf.addPage(); }
-  if (s.thanks){ font(10, true, BLUE); txt(s.thanks, W/2, H - 29.5, {align:'center'}); }
-  pdf.setFillColor(51,51,51); pdf.rect(L, H - 26, CW/2, 1.1, 'F');
-  pdf.setFillColor(47,127,193); pdf.rect(L + CW/2, H - 26, CW/2, 1.1, 'F');
-  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(11); pdf.setTextColor(51,51,51);
-  pdf.text(`If you have any queries regarding this ${T.label.toLowerCase()}, please contact`, W/2, H - 19.5, {align:'center'});
-  const IC = 7.4, GAP = 2.6, SEP = 12, cyc = H - 11.6;
-  const parts = [['mail', s.email], ['phone', s.phone]].filter(p => p[1]);
-  font(10.5, true, [51,51,51]);
-  const widths = parts.map(p => IC + GAP + tw(p[1]));
-  let fx = W/2 - (widths.reduce((a,b) => a + b, 0) + SEP * (parts.length - 1)) / 2;
-  parts.forEach(([k, v], i) => {
-    const png = FOOT_PNG && FOOT_PNG[k];
-    if (png) pdf.addImage(png, 'PNG', fx, cyc - IC/2, IC, IC, 'foot-' + k, 'NONE');
-    else { pdf.setFillColor(47,127,193); pdf.circle(fx + IC/2, cyc, IC/2, 'F'); }
-    font(10.5, true, [51,51,51]); txt(v, fx + IC + GAP, cyc + 1.3);
-    fx += widths[i] + SEP;
-  });
-  const n = pdf.getNumberOfPages();
-  if (n > 1) for (let p = 1; p <= n; p++){ pdf.setPage(p); font(8.5, false, GREY); pdf.text(`${d.number} · Page ${p} of ${n}`, R, H - 6, {align:'right'}); }
+  const end = {y, pages: pdf.getNumberOfPages()};
+  end.fTop = pdfFooter(pdf, k, y, T.label.toLowerCase(), d.number);
+  return end;
 }
 
-async function buildPDF(d){
-  await loadScript(JSPDF_URL);
+function newPDF(title, subject){
   const pdf = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
   pdf.addFileToVFS('FS-Regular.ttf', PDF_FONT_R); pdf.addFont('FS-Regular.ttf', 'FS', 'normal');
   pdf.addFileToVFS('FS-Bold.ttf', PDF_FONT_B); pdf.addFont('FS-Bold.ttf', 'FS', 'bold');
-  pdf.setProperties({title: `${TYPES[d.type].label} ${d.number}`, subject: d.customer?.name || '', author: S.settings.name, creator: S.settings.name});
+  pdf.setProperties({title, subject: subject || '', author: S.settings.name, creator: S.settings.name});
+  return pdf;
+}
+async function buildPDF(d){
+  await loadScript(JSPDF_URL);
   await footIcons(); await loadSignInfo();
-  drawPDF(pdf, d);
+  const title = `${TYPES[d.type].label} ${d.number}`;
+  // draw once to measure, then again with the item table stretched so a one-page document reaches the footer
+  const probe = drawPDF(newPDF(title), d, 0);
+  const fill = probe.pages === 1 ? Math.max(0, probe.fTop - 9 - probe.y) : 0;
+  const pdf = newPDF(title, d.customer?.name);
+  drawPDF(pdf, d, fill);
   const name = `${(d.number||'document').replace(/[\/\\]+/g,'-')} ${(d.customer?.name||'').replace(/[^\w .-]+/g,'').slice(0,40)}`.trim() + '.pdf';
   return {name, blob: pdf.output('blob')};
 }
@@ -1883,13 +2024,15 @@ function shareText(d){
   return lines.filter((l, i) => l !== '' || i > 0).join('\n').trim();
 }
 let shareCache = null;   // the PDF from the last tap, reused if the browser needs a second tap
-async function shareTelegram(d, btn){
-  const key = d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length;
+function shareTelegram(d, btn){
+  return sharePDF(d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length, () => buildPDF(d), shareText(d), btn);
+}
+async function sharePDF(key, build, text, btn){
   const label = btn.innerHTML; btn.disabled = true;
   try {
     let f = shareCache && shareCache.key === key ? shareCache : null;
-    if (!f){ btn.textContent = 'Preparing PDF…'; f = shareCache = {key, ...(await buildPDF(d))}; }
-    const file = new File([f.blob], f.name, {type:'application/pdf'}), text = shareText(d);
+    if (!f){ btn.textContent = 'Preparing PDF…'; f = shareCache = {key, ...(await build())}; }
+    const file = new File([f.blob], f.name, {type:'application/pdf'});
     if (navigator.canShare && navigator.canShare({files:[file]})){
       // phones and some computers: share sheet with the PDF attached, then pick Telegram
       try { await navigator.share({files:[file], title: f.name, text}); }
@@ -1949,6 +2092,7 @@ function customerBox(c){
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
     ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
+    ${isNew ? '' : `<div class="row"><button type="button" class="btn sm" data-stmt>Statement PDF</button><button type="button" class="btn sm tg" data-stmt-tg>${icon('send',15)}Share statement</button><span class="dim">Invoices, payments and balance</span></div>`}
     ${isNew ? '' : `<div class="row" data-need="edit"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a>${isOwnerRole() ? '<button class="btn sm danger" data-delc>Delete customer</button>' : ''}</div>`}`,
     'Save customer', async w => {
       if (!canEdit()){ toast('Your role can only view customers.'); return false; }
@@ -1958,6 +2102,10 @@ function customerBox(c){
       toast('Customer saved');
     });
   const pvIds = ds.slice(0,12).map(d => d.id);
+  const sb = w.querySelector('[data-stmt]');
+  if (sb) sb.addEventListener('click', async () => { const l = sb.innerHTML; sb.disabled = true; sb.textContent = 'Preparing…'; try { const f = await buildStatement(c); await saveFile(f.name, f.blob); } catch(e){ console.error(e); toast('The statement could not be created.'); } sb.disabled = false; sb.innerHTML = l; });
+  const st2 = w.querySelector('[data-stmt-tg]');
+  if (st2) st2.addEventListener('click', () => sharePDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c), statementText(c), st2));
   const pv = e => { const b = e.target.closest('[data-pv]'); if (!b || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')) return; e.preventDefault(); e.stopPropagation(); previewDoc(b.dataset.pv, pvIds); };
   w.addEventListener('click', pv, true); w.addEventListener('keydown', pv, true);
   if (!canEdit()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('[data-ok]').style.display = 'none'; }
@@ -2227,7 +2375,8 @@ function viewSettings(main){
           <span class="hint">Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save settings to keep it.</span></div>
         <div style="display:grid;gap:14px;align-content:start">
           <div class="fld"><label for="s-sign">Signature on delivery notes</label><select id="s-sign" data-s="signDelivery"><option value="1" ${s.signDelivery?'selected':''}>Place on the "Delivered by" line</option><option value="" ${!s.signDelivery?'selected':''}>Leave blank to sign by hand</option></select></div>
-          ${F('signName','"Delivered by" name',{hint:'Filled in automatically on new delivery notes. You can change it on each note.'})}
+          <div class="fld"><label for="s-signdocs">Signature on quotations &amp; invoices</label><select id="s-signdocs" data-s="signDocs"><option value="1" ${s.signDocs !== false ? 'selected' : ''}>Place on the "Authorised signature" line</option><option value="" ${s.signDocs === false ? 'selected' : ''}>Leave blank to sign by hand</option></select></div>
+          ${F('signName','Your name (printed under your signature)',{hint:'Shown under "Authorised signature" on quotations and invoices, and filled in as "Delivered by" on new delivery notes.'})}
         </div>
       </div></section>
       <section class="panel"><h2>Default wording</h2><div class="fgrid two">
@@ -2291,7 +2440,7 @@ function viewSettings(main){
   });
   $('#ss').addEventListener('click', async e => {
     const b = e.currentTarget; b.disabled = true;
-    s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery;
+    s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery; s.signDocs = !!s.signDocs;
     s.prefix = (s.prefix||'ESC').trim().replace(/[\/\s]+/g,'') || 'ESC';
     s.products = S.settings.products || [];
     try { await saveSettings(s); toast('Settings saved'); } catch(err){}
