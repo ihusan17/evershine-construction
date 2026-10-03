@@ -275,16 +275,22 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .foot .ct svg{width:28px;height:28px;flex:none}
 .sheet .sum{position:relative}
 .sheet .hire .hdesc{font-weight:600}
-.sheet .hire .route{display:flex;align-items:flex-end;gap:10px;margin-top:6px;flex-wrap:wrap}
-.sheet .hire .pt{display:inline-flex;flex-direction:column;line-height:1.2}
-.sheet .hire .pt small{font-size:9.5px;letter-spacing:.08em;color:#33669b;font-weight:700}
-.sheet .hire .pt b{font-size:13px;font-weight:600}
-.sheet .hire .arw{width:46px;height:14px;position:relative;margin-bottom:3px}
-.sheet .hire .arw.s{width:26px}
-.sheet .hire .route .when{margin-left:auto}
-.sheet .hire .arw i{position:absolute;left:0;right:6px;top:7px;border-top:1.5px dashed #33669b}
-.sheet .hire .arw::after{content:"";position:absolute;right:0;top:3px;border-left:8px solid #33669b;border-top:4.5px solid transparent;border-bottom:4.5px solid transparent}
-.sheet .hire .when{margin-left:auto;padding-left:14px;border-left:1px solid #dde3ea}
+.sheet .hire .route{display:flex;align-items:flex-start;gap:10px;margin-top:6px}
+/* route map: islands on a line, dots filled at FROM / TO, open at stops, orange dashed leg for the return */
+.sheet .hire .map{display:flex;flex-wrap:wrap;row-gap:8px;min-width:0}
+.sheet .hire .stn{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:70px;padding:0 8px;position:relative;line-height:1.2}
+.sheet .hire .stn small{display:block;height:12px;font-size:9.5px;letter-spacing:.08em;color:#33669b;font-weight:700}
+.sheet .hire .stn i{width:11px;height:11px;margin:3px 0 4px;border-radius:50%;border:2px solid #33669b;background:#fff;box-sizing:border-box;position:relative;z-index:1}
+.sheet .hire .stn.end i{background:#33669b}
+.sheet .hire .stn b{font-size:13px;font-weight:600;white-space:nowrap}
+.sheet .hire .stn::before,.sheet .hire .stn::after{content:"";position:absolute;top:19.5px;height:2px;background:#33669b}
+.sheet .hire .stn::before{left:0;right:50%}.sheet .hire .stn::after{left:50%;right:0}
+.sheet .hire .stn:first-child::before,.sheet .hire .stn:last-child::after{display:none}
+.sheet .hire .stn.ret small{color:#d0782f}.sheet .hire .stn.ret i{border-color:#d0782f}
+.sheet .hire .stn.ret::before,.sheet .hire .stn.toret::after{background:repeating-linear-gradient(90deg,#d0782f 0 5px,transparent 5px 9px)}
+.sheet .hire .when{display:inline-flex;flex-direction:column;line-height:1.2;margin-left:auto;padding-left:14px;border-left:1px solid #dde3ea}
+.sheet .hire .when small{font-size:9.5px;letter-spacing:.08em;color:#33669b;font-weight:700}
+.sheet .hire .when b{font-size:13px;font-weight:600;margin-top:3px}
 .sheet .stamp{position:absolute;width:190px;right:6px;top:62px;pointer-events:none}
 .sheet .void{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:700 110px/1 var(--serif);color:rgba(178,55,44,.14);transform:rotate(-24deg);letter-spacing:.08em}
 .sheet [lang="dv"],.sheet .dv{font-family:"Noto Sans Thaana",var(--serif)}
@@ -789,12 +795,12 @@ const routePts = it => { const via = viaList(it.via), out = [];
   if (it.to) out.push(['TO', it.to]);
   if (it.ret && it.from && out.length > 1) out.push(['RETURN', it.from]);
   return out; };
-// Boat hire line on the document: description, then FROM → stops → TO and DATE (each part only when filled in)
+// Boat hire line on the document: description, then the route map (FROM → stops → TO → RETURN) and DATE (each part only when filled in)
 const hireCell = it => {
-  const pt = (lab, v) => `<span class="pt"><small>${lab}</small><b class="${hasThaana(v) ? 'dv' : ''}">${esc(v)}</b></span>`;
-  const pts = routePts(it), short = pts.length > 3;
-  const route = pts.map((p, i) => (i ? `<span class="arw${short ? ' s' : ''}"><i></i></span>` : '') + pt(p[0], p[1])).join('');
-  return `<div class="hire"><div class="hdesc ${hasThaana(it.desc) ? 'dv' : ''}">${nl(it.desc)}</div>${route || it.when ? `<div class="route">${route}${it.when ? `<span class="pt when"><small>DATE</small><b>${esc(it.when)}</b></span>` : ''}</div>` : ''}</div>`;
+  const pts = routePts(it);
+  const map = pts.map(([lab, v], i) => { const cls = ['stn', lab === 'FROM' || lab === 'TO' ? 'end' : '', lab === 'RETURN' ? 'ret' : '', (pts[i+1]||[])[0] === 'RETURN' ? 'toret' : ''].filter(Boolean).join(' ');
+    return `<span class="${cls}"><small>${lab}</small><i></i><b class="${hasThaana(v) ? 'dv' : ''}">${esc(v)}</b></span>`; }).join('');
+  return `<div class="hire"><div class="hdesc ${hasThaana(it.desc) ? 'dv' : ''}">${nl(it.desc)}</div>${map || it.when ? `<div class="route"><div class="map">${map}</div>${it.when ? `<span class="when"><small>DATE</small><b>${esc(it.when)}</b></span>` : ''}</div>` : ''}</div>`;
 };
 const hireLines = it => [it.desc,
   routePts(it).length ? routePts(it).map(([l, v]) => l === 'FROM' ? 'From: ' + v : l === 'TO' ? 'To: ' + v : l === 'RETURN' ? 'Return: ' + v : v).join('  →  ') : '',
@@ -2188,24 +2194,23 @@ function drawPDF(pdf, d, fill){
     const hire = lump && kindOf(d) === 'hire', pts = hire ? routePts(it) : [], hasRoute = hire && (pts.length || it.when);
     if (hire) font(9.75, true);
     const lines = wrap(hire ? it.desc : vals[dIdx], cols[dIdx].w - PAD*2);
-    // lay the route out first (it may wrap onto more lines when there are many stops)
+    // lay the route map out first: each island is a station (label, dot, name); rows wrap when there are many stops
     let rLines = [];
+    const SP = 2.8, RH = 12;
     if (hasRoute){
-      const k0 = cols[dIdx], x0 = cellX(k0), right = k0.x + k0.w - PAD;
+      const k0 = cols[dIdx], x0 = cellX(k0) - SP, right = k0.x + k0.w - PAD;
       font(9.4, true); const dw = it.when ? Math.max(tw(it.when), 8) : 0;
-      const AW = pts.length > 3 ? 8.5 : 12.4, AG = 3.1;
       let cur = [], rx = x0, limit = it.when ? right - dw - 7 : right;
       pts.forEach((p, i) => {
-        font(9.4, true); const w = Math.max(tw(p[1]), 8);
-        const need = (i ? AW + AG : 0) + w;
-        if (cur.length && rx + need > limit){ rLines.push(cur); cur = []; rx = x0; limit = right; }
-        cur.push({lab:p[0], v:p[1], arrow: i > 0, w, aw: AW});
-        rx += (i ? AW + AG : 0) + w + 3.2;
+        font(9.4, true); const nw = tw(p[1]); font(6.8, true); const lw = tw(p[0]);
+        const w = Math.max(nw, lw, 15.5) + SP * 2;
+        if (cur.length && rx + w > limit){ rLines.push(cur); cur = []; rx = x0; limit = right; }
+        cur.push({lab:p[0], v:p[1], g:i, x:rx, w}); rx += w;
       });
       if (cur.length || it.when) rLines.push(cur);
       rLines.dw = dw;
     }
-    const rh = Math.max(1, lines.length) * lh(9.75) + 3.8 + rLines.length * 9;
+    const rh = Math.max(1, lines.length) * lh(9.75) + 3.8 + rLines.length * RH + (rLines.length ? 1.2 : 0);
     if (y + rh > BOTTOM){ pdf.addPage(); y = 16; headRow(); }
     if (i % 2){ pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, rh, 'F'); }
     font(9.75, hire);
@@ -2214,24 +2219,23 @@ function drawPDF(pdf, d, fill){
       else { font(9.75, false); pdf.text(vis(vals[ci]), cellX(k), y + 5.2, {align:k.a}); }
     });
     if (hasRoute){
-      // FROM → stops → TO (dashed arrows) and DATE, labels in small blue capitals
-      const k0 = cols[dIdx], x0 = cellX(k0);
+      // route map: blue line through the islands (orange dashes for the return leg), filled dots at FROM / TO, open dots at stops
+      const k0 = cols[dIdx], ORANGE = [208,120,47], last = pts.length - 1;
+      const seg = (x1, x2, yy, ret) => { if (x2 - x1 < 0.2) return; pdf.setLineWidth(0.5);
+        if (ret){ pdf.setDrawColor(...ORANGE); pdf.setLineDashPattern([1.1, 0.8], 0); } else pdf.setDrawColor(...BLUE);
+        pdf.line(x1, yy, x2, yy); pdf.setLineDashPattern([], 0); };
       rLines.forEach((row, li) => {
-        const ly = y + 5.2 + lines.length * lh(9.75) + 1.6 + li * 9, vy = ly + 3.9;
-        let rx = x0;
-        row.forEach((p, pi) => {
-          if (p.arrow){
-            const ax = pi === 0 ? x0 : rx;   // a wrapped line starts with the arrow that continues the trip
-            pdf.setDrawColor(...BLUE); pdf.setLineWidth(0.35); pdf.setLineDashPattern([0.9, 0.7], 0); pdf.line(ax, vy - 1.2, ax + p.aw - 2.4, vy - 1.2); pdf.setLineDashPattern([], 0);
-            pdf.setFillColor(...BLUE); pdf.triangle(ax + p.aw - 2.4, vy - 2.4, ax + p.aw, vy - 1.2, ax + p.aw - 2.4, vy, 'F');
-            rx = ax + p.aw + 3.1;
-          }
-          font(6.8, true, BLUE); pdf.text(p.lab, rx, ly); font(9.4, true); txt(p.v, rx, vy); rx += p.w + 3.2;
-        });
+        const ly = y + 5.2 + lines.length * lh(9.75) + 1.6 + li * RH, dy = ly + 2.6, vy = ly + 7.3;
+        row.forEach(p => { const cx = p.x + p.w / 2;
+          if (p.g > 0) seg(p.x, cx, dy, p.lab === 'RETURN');
+          if (p.g < last) seg(cx, p.x + p.w, dy, (pts[p.g + 1] || [])[0] === 'RETURN'); });
+        row.forEach(p => { const cx = p.x + p.w / 2, ret = p.lab === 'RETURN', end = p.lab === 'FROM' || p.lab === 'TO', col = ret ? ORANGE : BLUE;
+          pdf.setLineWidth(0.55); pdf.setDrawColor(...col); pdf.setFillColor(...(end ? col : WHITE)); pdf.circle(cx, dy, 1.25, 'FD');
+          font(6.8, true, col); pdf.text(p.lab, cx, ly, {align:'center'}); font(9.4, true); txt(p.v, cx, vy, {align:'center'}); });
         if (li === 0 && it.when){
           const wx = k0.x + k0.w - PAD - rLines.dw;
           pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(wx - 3.5, ly - 2.2, wx - 3.5, vy + 0.8);
-          font(6.8, true, BLUE); pdf.text('DATE', wx, ly); font(9.4, true); txt(it.when, wx, vy);
+          font(6.8, true, BLUE); pdf.text('DATE', wx, ly); font(9.4, true); txt(it.when, wx, ly + 4.6);
         }
       });
     }
