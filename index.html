@@ -785,7 +785,7 @@ const viaList = v => String(v || '').split(/\s*(?:,|;|→|->|–|—|\s-\s|-|\n)
 // [label, place] for each point of the trip: FROM, the stops, TO, and RETURN (back to the start) on a return trip
 const routePts = it => { const via = viaList(it.via), out = [];
   if (it.from) out.push(['FROM', it.from]);
-  via.forEach((v, i) => out.push([via.length > 1 ? 'STOP ' + (i + 1) : 'VIA', v]));
+  via.forEach((v, i) => out.push([via.length > 1 ? 'STOP ' + (i + 1) : 'STOP', v]));
   if (it.to) out.push(['TO', it.to]);
   if (it.ret && it.from && out.length > 1) out.push(['RETURN', it.from]);
   return out; };
