@@ -272,6 +272,15 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .foot .ct span{display:inline-flex;align-items:center;gap:10px}
 .sheet .foot .ct svg{width:28px;height:28px;flex:none}
 .sheet .sum{position:relative}
+.sheet .hire .hdesc{font-weight:600}
+.sheet .hire .route{display:flex;align-items:flex-end;gap:10px;margin-top:6px;flex-wrap:wrap}
+.sheet .hire .pt{display:inline-flex;flex-direction:column;line-height:1.2}
+.sheet .hire .pt small{font-size:9.5px;letter-spacing:.08em;color:#33669b;font-weight:700}
+.sheet .hire .pt b{font-size:13px;font-weight:600}
+.sheet .hire .arw{width:46px;height:14px;position:relative;margin-bottom:3px}
+.sheet .hire .arw i{position:absolute;left:0;right:6px;top:7px;border-top:1.5px dashed #33669b}
+.sheet .hire .arw::after{content:"";position:absolute;right:0;top:3px;border-left:8px solid #33669b;border-top:4.5px solid transparent;border-bottom:4.5px solid transparent}
+.sheet .hire .when{margin-left:auto;padding-left:14px;border-left:1px solid #dde3ea}
 .sheet .stamp{position:absolute;width:190px;right:6px;top:62px;pointer-events:none}
 .sheet .void{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:700 110px/1 var(--serif);color:rgba(178,55,44,.14);transform:rotate(-24deg);letter-spacing:.08em}
 .sheet [lang="dv"],.sheet .dv{font-family:"Noto Sans Thaana",var(--serif)}
@@ -758,8 +767,14 @@ const lineAmt = (d, it) => d.type === 'delivery' ? 0 : (d.layout === 'lump' ? r2
 const KINDS = {goods:{label:'Goods & materials', short:'Goods'}, hire:{label:'Boat hire', short:'Boat hire'}};
 const kindOf = d => d.type === 'delivery' ? null : (d.kind || (d.layout === 'lump' ? 'hire' : 'goods'));
 const hireProject = () => `VESSEL HIRE (${(S.settings.vesselName || 'REHENDHI').toUpperCase()})`;
+// Boat hire line on the document: description, then FROM → TO and DATE (each part only when filled in)
+const hireCell = it => {
+  const pt = (lab, v) => `<span class="pt"><small>${lab}</small><b class="${hasThaana(v) ? 'dv' : ''}">${esc(v)}</b></span>`;
+  const route = [it.from ? pt('FROM', it.from) : '', it.from && it.to ? '<span class="arw"><i></i></span>' : '', it.to ? pt('TO', it.to) : ''].join('');
+  return `<div class="hire"><div class="hdesc ${hasThaana(it.desc) ? 'dv' : ''}">${nl(it.desc)}</div>${route || it.when ? `<div class="route">${route}${it.when ? `<span class="pt when"><small>DATE</small><b>${esc(it.when)}</b></span>` : ''}</div>` : ''}</div>`;
+};
 const hireLines = it => [it.desc,
-  (it.from || it.to) ? [it.from ? 'Loading: ' + it.from : '', it.to ? 'Unloading: ' + it.to : ''].filter(Boolean).join('     ') : '',
+  (it.from || it.to) ? [it.from ? 'From: ' + it.from : '', it.to ? 'To: ' + it.to : ''].filter(Boolean).join('  →  ') : '',
   it.when ? 'Date: ' + it.when : ''].filter(x => String(x||'').trim()).join('\n');
 const subtotal = d => r2((d.items||[]).reduce((s,it) => s + lineAmt(d,it), 0));
 // optional discount: a percentage or a fixed MVR amount, taken off before GST
@@ -1631,11 +1646,11 @@ function viewEditor(main, d, isEdit){
     drawPicker();
     $('#ititle').textContent = hire ? 'Trips / hire charges' : 'Items';
     if (hire){
-      $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:17%">Loading at</th><th style="width:17%">Unloading at</th><th style="width:13%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
+      $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:17%">From <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:17%">To <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:13%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
       $('#ibody').innerHTML = d.items.map((it,i) => `<tr>
         <td class="d"><textarea rows="1" data-i="${i}" data-k="desc" placeholder="Cargo or job" aria-label="Description">${esc(it.desc)}</textarea></td>
-        <td><input data-i="${i}" data-k="from" value="${esc(it.from)}" placeholder="Island" aria-label="Loading at"></td>
-        <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Island" aria-label="Unloading at"></td>
+        <td><input data-i="${i}" data-k="from" value="${esc(it.from)}" placeholder="Loading point" aria-label="From (loading point, optional)"></td>
+        <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Unloading point" aria-label="To (unloading point, optional)"></td>
         <td><input data-i="${i}" data-k="when" value="${esc(it.when)}" placeholder="Date" aria-label="Date or period"></td>
         <td><input class="n" inputmode="decimal" data-i="${i}" data-k="amount" value="${esc(it.amount)}" placeholder="0.00" aria-label="Amount"></td>
         <td><button type="button" class="x" data-rm="${i}" aria-label="Remove line" title="Remove line">×</button></td></tr>`).join('');
@@ -1934,7 +1949,7 @@ function sheetHTML(d){
   if (isDN){ cols = 4; head = `<th style="width:50px" class="c">S/N</th><th>Description</th><th style="width:90px" class="c">Unit</th><th style="width:100px" class="r">Qty</th>`;
     rows = items.map((it,i) => `<tr><td class="c">${i+1}</td>${td(it.desc)}<td class="c">${esc(it.unit)}</td><td class="r">${qfmt(it.qty)}</td></tr>`); }
   else if (lump){ cols = 2; head = `<th>Description</th><th style="width:150px" class="r">Amount (MVR)</th>`;
-    rows = items.map(it => `<tr>${td(kindOf(d) === 'hire' ? hireLines(it) : it.desc)}<td class="r">${money(lineAmt(d,it))}</td></tr>`); }
+    rows = items.map(it => `<tr>${kindOf(d) === 'hire' ? `<td>${hireCell(it)}</td>` : td(it.desc)}<td class="r">${money(lineAmt(d,it))}</td></tr>`); }
   else { cols = 5; head = `<th>Description</th><th style="width:70px" class="c">Unit</th><th style="width:80px" class="r">Qty</th><th style="width:90px" class="r">Rate</th><th style="width:120px" class="r">Amt. (MVR)</th>`;
     rows = items.map(it => `<tr>${td(it.desc)}<td class="c">${esc(it.unit)}</td><td class="r">${qfmt(it.qty)}</td><td class="r">${money(it.rate)}</td><td class="r">${money(lineAmt(d,it))}</td></tr>`); }
   const meta = [[T.numLabel, d.number], [T.dateLabel + ':', fmtDate(d.date)]];
@@ -2143,15 +2158,29 @@ function drawPDF(pdf, d, fill){
       : [it.desc, it.unit || '', qfmt(it.qty), money(it.rate), money(lineAmt(d,it))];
     font(9.75, false);
     const dIdx = isDN ? 1 : 0;
-    const lines = wrap(vals[dIdx], cols[dIdx].w - PAD*2);
-    const rh = Math.max(1, lines.length) * lh(9.75) + 3.8;
+    const hire = lump && kindOf(d) === 'hire', hasRoute = hire && (it.from || it.to || it.when);
+    if (hire) font(9.75, true);
+    const lines = wrap(hire ? it.desc : vals[dIdx], cols[dIdx].w - PAD*2);
+    const rh = Math.max(1, lines.length) * lh(9.75) + 3.8 + (hasRoute ? 9 : 0);
     if (y + rh > BOTTOM){ pdf.addPage(); y = 16; headRow(); }
     if (i % 2){ pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, rh, 'F'); }
-    font(9.75, false);
+    font(9.75, hire);
     cols.forEach((k, ci) => {
       if (ci === dIdx) lines.forEach((t, li) => pdf.text(t, cellX(k), y + 5.2 + li * lh(9.75)));
-      else pdf.text(vis(vals[ci]), cellX(k), y + 5.2, {align:k.a});
+      else { font(9.75, false); pdf.text(vis(vals[ci]), cellX(k), y + 5.2, {align:k.a}); }
     });
+    if (hasRoute){
+      // FROM → TO and DATE under the description, labels in small blue capitals
+      const k0 = cols[dIdx]; let rx = cellX(k0); const ly = y + 5.2 + lines.length * lh(9.75) + 1.6, vy = ly + 3.9;
+      const pt = (lab, v) => { font(6.8, true, BLUE); pdf.text(lab, rx, ly); font(9.4, true); txt(v, rx, vy); rx += Math.max(tw(v), 8) + 3.2; };
+      if (it.from) pt('FROM', it.from);
+      if (it.from && it.to){ pdf.setDrawColor(...BLUE); pdf.setLineWidth(0.35); pdf.setLineDashPattern([0.9, 0.7], 0); pdf.line(rx, vy - 1.2, rx + 10, vy - 1.2); pdf.setLineDashPattern([], 0);
+        pdf.setFillColor(...BLUE); pdf.triangle(rx + 10, vy - 2.4, rx + 12.4, vy - 1.2, rx + 10, vy, 'F'); rx += 15.5; }
+      if (it.to) pt('TO', it.to);
+      if (it.when){ font(9.4, true); const wx = k0.x + k0.w - PAD - Math.max(tw(it.when), 8);
+        pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(wx - 3.5, ly - 2.2, wx - 3.5, vy + 0.8);
+        rx = Math.max(rx, wx); pt('DATE', it.when); }
+    }
     y += rh; pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y);
   });
   if (fill > 0.5){ y += fill; pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y); }   // stretch the table down to the footer
