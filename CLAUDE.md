@@ -10,3 +10,5 @@
   (doc id = lowercase email); the main owner email is hard-coded as OWNER_EMAIL. The server-side
   limits are the Firestore rules in `firestore.rules` (same text as FIRESTORE_RULES in index.html,
   shown in Settings → Team). Keep the two in sync; the owner pastes them into the Firebase console.
+- Data: Firestore collections `docs`, `customers`, `expenses` (owner/staff only), `team`, and `settings/company`
+  (products and signature live in settings). Any new collection needs a matching rule in FIRESTORE_RULES.
