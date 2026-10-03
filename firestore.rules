@@ -33,5 +33,9 @@ service cloud.firestore {
       allow update: if isOwner() || (canWrite() && !isVoid(resource.data) && !isVoid(request.resource.data));
       allow delete: if false;   // documents are voided, never deleted
     }
+    match /expenses/{id} {
+      allow read, create, update: if canWrite();   // owner and staff; viewers don't see costs
+      allow delete: if isOwner();
+    }
   }
 }

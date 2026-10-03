@@ -374,6 +374,53 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+/* reports & expenses */
+:root{--c-sales:#2f6199;--c-exp:#d0782f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-sales:#4f8fd6;--c-exp:#c97832}}
+:root[data-theme="dark"]{--c-sales:#4f8fd6;--c-exp:#c97832}
+.tabs{display:inline-flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:999px;margin-bottom:18px}
+.tabs a{padding:7px 16px;border-radius:999px;font-weight:600;font-size:14.5px;color:var(--muted);text-decoration:none}
+.tabs a.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(16,24,40,.1)}
+.chartwrap{position:relative;padding:8px 18px 14px}
+.chartwrap svg{display:block;width:100%;height:auto;overflow:visible}
+.chartwrap .gl{stroke:var(--line);stroke-width:1}
+.chartwrap .ax{fill:var(--muted);font:12px var(--ui)}
+.chartwrap .hit{fill:transparent;cursor:default}
+.chartwrap .hit:hover,.chartwrap .hit.on{fill:var(--surface-2)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 18px 0;font-size:13.5px;color:var(--ink)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.ctip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(16,24,40,.16);padding:10px 12px;font-size:13px;min-width:170px;z-index:5}
+.ctip b{display:block;margin-bottom:4px}
+.ctip div{display:flex;justify-content:space-between;gap:14px;font-variant-numeric:tabular-nums}
+.ctip i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:6px}
+.ctip .pf{border-top:1px solid var(--line);margin-top:4px;padding-top:4px;font-weight:700}
+.hbars{list-style:none;margin:0;padding:6px 18px 14px;display:grid;gap:10px}
+.hbars li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;font-size:14px}
+.hbars .bar{grid-column:1/-1;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.hbars .bar i{display:block;height:100%;border-radius:0 4px 4px 0}
+.hbars .v{font-variant-numeric:tabular-nums;font-weight:600}
+.neg{color:var(--bad)}
+.warnbox2{margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--warn-soft);font-size:14px}
+.costlist{list-style:none;margin:0;padding:0}
+.costlist li{display:flex;justify-content:space-between;gap:8px;padding:9px 18px;border-top:1px solid var(--line);font-size:14px;cursor:pointer}
+.costlist li:hover{background:var(--surface-2)}
+@media (max-width:640px){
+  table.list.exps thead{display:none}
+  table.list.exps,table.list.exps tbody{display:block}
+  table.list.exps tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"what amt" "meta cat";column-gap:12px;row-gap:3px;padding:12px 6px;border-bottom:1px solid var(--line)}
+  table.list.exps td{display:block;padding:0;border:0;min-width:0;background:none!important}
+  table.list.exps td.empty{grid-column:1/-1;padding:24px 8px}
+  table.list.exps .e-what{grid-area:what;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.list.exps .e-amt{grid-area:amt;font-weight:700}
+  table.list.exps .e-date{grid-area:meta;font-size:12.5px;color:var(--muted)}
+  table.list.exps .e-cat{grid-area:cat;justify-self:end}
+  table.list.exps .e-job{display:none}
+  .chartwrap+.tablewrap .cc{display:none}
+  .chartwrap+.tablewrap td,.chartwrap+.tablewrap th{padding-left:5px;padding-right:5px;font-size:12.5px}
+  .chartwrap+.tablewrap th{font-size:10.5px;letter-spacing:.03em}
+}
+
 body[data-role=viewer] [data-need=edit],body:not([data-role=owner]) [data-need=owner]{display:none!important}
 body[data-role=viewer] .stbtn{cursor:default} body[data-role=viewer] .stbtn svg{display:none}
 .rolechip{display:inline-block;margin:4px 0 2px;padding:1px 9px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-size:12px;font-weight:700}
@@ -579,6 +626,7 @@ table.items th{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
   .chip{flex:none}
   .filters select{flex:1}
   .nav .cnt{right:calc(50% - 22px);top:1px}
+  .nav a[href="#/settings"]{display:none}   /* Settings stays in the account menu on phones */
   main{border-radius:22px 22px 0 0;border-right:1px solid var(--line);padding:22px 14px 110px;min-height:auto}
   .pagehead h1{font-size:25px}
   .board,.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -704,8 +752,11 @@ const hireLines = it => [it.desc,
   (it.from || it.to) ? [it.from ? 'Loading: ' + it.from : '', it.to ? 'Unloading: ' + it.to : ''].filter(Boolean).join('     ') : '',
   it.when ? 'Date: ' + it.when : ''].filter(x => String(x||'').trim()).join('\n');
 const subtotal = d => r2((d.items||[]).reduce((s,it) => s + lineAmt(d,it), 0));
-const taxAmt = d => r2(subtotal(d) * num(d.taxRate) / 100);
-const total = d => r2(subtotal(d) + taxAmt(d));
+// optional discount: a percentage or a fixed MVR amount, taken off before GST
+const discAmt = d => { const v = num(d.discount); if (!v || d.type === 'delivery') return 0; const sub = subtotal(d); return r2(d.discountType === 'amt' ? Math.min(v, sub) : sub * Math.min(v, 100) / 100); };
+const discLabel = d => d.discountType === 'amt' ? 'Discount' : `Discount ${num(d.discount)}%`;
+const taxAmt = d => r2((subtotal(d) - discAmt(d)) * num(d.taxRate) / 100);
+const total = d => r2(subtotal(d) - discAmt(d) + taxAmt(d));
 const paidOf = d => r2((d.payments||[]).reduce((s,p) => s + num(p.amount), 0));
 const balance = d => r2(total(d) - paidOf(d));
 const qtyTotal = d => (d.items||[]).reduce((s,it) => s + num(it.qty), 0);
@@ -731,15 +782,15 @@ function statusOf(d){
 const badge = st => { const [l,t] = STATUS[st] || [st,'neutral']; return `<span class="badge b-${t}">${esc(l)}</span>`; };
 
 /* ---------- store ---------- */
-const S = { docs:{}, customers:{}, settings:{...DEFAULTS}, ready:false, mode:'loading', role:null };
+const S = { docs:{}, customers:{}, expenses:{}, settings:{...DEFAULTS}, ready:false, mode:'loading', role:null };
 let db = null, downloads = null;
 const LSKEY = 'evershine-portal-v1';
 
 function loadLocal(){
-  try { const o = JSON.parse(localStorage.getItem(LSKEY) || '{}'); S.docs = o.docs || {}; S.customers = o.customers || {}; S.settings = {...DEFAULTS, ...(o.settings||{})}; } catch(e){}
+  try { const o = JSON.parse(localStorage.getItem(LSKEY) || '{}'); S.docs = o.docs || {}; S.customers = o.customers || {}; S.expenses = o.expenses || {}; S.settings = {...DEFAULTS, ...(o.settings||{})}; } catch(e){}
 }
 function saveLocal(){
-  try { localStorage.setItem(LSKEY, JSON.stringify({docs:S.docs, customers:S.customers, settings:S.settings})); } catch(e){ toast('This browser could not save the change.'); }
+  try { localStorage.setItem(LSKEY, JSON.stringify({docs:S.docs, customers:S.customers, expenses:S.expenses, settings:S.settings})); } catch(e){ toast('This browser could not save the change.'); }
 }
 function dbErr(e){
   const c = e && e.code;
@@ -750,14 +801,14 @@ function dbErr(e){
 }
 async function put(col, id, data){
   const body = clone(data); delete body.id;
-  const bucket = col === 'docs' ? S.docs : S.customers;
+  const bucket = col === 'docs' ? S.docs : col === 'expenses' ? S.expenses : S.customers;
   bucket[id] = {...body, id};
   if (db){ try { await db.collection(col).doc(id).set(body); } catch(e){ dbErr(e); throw e; } }
   else saveLocal();
   onData();
 }
 async function del(col, id){
-  const bucket = col === 'docs' ? S.docs : S.customers;
+  const bucket = col === 'docs' ? S.docs : col === 'expenses' ? S.expenses : S.customers;
   delete bucket[id];
   if (db){ try { await db.collection(col).doc(id).delete(); } catch(e){ dbErr(e); throw e; } }
   else saveLocal();
@@ -790,6 +841,10 @@ function subscribe(){
   db.doc('settings/company').onSnapshot(snap => {
     S.settings = {...DEFAULTS, ...(snap.exists ? snap.data() : {})}; ready('s'); onData();
   }, fail('s'));
+  // expenses: owner and staff only; a viewer (or rules not yet updated) simply sees none
+  if (canEdit()) db.collection('expenses').limit(2000).onSnapshot(snap => {
+    const m = {}; snap.docs.forEach(x => m[x.id] = {...x.data(), id:x.id}); S.expenses = m; S.expensesBlocked = false; onData();
+  }, e => { S.expensesBlocked = e && e.code === 'invalid_argument'; onData(); });
 }
 
 /* ---------- team roles ----------
@@ -874,6 +929,7 @@ function render(force, keepScroll){
   else if (r.a === 'convert' && S.docs[r.b] && TYPES[r.c]) viewEditor(main, convertDraft(S.docs[r.b], r.c), false);
   else if (r.a === 'customers') viewCustomers(main);
   else if (r.a === 'products') viewProducts(main);
+  else if (r.a === 'reports') viewReports(main, r.b === 'expenses' && canEdit() ? 'expenses' : 'overview');
   else if (r.a === 'settings') viewSettings(main);
   else { main.innerHTML = `<div class="empty">That page doesn't exist or the document was deleted. <a href="#/dashboard">Go to the overview</a></div>`; }
   if (changed && !keepScroll) window.scrollTo(0,0); else if (keepScroll) window.scrollTo(0,y);
@@ -900,6 +956,8 @@ const ICONS = {
   check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   hourglass:'<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22"/><path d="M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>',
   crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+  mail:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  chart:'<path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/>',
   send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
@@ -944,6 +1002,7 @@ function renderSide(){
       ${link('delivery','truck','Delivery', pend)}
       ${link('customers','users','Customers',0,false,'Clients')}
       ${link('products','box','Products',0,false,'Items')}
+      ${link('reports','chart','Reports')}
       ${isOwnerRole() ? link('settings','gear','Settings') : ''}
     </nav>`;
   if ($('#side').innerHTML !== side) $('#side').innerHTML = side;
@@ -1222,6 +1281,151 @@ function statementText(c){
   return [`Statement of account – ${c.name}`, `Date: ${fmtDate(todayISO())}`, `Total invoiced: MVR ${money(sd.billed)}`, `Total received: MVR ${money(sd.paid)}`, `Balance due: MVR ${money(sd.due)}`, '', s.name || '', [s.phone, s.email].filter(Boolean).join(' · ')].join('\n').trim();
 }
 
+/* ---------- reports & expenses ---------- */
+const EXP_CATS = ['Materials','Fuel','Labour','Boat maintenance','Transport & freight','Salaries','Rent','Utilities','Equipment','Office','Other'];
+const repState = {period:'12m', q:'', cat:'all', month:'all'};
+const ym = iso => (iso || '').slice(0,7);
+const monthName = key => new Date(key + '-01T00:00:00').toLocaleDateString('en-GB', {month:'short', year:'2-digit'});
+const compact = n => { const a = Math.abs(n); return a >= 1e6 ? (n/1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/,'') + 'M' : a >= 1e3 ? (n/1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/,'') + 'k' : String(Math.round(n)); };
+function periodMonths(p){
+  const now = new Date(), out = [];
+  if (p === 'ty' || p === 'ly'){ const y = now.getFullYear() - (p === 'ly' ? 1 : 0), last = p === 'ly' ? 11 : now.getMonth(); for (let m = 0; m <= last; m++) out.push(`${y}-${pad2(m+1)}`); }
+  else for (let i = 11; i >= 0; i--){ const d = new Date(now.getFullYear(), now.getMonth() - i, 1); out.push(`${d.getFullYear()}-${pad2(d.getMonth()+1)}`); }
+  return out;
+}
+const expList = () => Object.values(S.expenses || {}).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+const docCosts = d => expList().filter(x => x.docId && (x.docId === d.id || (d.sourceId && x.docId === d.sourceId)));
+function jobCostsPanel(d){
+  const costs = docCosts(d), sum = r2(costs.reduce((a,x) => a + num(x.amount), 0)), profit = r2(total(d) - sum);
+  return `<section class="panel" id="jobcosts" data-need="edit"><h2>Job costs <button type="button" class="btn sm" data-addcost>${icon('plus',15)}Add cost</button></h2>
+    ${costs.length ? `<ul class="costlist">${costs.map(x => `<li data-x="${esc(x.id)}"><span>${esc(x.desc || x.category)}<br><span class="dim">${fmtDate(x.date)} · ${esc(x.category || '')}</span></span><b>${money(x.amount)}</b></li>`).join('')}</ul>` : '<div class="empty" style="padding:14px">No costs linked yet. Add fuel, materials or labour for this job to see its profit.</div>'}
+    <div class="facts" style="border-top:1px solid var(--line)"><div class="row" style="gap:22px"><div><div class="k">Costs</div><div class="v">${money(sum)}</div></div><div><div class="k">${d.type === 'quotation' ? 'Estimated profit' : 'Profit'}</div><div class="v ${profit < 0 ? 'neg' : ''}">${money(profit)}</div></div></div></div></section>`;
+}
+function expenseBox(x, preset){
+  if (!canEdit()) return;
+  const isNew = !x; x = x || {date: todayISO(), category: 'Materials', amount: '', desc: '', vendor: '', method: 'Cash', docId: '', note: '', ...(preset || {})};
+  const jobs = Object.values(S.docs).filter(d => (d.type === 'invoice' || d.type === 'quotation') && !isVoid(d)).sort((a,b) => (b.date||'').localeCompare(a.date||'')).slice(0, 300);
+  const w = modal(isNew ? 'Add expense' : 'Expense', `
+    <div class="fgrid two" style="padding:0"><div class="fld"><label for="x-d">Date</label><input id="x-d" type="date" value="${esc(x.date)}"></div>
+      <div class="fld"><label for="x-a">Amount (MVR)</label><input id="x-a" inputmode="decimal" value="${esc(x.amount)}" placeholder="0.00"></div></div>
+    <div class="fgrid two" style="padding:0"><div class="fld"><label for="x-c">Category</label><select id="x-c">${EXP_CATS.concat(EXP_CATS.includes(x.category) ? [] : [x.category]).map(c => `<option ${c === x.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="x-m">Paid by</label><select id="x-m">${['Cash','Bank transfer','Card','Cheque','Other'].map(m => `<option ${m === x.method ? 'selected' : ''}>${m}</option>`).join('')}</select></div></div>
+    <div class="fld"><label for="x-s">Description</label><input id="x-s" value="${esc(x.desc)}" placeholder="e.g. Diesel for REHENDHI, 200 L"></div>
+    <div class="fld"><label for="x-v">Paid to (optional)</label><input id="x-v" value="${esc(x.vendor)}" placeholder="Supplier or person"></div>
+    <div class="fld"><label for="x-j">For job (optional)</label><select id="x-j"><option value="">Not linked to a job</option>${jobs.map(d => `<option value="${esc(d.id)}" ${d.id === x.docId ? 'selected' : ''}>${esc(d.number)} · ${esc(d.customer?.name || '')}</option>`).join('')}</select><span class="hint">Link it to a quotation or invoice to see that job's profit.</span></div>
+    ${!isNew && isOwnerRole() ? '<div class="row"><button type="button" class="btn sm danger" data-delx>Delete expense</button></div>' : ''}`,
+    'Save expense', async w => {
+      const amount = r2(num(w.querySelector('#x-a').value));
+      if (!(amount > 0)){ toast('Enter an amount above zero.'); return false; }
+      const id = x.id || uid();
+      await put('expenses', id, {date: w.querySelector('#x-d').value || todayISO(), amount, category: w.querySelector('#x-c').value, method: w.querySelector('#x-m').value,
+        desc: w.querySelector('#x-s').value.trim(), vendor: w.querySelector('#x-v').value.trim(), docId: w.querySelector('#x-j').value, note: x.note || '',
+        createdAt: x.createdAt || new Date().toISOString(), createdBy: x.createdBy || S.user || '', updatedAt: new Date().toISOString()});
+      toast(isNew ? 'Expense added' : 'Expense saved');
+      if (location.hash.startsWith('#/doc/')) render(true, true);
+    });
+  const dx = w.querySelector('[data-delx]');
+  if (dx) dx.addEventListener('click', () => { w.remove(); confirmBox('Delete this expense?', `MVR ${money(x.amount)} · ${x.desc || x.category} on ${fmtDate(x.date)}`, 'Delete', async () => { await del('expenses', x.id); toast('Expense deleted'); if (location.hash.startsWith('#/doc/')) render(true, true); }); });
+}
+function viewReports(main, tab){
+  const showExp = canEdit();
+  main.innerHTML = `<div class="pagehead"><div><h1>Reports</h1><p>${tab === 'expenses' ? 'Costs of running the business. Link a cost to a job to see that job\'s profit.' : 'Sales are invoices issued (incl. GST), by invoice date. Voided invoices are left out.'}</p></div>
+      <div class="row">${tab === 'expenses' ? `<button class="btn primary" id="addx" data-need="edit">${icon('plus',18)}Add expense</button>` : `<select id="rp" class="btn" aria-label="Period"><option value="12m">Last 12 months</option><option value="ty">This year</option><option value="ly">Last year</option></select>`}</div></div>
+    ${showExp ? `<nav class="tabs"><a href="#/reports" class="${tab === 'overview' ? 'on' : ''}">Overview</a><a href="#/reports/expenses" class="${tab === 'expenses' ? 'on' : ''}">Expenses</a></nav>` : ''}
+    ${showExp && S.expensesBlocked ? '<div class="warnbox2"><b>One step left for expenses:</b> the security rules in Firebase need updating. Owner: Settings → Team → Security rules → Copy rules, then paste and Publish in Firebase.</div>' : ''}
+    <div id="rbody"></div>`;
+  if (tab === 'expenses') return expensesTab(main);
+  $('#rp').value = repState.period;
+  $('#rp').addEventListener('change', e => { repState.period = e.target.value; overview(); });
+  const overview = () => {
+    const months = periodMonths(repState.period), set = new Set(months);
+    const M = {}; months.forEach(k => M[k] = {sales:0, coll:0, exp:0});
+    const inv = Object.values(S.docs).filter(d => d.type === 'invoice' && !isVoid(d));
+    const custs = {};
+    inv.forEach(d => { const k = ym(d.date); if (set.has(k)){ M[k].sales += total(d); const cn = d.customer?.name || '—'; custs[cn] = (custs[cn] || 0) + total(d); }
+      (d.payments || []).forEach(p => { const pk = ym(p.date || d.date); if (set.has(pk)) M[pk].coll += num(p.amount); }); });
+    const cats = {};
+    if (showExp) expList().forEach(x => { const k = ym(x.date); if (set.has(k)){ M[k].exp += num(x.amount); cats[x.category || 'Other'] = (cats[x.category || 'Other'] || 0) + num(x.amount); } });
+    const T = months.reduce((a,k) => ({sales:a.sales + M[k].sales, coll:a.coll + M[k].coll, exp:a.exp + M[k].exp}), {sales:0, coll:0, exp:0});
+    const profit = T.sales - T.exp, margin = T.sales ? Math.round(profit / T.sales * 100) : 0;
+    const series = [{k:'sales', label:'Sales', color:'var(--c-sales)'}].concat(showExp ? [{k:'exp', label:'Expenses', color:'var(--c-exp)'}] : []);
+    // grouped bar chart (one axis), with a hover tooltip per month
+    // drawn at the real on-screen width so the axis text stays readable on phones
+    const VW = Math.max(300, Math.min(1100, ($('#rbody').clientWidth || 760) - 40)), VH = VW < 560 ? 220 : 250, PL = 40, PR = 6, PT = 10, PB = 28, ih = VH - PT - PB, iw = VW - PL - PR;
+    const maxV = Math.max(1, ...months.map(k => Math.max(...series.map(sr => M[k][sr.k]))));
+    const step = Math.pow(10, Math.floor(Math.log10(maxV))), top = Math.ceil(maxV / step / 2) * step * 2 || 1;
+    const ticks = [0, .25, .5, .75, 1].map(f => f * top), Y = v => PT + ih - v / top * ih;
+    const gw = iw / months.length, bw = Math.max(4, Math.min(22, (gw - 10) / series.length - 2));
+    const bar = (x, v) => { const h = Math.max(0, ih - (Y(v) - PT)); if (h < .5) return ''; const r = Math.min(4, h, bw/2), y0 = PT + ih, y1 = y0 - h;
+      return `M${x},${y0}V${y1 + r}Q${x},${y1} ${x + r},${y1}H${x + bw - r}Q${x + bw},${y1} ${x + bw},${y1 + r}V${y0}Z`; };
+    const svg = `<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Monthly sales${showExp ? ' and expenses' : ''}">
+      ${ticks.map(t => `<line class="gl" x1="${PL}" x2="${VW - PR}" y1="${Y(t)}" y2="${Y(t)}"/><text class="ax" x="${PL - 8}" y="${Y(t) + 4}" text-anchor="end">${compact(t)}</text>`).join('')}
+      ${months.map((k, i) => { const gx = PL + i * gw, x0 = gx + (gw - series.length * (bw + 2) + 2) / 2;
+        return `<rect class="hit" data-m="${k}" x="${gx + 1}" y="${PT}" width="${gw - 2}" height="${ih}" rx="6"/>`
+          + series.map((sr, j) => `<path d="${bar(x0 + j * (bw + 2), M[k][sr.k])}" fill="${sr.color}" pointer-events="none"/>`).join('')
+          + (gw >= 46 || i % 2 === (months.length - 1) % 2 ? `<text class="ax" x="${gx + gw/2}" y="${VH - 8}" text-anchor="middle">${gw >= 46 ? monthName(k) : new Date(k + '-01T00:00:00').toLocaleDateString('en-GB', {month:'short'})}</text>` : ''); }).join('')}
+    </svg>`;
+    const hb = (obj, color) => { const e = Object.entries(obj).sort((a,b) => b[1] - a[1]).slice(0, 6), mx = e.length ? e[0][1] : 1;
+      return e.length ? `<ul class="hbars">${e.map(([n, v]) => `<li><span>${esc(n)}</span><span class="v">${money0(v)}</span><span class="bar"><i style="width:${Math.max(2, v / mx * 100)}%;background:${color}"></i></span></li>`).join('')}</ul>` : '<div class="empty" style="padding:16px">Nothing in this period.</div>'; };
+    $('#rbody').innerHTML = `
+      <div class="stats">${stat('receipt', money0(T.sales), 'MVR', 'Sales', `${months.length} months`)}${stat('check', money0(T.coll), 'MVR', 'Collected', '', 'ok')}
+        ${showExp ? stat('wallet', money0(T.exp), 'MVR', 'Expenses', '', 'warn') + stat('chart', money0(profit), 'MVR', 'Profit', T.sales ? `${margin}% of sales` : '', profit < 0 ? 'bad' : '') : ''}</div>
+      <section class="panel"><h2>Monthly sales${showExp ? ' and expenses' : ''}</h2>
+        ${series.length > 1 ? `<div class="legend">${series.map(sr => `<span><i style="background:${sr.color}"></i>${sr.label}</span>`).join('')}</div>` : ''}
+        <div class="chartwrap" id="chart">${svg}<div class="ctip" id="ctip" hidden></div></div>
+        <div class="tablewrap"><table class="list"><thead><tr><th>Month</th><th class="num">Sales</th><th class="num cc">Collected</th>${showExp ? '<th class="num">Expenses</th><th class="num">Profit</th>' : ''}</tr></thead><tbody>
+          ${months.slice().reverse().map(k => `<tr style="cursor:default"><td style="white-space:nowrap">${new Date(k + '-01T00:00:00').toLocaleDateString('en-GB', {month:'short', year:'numeric'})}</td><td class="num">${money(M[k].sales)}</td><td class="num cc">${money(M[k].coll)}</td>${showExp ? `<td class="num">${money(M[k].exp)}</td><td class="num ${M[k].sales - M[k].exp < 0 ? 'neg' : ''}">${money(M[k].sales - M[k].exp)}</td>` : ''}</tr>`).join('')}
+          <tr style="cursor:default;font-weight:700"><td>Total</td><td class="num">${money(T.sales)}</td><td class="num cc">${money(T.coll)}</td>${showExp ? `<td class="num">${money(T.exp)}</td><td class="num ${profit < 0 ? 'neg' : ''}">${money(profit)}</td>` : ''}</tr>
+        </tbody></table></div></section>
+      <div class="grid2" style="margin-top:22px">
+        <section class="panel"><h2>Top customers by sales</h2>${hb(custs, 'var(--c-sales)')}</section>
+        ${showExp ? `<section class="panel"><h2>Expenses by category</h2>${hb(cats, 'var(--c-exp)')}</section>` : ''}
+      </div>`;
+    const wrap = $('#chart'), tip = $('#ctip');
+    const showTip = el => {
+      wrap.querySelectorAll('.hit.on').forEach(h => h.classList.remove('on')); el.classList.add('on');
+      const k = el.dataset.m, m = M[k];
+      tip.innerHTML = `<b>${new Date(k + '-01T00:00:00').toLocaleDateString('en-GB', {month:'long', year:'numeric'})}</b>` + series.map(sr => `<div><span><i style="background:${sr.color}"></i>${sr.label}</span><span>${money(m[sr.k])}</span></div>`).join('')
+        + (showExp ? `<div class="pf"><span>Profit</span><span class="${m.sales - m.exp < 0 ? 'neg' : ''}">${money(m.sales - m.exp)}</span></div>` : `<div><span>Collected</span><span>${money(m.coll)}</span></div>`);
+      tip.hidden = false;
+      const wr = wrap.getBoundingClientRect(), br = el.getBoundingClientRect(), tw2 = tip.offsetWidth;
+      let left = br.left - wr.left + br.width / 2 - tw2 / 2; left = Math.max(4, Math.min(wr.width - tw2 - 4, left));
+      tip.style.left = left + 'px'; tip.style.top = Math.max(0, br.top - wr.top + 6) + 'px';
+    };
+    wrap.querySelectorAll('.hit').forEach(h => { h.addEventListener('mouseenter', () => showTip(h)); h.addEventListener('click', () => showTip(h)); });
+    wrap.addEventListener('mouseleave', () => { tip.hidden = true; wrap.querySelectorAll('.hit.on').forEach(h => h.classList.remove('on')); });
+  };
+  overview();
+  let rt; const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (location.hash.replace(/^#\/?/, '') === 'reports' && $('#chart')) overview(); }, 200); };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('hashchange', () => window.removeEventListener('resize', onResize), {once:true});
+}
+function expensesTab(main){
+  const st = repState;
+  const all = expList(), months = [...new Set(all.map(x => ym(x.date)))].sort().reverse();
+  $('#rbody').innerHTML = `<section class="panel">
+      <div class="filters"><label class="search">${icon('search',18)}<input id="xq" type="search" placeholder="Search description, supplier or job" value="${esc(st.q)}" aria-label="Search expenses"></label>
+        <select id="xm" aria-label="Month"><option value="all">All months</option>${months.map(k => `<option value="${k}" ${st.month === k ? 'selected' : ''}>${new Date(k + '-01T00:00:00').toLocaleDateString('en-GB', {month:'long', year:'numeric'})}</option>`).join('')}</select>
+        <select id="xc" aria-label="Category"><option value="all">All categories</option>${EXP_CATS.map(c => `<option ${st.cat === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="tablewrap"><table class="list exps"><thead><tr><th>Date</th><th>Details</th><th>Category</th><th>Job</th><th class="num">Amount (MVR)</th></tr></thead><tbody id="xrows"></tbody></table></div></section>`;
+  const draw = () => {
+    const q = st.q.trim().toLowerCase();
+    const list = all.filter(x => (st.month === 'all' || ym(x.date) === st.month) && (st.cat === 'all' || x.category === st.cat)
+      && (!q || [x.desc, x.vendor, x.category, (S.docs[x.docId] || {}).number, (S.docs[x.docId] || {}).customer?.name].join(' ').toLowerCase().includes(q)));
+    const sum = list.reduce((a,x) => a + num(x.amount), 0);
+    $('#xrows').innerHTML = list.length ? list.map(x => { const j = S.docs[x.docId];
+      return `<tr data-x="${esc(x.id)}"><td class="e-date">${fmtDate(x.date)}${x.vendor ? `<span class="m-only"> · ${esc(x.vendor)}</span>` : ''}</td><td class="e-what"><div>${esc(x.desc || x.category)}</div><div class="dim">${esc(x.vendor || '')}</div></td><td class="e-cat"><span class="tag" style="margin:0">${esc(x.category || '')}</span></td><td class="e-job dim">${j ? esc(j.number) : ''}</td><td class="num e-amt">${money(x.amount)}</td></tr>`; }).join('')
+      + `<tr style="cursor:default;font-weight:700"><td colspan="4">Total (${list.length})</td><td class="num">${money(sum)}</td></tr>`
+      : `<tr><td colspan="5" class="empty">${all.length ? 'No expenses match.' : 'No expenses yet. Add fuel, materials, labour and other costs to see your profit.'}</td></tr>`;
+    $('#xrows').querySelectorAll('[data-x]').forEach(r => r.addEventListener('click', () => expenseBox(S.expenses[r.dataset.x])));
+  };
+  $('#xq').addEventListener('input', e => { st.q = e.target.value; draw(); });
+  $('#xm').addEventListener('change', e => { st.month = e.target.value; draw(); });
+  $('#xc').addEventListener('change', e => { st.cat = e.target.value; draw(); });
+  const ax = $('#addx'); if (ax) ax.addEventListener('click', () => expenseBox(null));
+  draw();
+}
+
 /* ---------- quick preview ---------- */
 function previewDoc(id, ids){
   ids = ids && ids.length ? ids : [id];
@@ -1231,7 +1435,7 @@ function previewDoc(id, ids){
     <div class="pvhead"><div class="pvtitle"></div>
       <div class="row pvnav"><button type="button" class="ibtn" data-step="-1" title="Previous (←)" aria-label="Previous document">‹</button><span class="dim pvcount"></span><button type="button" class="ibtn" data-step="1" title="Next (→)" aria-label="Next document">›</button><button type="button" class="ibtn" data-close title="Close (Esc)" aria-label="Close">×</button></div></div>
     <div class="pvbody"><div class="sheet-fit"></div></div>
-    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit data-need="edit">Edit</a><button type="button" class="btn tg" data-tg>${icon('send',17)}Telegram</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
+    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit data-need="edit">Edit</a><button type="button" class="btn" data-em>${icon('mail',17)}Email</button><button type="button" class="btn tg" data-tg>${icon('send',17)}Telegram</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
   document.body.appendChild(w);
   const show = () => {
     const d = S.docs[ids[i]]; if (!d) return close();
@@ -1253,6 +1457,7 @@ function previewDoc(id, ids){
     const d = S.docs[ids[i]];
     if (e.target.closest('[data-pdf]')) makePDF(d, e.target.closest('[data-pdf]'));
     else if (e.target.closest('[data-tg]')) shareTelegram(d, e.target.closest('[data-tg]'));
+    else if (e.target.closest('[data-em]')) emailDoc(d, e.target.closest('[data-em]'));
   });
   // swipe left / right on phones
   let sx = null; const body = w.querySelector('.pvbody');
@@ -1285,7 +1490,7 @@ function newDraft(type, kind){
 function convertDraft(src, type){
   const d = newDraft(type);
   Object.assign(d, {customerId:src.customerId, customer:clone(src.customer||{}), po:src.po||'', project:src.project||'', sourceId:src.id,
-    deliveryAddress: src.deliveryAddress || '', kind: type === 'delivery' ? null : kindOf(src), layout: src.layout || 'items', taxRate: src.taxRate || 0});
+    deliveryAddress: src.deliveryAddress || '', kind: type === 'delivery' ? null : kindOf(src), layout: src.layout || 'items', taxRate: src.taxRate || 0, discount: type === 'delivery' ? 0 : (src.discount || 0), discountType: src.discountType || 'pct'});
   d.items = clone(src.items||[]).map(it => {
     if (type === 'delivery' && src.layout === 'lump') return {...blankItem(), desc: kindOf(src) === 'hire' ? hireLines(it) : it.desc, unit: kindOf(src) === 'hire' ? 'Trip' : (it.unit || 'Lot'), qty: it.qty || 1};
     if (src.type === 'delivery' && d.layout === 'lump') return {...blankItem(), desc: it.desc};
@@ -1350,6 +1555,7 @@ function viewEditor(main, d, isEdit){
         <div class="fgrid two">
           ${isDN ? `<div class="fld span4"><label for="f-msg">Confirmation text</label><textarea id="f-msg" data-f="message" rows="3">${esc(d.message)}</textarea></div>`
                  : `<div class="fld span4"><label for="f-terms">One term per line</label><textarea id="f-terms" data-f="terms" rows="4">${esc(d.terms)}</textarea></div>
+                    <div class="fld"><label for="f-disc">Discount (optional)</label><div class="dpick"><input id="f-disc" type="number" min="0" step="0.01" data-f="discount" value="${esc(d.discount || '')}" placeholder="None" style="flex:1;width:auto"><select data-f="discountType" aria-label="Discount type" style="flex:none;width:92px"><option value="pct" ${d.discountType !== 'amt' ? 'selected' : ''}>%</option><option value="amt" ${d.discountType === 'amt' ? 'selected' : ''}>MVR</option></select></div><span class="hint">Leave empty for no discount. Taken off before GST.</span></div>
                     <div class="fld"><label for="f-tax">GST / tax (%)</label><input id="f-tax" type="number" min="0" step="0.01" data-f="taxRate" value="${esc(d.taxRate||0)}"><span class="hint">Leave at 0 if you don't charge tax. The row is hidden when 0.</span></div>`}
         </div>
       </section>
@@ -1415,7 +1621,7 @@ function viewEditor(main, d, isEdit){
     if (!isDN && d.layout !== 'lump') d.items.forEach((it,i) => { const c = $('#a'+i); if (c) c.textContent = money(lineAmt(d,it)); });
     if (isDN){ $('#tot').innerHTML = `<div class="totals"><span>Total quantity</span><span class="gt">${qfmt(qtyTotal(d))}</span></div>`; return; }
     const tx = num(d.taxRate);
-    $('#tot').innerHTML = `<div class="totals"><span>Sub total</span><span>${money(subtotal(d))}</span>${tx ? `<span>GST ${tx}%</span><span>${money(taxAmt(d))}</span>` : ''}<span>Grand total (MVR)</span><span class="gt">${money(total(d))}</span></div><div class="words">${esc(amountWords(total(d)))}</div>`;
+    $('#tot').innerHTML = `<div class="totals"><span>Sub total</span><span>${money(subtotal(d))}</span>${discAmt(d) ? `<span>${esc(discLabel(d))}</span><span>-${money(discAmt(d))}</span>` : ''}${tx ? `<span>GST ${tx}%</span><span>${money(taxAmt(d))}</span>` : ''}<span>Grand total (MVR)</span><span class="gt">${money(total(d))}</span></div><div class="words">${esc(amountWords(total(d)))}</div>`;
   };
 
   const form = $('#ed');
@@ -1428,7 +1634,7 @@ function viewEditor(main, d, isEdit){
         d.terms = syncTermDays(d.terms, d.type, el.value); const ta = $('#f-terms'); if (ta) ta.value = d.terms;
       }
       if (el.dataset.f === 'date' && d._auto && !isEdit){ d.number = nextNumber(d.type, d.date); $('#f-number').value = d.number; }
-      if (el.dataset.f === 'taxRate') drawTotals();
+      if (['taxRate','discount','discountType'].includes(el.dataset.f)) drawTotals();
       hints();
     } else if (el.dataset.g){
       d.signs = {...dnSigns(d), [el.dataset.g]: el.value};
@@ -1494,7 +1700,7 @@ function viewEditor(main, d, isEdit){
         d.customerId = cid;
       }
       const body = clone(d); delete body._auto;
-      body.validDays = num(body.validDays); body.dueDays = num(body.dueDays); body.taxRate = num(body.taxRate);
+      body.validDays = num(body.validDays); body.dueDays = num(body.dueDays); body.taxRate = num(body.taxRate); body.discount = num(body.discount) > 0 ? num(body.discount) : 0; body.discountType = body.discountType === 'amt' ? 'amt' : 'pct';
       body.updatedAt = new Date().toISOString();
       await put('docs', d.id, body);
       if (!isEdit && src && src.type === 'quotation' && d.type === 'invoice' && src.status !== 'accepted'){
@@ -1544,12 +1750,13 @@ function viewDoc(main, d){
   }
   main.innerHTML = `
     <div class="pagehead"><div><div class="row"><span class="tag">${T.label}${kindOf(d) ? ' · ' + KINDS[kindOf(d)].short : ''}</span>${badge(st)}</div><h1 style="margin-top:6px">${esc(d.number)}</h1><p>${esc(d.customer?.name)} · ${fmtDate(d.date)}</p></div>
-      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" data-need="edit" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn tg" id="tg" title="Share the PDF on Telegram">${icon('send',17)}Telegram</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
+      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" data-need="edit" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn" id="em" title="Email the PDF">${icon('mail',17)}Email</button><button class="btn tg" id="tg" title="Share the PDF on Telegram">${icon('send',17)}Telegram</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
     <div class="docview">
       <div class="sheet-fit">${sheetHTML(d)}</div>
       <div class="sidecol">
         <section class="panel"><div class="facts">${facts}</div><div class="acts" data-need="edit">${acts}</div></section>
         ${d.type === 'invoice' ? `<section class="panel"><h2>Payments</h2>${(d.payments||[]).length ? `<ul class="plist">${d.payments.map((p,i) => `<li><span><b>${money(p.amount)}</b><br><span class="dim">${fmtDate(p.date)} · ${esc(p.method||'')}${p.ref ? ' · '+esc(p.ref) : ''}</span></span><button class="x" data-rmpay="${i}" data-need="edit" aria-label="Remove payment" title="Remove payment">×</button></li>`).join('')}</ul>` : `<div class="empty" style="padding:16px">No payments recorded yet.</div>`}</section>` : ''}
+        ${d.type !== 'delivery' && canEdit() ? jobCostsPanel(d) : ''}
         ${src || kids.length ? `<section class="panel"><h2>Linked documents</h2><div class="links">${src ? `<a href="#/doc/${src.id}"><span class="dim">Created from</span><br><b>${TYPES[src.type].label} ${esc(src.number)}</b></a>` : ''}${kids.map(k => `<a href="#/doc/${k.id}"><span class="dim">${TYPES[k.type].label}</span><br><b>${esc(k.number)}</b> ${badge(statusOf(k))}</a>`).join('')}</div></section>` : ''}
         <section class="panel" data-need="edit"><div class="acts" style="padding-top:18px">${A('dup','Duplicate')}${st === 'void' || !isOwnerRole() ? '' : A('void','Void ' + T.label.toLowerCase(),'danger')}</div>${st === 'void' ? `<p class="dim" style="margin:0;padding:0 18px 16px">Voided${d.voided?.date ? ' on ' + fmtDate(d.voided.date) : ''}${d.voided?.reason ? ': ' + esc(d.voided.reason) : ''}. It stays on record and in the list, but doesn't count in any totals.</p>` : `<p class="dim" style="margin:0;padding:0 18px 16px">Documents can't be deleted. Void it instead to keep the record.</p>`}</section>
       </div>
@@ -1557,6 +1764,12 @@ function viewDoc(main, d){
   $('#print').addEventListener('click', () => { try { window.print(); } catch(e){ toast('Printing isn\'t available here. Use Download PDF instead.'); } });
   $('#pdf').addEventListener('click', e => makePDF(d, e.currentTarget));
   $('#tg').addEventListener('click', e => shareTelegram(d, e.currentTarget));
+  $('#em').addEventListener('click', e => emailDoc(d, e.currentTarget));
+  const jc = main.querySelector('#jobcosts');
+  if (jc) jc.addEventListener('click', e => {
+    const a = e.target.closest('[data-addcost]'); if (a) return expenseBox(null, {docId: d.id});
+    const r = e.target.closest('[data-x]'); if (r) expenseBox(S.expenses[r.dataset.x]);
+  });
   main.querySelectorAll('[data-rmpay]').forEach(b => b.addEventListener('click', () => {
     const i = +b.dataset.rmpay, p = d.payments[i];
     confirmBox('Remove this payment?', `MVR ${money(p.amount)} recorded on ${fmtDate(p.date)} will be removed from ${d.number}.`, 'Remove payment', async () => {
@@ -1694,6 +1907,7 @@ function sheetHTML(d){
   if (isDN) sum = `<div class="sum"><div class="w"></div><table><tr class="gt"><td>Total</td><td>${qfmt(qtyTotal(d))}</td></tr></table></div>`;
   else sum = `<div class="sum"><div class="w"><b>Amount in words (MVR):</b> ${esc(amountWords(total(d)))}</div><table>
       <tr><td>Sub Total</td><td>${money(subtotal(d))}</td></tr>
+      ${discAmt(d) ? `<tr><td>${esc(discLabel(d))}</td><td>-${money(discAmt(d))}</td></tr>` : ''}
       ${num(d.taxRate) ? `<tr><td>GST ${num(d.taxRate)}%</td><td>${money(taxAmt(d))}</td></tr>` : ''}
       <tr class="gt"><td>Grand Total</td><td>${money(total(d))}</td></tr>
       ${d.type === 'invoice' && paidNow > 0 && st !== 'paid' ? `<tr><td>Paid</td><td>${money(paidNow)}</td></tr><tr class="bal"><td>Balance due</td><td>${money(balance(d))}</td></tr>` : ''}
@@ -1907,6 +2121,7 @@ function drawPDF(pdf, d, fill){
   if (isDN) tRows.push(['Total', qfmt(qtyTotal(d)), 'gt']);
   else {
     tRows.push(['Sub Total', money(subtotal(d))]);
+    if (discAmt(d)) tRows.push([discLabel(d), '-' + money(discAmt(d))]);
     if (num(d.taxRate)) tRows.push([`GST ${num(d.taxRate)}%`, money(taxAmt(d))]);
     tRows.push(['Grand Total', money(total(d)), 'gt']);
     const p = paidOf(d);
@@ -2038,6 +2253,32 @@ let shareCache = null;   // the PDF from the last tap, reused if the browser nee
 function shareTelegram(d, btn){
   return sharePDF(d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length, () => buildPDF(d), shareText(d), btn);
 }
+// Email: phones get the share sheet with the PDF attached (pick Mail or Gmail);
+// computers download the PDF and open Gmail with the customer, subject and message filled in.
+async function emailPDF(key, build, mail, btn){
+  const label = btn.innerHTML; btn.disabled = true;
+  try {
+    let f = shareCache && shareCache.key === key ? shareCache : null;
+    if (!f){ btn.textContent = 'Preparing PDF…'; f = shareCache = {key, ...(await build())}; }
+    const file = new File([f.blob], f.name, {type:'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files:[file]})){
+      try { await navigator.share({files:[file], title: mail.subject, text: mail.body}); }
+      catch(e){ if (e && e.name === 'NotAllowedError') toast('PDF is ready. Tap Email again.'); else if (!e || e.name !== 'AbortError') throw e; }
+    } else {
+      await saveFile(f.name, f.blob);
+      window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail.to || '') + '&su=' + encodeURIComponent(mail.subject) + '&body=' + encodeURIComponent(mail.body), '_blank', 'noopener');
+      toast('PDF downloaded. In Gmail, attach it with the 📎 button, then Send.');
+    }
+  } catch(e){ console.error(e); toast('Email didn\'t open here. Use Download PDF and attach it to an email.'); }
+  btn.disabled = false; btn.innerHTML = label;
+}
+function docMail(d){
+  const T = TYPES[d.type], s = S.settings, c = S.customers[d.customerId] || {};
+  const who = (d.customer?.name || c.name || '').trim();
+  return { to: c.email || '', subject: `${T.label} ${d.number} – ${s.name || ''}`.trim(),
+    body: `Dear ${who || 'Sir/Madam'},\n\nPlease find attached ${T.label.toLowerCase()} ${d.number}.\n\n${shareText(d)}\n\nThank you.` };
+}
+function emailDoc(d, btn){ return emailPDF(d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length, () => buildPDF(d), docMail(d), btn); }
 async function sharePDF(key, build, text, btn){
   const label = btn.innerHTML; btn.disabled = true;
   try {
@@ -2103,7 +2344,7 @@ function customerBox(c){
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
     ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
-    ${isNew ? '' : `<div class="row"><button type="button" class="btn sm" data-stmt>Statement PDF</button><button type="button" class="btn sm tg" data-stmt-tg>${icon('send',15)}Share statement</button><span class="dim">Invoices, payments and balance</span></div>`}
+    ${isNew ? '' : `<div class="row"><button type="button" class="btn sm" data-stmt>Statement PDF</button><button type="button" class="btn sm" data-stmt-em>${icon('mail',15)}Email statement</button><button type="button" class="btn sm tg" data-stmt-tg>${icon('send',15)}Share statement</button><span class="dim">Invoices, payments and balance</span></div>`}
     ${isNew ? '' : `<div class="row" data-need="edit"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a>${isOwnerRole() ? '<button class="btn sm danger" data-delc>Delete customer</button>' : ''}</div>`}`,
     'Save customer', async w => {
       if (!canEdit()){ toast('Your role can only view customers.'); return false; }
@@ -2117,6 +2358,9 @@ function customerBox(c){
   if (sb) sb.addEventListener('click', async () => { const l = sb.innerHTML; sb.disabled = true; sb.textContent = 'Preparing…'; try { const f = await buildStatement(c); await saveFile(f.name, f.blob); } catch(e){ console.error(e); toast('The statement could not be created.'); } sb.disabled = false; sb.innerHTML = l; });
   const st2 = w.querySelector('[data-stmt-tg]');
   if (st2) st2.addEventListener('click', () => sharePDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c), statementText(c), st2));
+  const se = w.querySelector('[data-stmt-em]');
+  if (se) se.addEventListener('click', () => emailPDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c),
+    {to: c.email || '', subject: `Statement of account – ${S.settings.name || ''}`, body: `Dear ${c.name || 'Sir/Madam'},\n\nPlease find attached your statement of account.\n\n${statementText(c)}\n\nThank you.`}, se));
   const pv = e => { const b = e.target.closest('[data-pv]'); if (!b || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')) return; e.preventDefault(); e.stopPropagation(); previewDoc(b.dataset.pv, pvIds); };
   w.addEventListener('click', pv, true); w.addEventListener('keydown', pv, true);
   if (!canEdit()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('[data-ok]').style.display = 'none'; }
@@ -2223,6 +2467,10 @@ service cloud.firestore {
       allow create: if canWrite() && !isVoid(request.resource.data);
       allow update: if isOwner() || (canWrite() && !isVoid(resource.data) && !isVoid(request.resource.data));
       allow delete: if false;   // documents are voided, never deleted
+    }
+    match /expenses/{id} {
+      allow read, create, update: if canWrite();   // owner and staff; viewers don't see costs
+      allow delete: if isOwner();
     }
   }
 }`;
@@ -2436,7 +2684,7 @@ function viewSettings(main){
   $('#sig-adj').addEventListener('click', () => signatureEditor(s.signImage || SIGN, {bg:true, size:s.signScale}, useSig));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
   $('#bk-exp').addEventListener('click', () => {
-    const data = {app:'evershine-portal', version:1, exportedAt:new Date().toISOString(), settings:S.settings, customers:S.customers, docs:S.docs};
+    const data = {app:'evershine-portal', version:1, exportedAt:new Date().toISOString(), settings:S.settings, customers:S.customers, docs:S.docs, expenses:S.expenses};
     saveFile(`evershine-backup-${todayISO()}.json`, JSON.stringify(data, null, 1));
   });
   $('#bk-imp').addEventListener('click', () => $('#bk-file').click());
@@ -2449,6 +2697,7 @@ function viewSettings(main){
     confirmBox('Restore this backup?', `This adds ${nd} documents and ${nc} customers from ${fmtDate((data.exportedAt||'').slice(0,10)) || 'the backup'}, plus its settings. Records with the same ID are replaced; everything else stays.`, 'Restore backup', async () => {
       let n = 0;
       for (const [id, c] of Object.entries(data.customers||{})){ await put('customers', id, c); n++; }
+      for (const [id, x] of Object.entries(data.expenses||{})){ try { await put('expenses', id, x); } catch(e){} }
       for (const [id, d] of Object.entries(data.docs||{})){ await put('docs', id, d); n++; if (n % 10 === 0) toast(`Restoring… ${n} of ${nd+nc}`); }
       if (data.settings) await saveSettings(data.settings);
       toast(`Backup restored: ${nd} documents, ${nc} customers`);
@@ -2564,7 +2813,7 @@ if (!configured){
     doc: id => docRef(name + '/' + id),
     onSnapshot: (next, err) => onSnapshot(n ? query(collection(fs, name), limit(n)) : collection(fs, name),
       s => next({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data() })) }),
-      e => { if (e.code === 'permission-denied') denied(); err && err(mapErr(e)); })
+      e => { if (e.code === 'permission-denied' && !['expenses','team'].includes(name)) denied(); err && err(mapErr(e)); })
   });
   const adapter = { collection: name => colRef(name), doc: path => docRef(path) };
 
