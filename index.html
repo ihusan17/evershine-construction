@@ -374,9 +374,16 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
-.stampopt{display:grid;gap:6px;padding:0 18px 14px}
-.stampopt .seg{display:grid;grid-template-columns:repeat(3,1fr);width:100%}
-.stampopt .seg button{padding:7px 6px;text-align:center}
+.stamptog{display:flex;align-items:center;gap:8px;margin:0 18px 14px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;cursor:pointer;font-size:14px;font-weight:600;user-select:none}
+.stamptog .ic{color:var(--muted);display:grid}
+.stamptog span:nth-child(2){flex:1}
+.stamptog input{position:absolute;opacity:0;width:1px;height:1px}
+.stamptog .sw{width:38px;height:22px;border-radius:999px;background:var(--line);position:relative;transition:background .15s;flex:none}
+.stamptog .sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
+.stamptog input:checked+.sw{background:var(--ok)}
+.stamptog input:checked+.sw::after{transform:translateX(16px)}
+.stamptog:has(input:checked) .ic{color:var(--ok)}
+.stamptog input:focus-visible+.sw{outline:2px solid var(--brand);outline-offset:2px}
 /* reports & expenses */
 :root{--c-sales:#2f6199;--c-exp:#d0782f}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-sales:#4f8fd6;--c-exp:#c97832}}
@@ -782,8 +789,8 @@ function statusOf(d){
   }
   return d.status === 'delivered' ? 'delivered' : 'pending';
 }
-// PAID stamp on invoices: 'auto' = when fully paid (default), 'show' = always, 'hide' = never
-const showPaidStamp = d => d.type === 'invoice' && !isVoid(d) && (d.paidStamp === 'show' || (d.paidStamp !== 'hide' && statusOf(d) === 'paid'));
+// PAID stamp on invoices: off unless switched on for that invoice
+const showPaidStamp = d => d.type === 'invoice' && !isVoid(d) && d.paidStamp === 'show';
 const badge = st => { const [l,t] = STATUS[st] || [st,'neutral']; return `<span class="badge b-${t}">${esc(l)}</span>`; };
 
 /* ---------- store ---------- */
@@ -961,6 +968,7 @@ const ICONS = {
   check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   hourglass:'<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22"/><path d="M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>',
   crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+  stamp:'<path d="M5 22h14"/><path d="M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5c0-.66-.26-1.3-.73-1.77Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/>',
   mail:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
   chart:'<path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/>',
   send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
@@ -1759,7 +1767,7 @@ function viewDoc(main, d){
     <div class="docview">
       <div class="sheet-fit">${sheetHTML(d)}</div>
       <div class="sidecol">
-        <section class="panel"><div class="facts">${facts}</div>${d.type === 'invoice' && st !== 'void' ? `<div class="stampopt" data-need="edit"><span class="k">PAID stamp</span><div class="seg" role="radiogroup" aria-label="PAID stamp">${[['auto','Auto','Shown when the invoice is fully paid'],['show','Show','Always show the PAID stamp'],['hide','Hide','Never show the PAID stamp']].map(([v,l,t]) => `<button type="button" role="radio" title="${t}" aria-checked="${(d.paidStamp || 'auto') === v}" class="${(d.paidStamp || 'auto') === v ? 'on' : ''}" data-stamp="${v}">${l}</button>`).join('')}</div></div>` : ''}<div class="acts" data-need="edit">${acts}</div></section>
+        <section class="panel"><div class="facts">${facts}</div>${d.type === 'invoice' && st !== 'void' ? `<label class="stamptog" data-need="edit" title="Show a PAID stamp on this invoice"><span class="ic">${icon('stamp',17)}</span><span>PAID stamp</span><input type="checkbox" role="switch" id="stampsw" ${d.paidStamp === 'show' ? 'checked' : ''} aria-label="PAID stamp on this invoice"><i class="sw"></i></label>` : ''}<div class="acts" data-need="edit">${acts}</div></section>
         ${d.type === 'invoice' ? `<section class="panel"><h2>Payments</h2>${(d.payments||[]).length ? `<ul class="plist">${d.payments.map((p,i) => `<li><span><b>${money(p.amount)}</b><br><span class="dim">${fmtDate(p.date)} · ${esc(p.method||'')}${p.ref ? ' · '+esc(p.ref) : ''}</span></span><button class="x" data-rmpay="${i}" data-need="edit" aria-label="Remove payment" title="Remove payment">×</button></li>`).join('')}</ul>` : `<div class="empty" style="padding:16px">No payments recorded yet.</div>`}</section>` : ''}
         ${d.type !== 'delivery' && canEdit() ? jobCostsPanel(d) : ''}
         ${src || kids.length ? `<section class="panel"><h2>Linked documents</h2><div class="links">${src ? `<a href="#/doc/${src.id}"><span class="dim">Created from</span><br><b>${TYPES[src.type].label} ${esc(src.number)}</b></a>` : ''}${kids.map(k => `<a href="#/doc/${k.id}"><span class="dim">${TYPES[k.type].label}</span><br><b>${esc(k.number)}</b> ${badge(statusOf(k))}</a>`).join('')}</div></section>` : ''}
@@ -1770,11 +1778,12 @@ function viewDoc(main, d){
   $('#pdf').addEventListener('click', e => makePDF(d, e.currentTarget));
   $('#tg').addEventListener('click', e => shareTelegram(d, e.currentTarget));
   $('#em').addEventListener('click', e => emailDoc(d, e.currentTarget));
-  main.querySelectorAll('[data-stamp]').forEach(b => b.addEventListener('click', async () => {
-    const v = b.dataset.stamp; if ((d.paidStamp || 'auto') === v || !canEdit()) return;
-    await put('docs', d.id, {...clone(d), paidStamp: v, updatedAt: new Date().toISOString()});
-    toast(v === 'show' ? 'PAID stamp shown' : v === 'hide' ? 'PAID stamp hidden' : 'PAID stamp shows when fully paid');
-  }));
+  const sw = main.querySelector('#stampsw');
+  if (sw) sw.addEventListener('change', async () => {
+    if (!canEdit()){ sw.checked = !sw.checked; return; }
+    await put('docs', d.id, {...clone(d), paidStamp: sw.checked ? 'show' : 'hide', updatedAt: new Date().toISOString()});
+    toast(sw.checked ? 'PAID stamp on' : 'PAID stamp off');
+  });
   const jc = main.querySelector('#jobcosts');
   if (jc) jc.addEventListener('click', e => {
     const a = e.target.closest('[data-addcost]'); if (a) return expenseBox(null, {docId: d.id});
