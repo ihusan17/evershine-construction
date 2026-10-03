@@ -37,5 +37,9 @@ service cloud.firestore {
       allow read, create, update: if canWrite();   // owner and staff; viewers don't see costs
       allow delete: if isOwner();
     }
+    match /places/{id} {
+      allow read: if canRead();
+      allow create, update, delete: if canWrite();   // custom trip places (resorts…) for the island picker
+    }
   }
 }
