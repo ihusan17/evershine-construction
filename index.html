@@ -154,6 +154,8 @@ table.items td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line
 table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
+table.items .ret{display:inline-flex;align-items:center;margin-top:5px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
+table.items .ret.on{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);font-weight:600}
 table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
 .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:8px 6px}
 .x:hover{color:var(--bad)}
@@ -326,6 +328,15 @@ table.items td.d{min-width:0}
   table.items td.d{grid-column:1/-1;min-width:0}
   table.items td.amt{padding-top:0}
   table.items .x{padding:4px}
+  /* boat trips on phones: description / from + to / stops / date + amount */
+  table.items tr.trip{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 28px;align-items:start}
+  table.items tr.trip td:nth-child(2){grid-column:1}
+  table.items tr.trip td:nth-child(3){grid-column:1/-1;order:1}
+  table.items tr.trip td:nth-child(4){grid-column:2/-1}
+  table.items tr.trip td:nth-child(n+5){order:2}
+  table.items tr.trip td:nth-child(5){grid-column:1}
+  table.items tr.trip td:nth-child(6){grid-column:2}
+  table.items tr.trip td:nth-child(4){display:flex;flex-direction:column;align-items:flex-start}
 }
 /* ===== Layout & look: light shell, slim icon menu, rounded workspace ===== */
 body{background:var(--shell)}
@@ -771,11 +782,12 @@ const kindOf = d => d.type === 'delivery' ? null : (d.kind || (d.layout === 'lum
 const hireProject = () => `VESSEL HIRE (${(S.settings.vesselName || 'REHENDHI').toUpperCase()})`;
 // Stops in between, typed as "Funadhoo, Lhaimagu" or "Funadhoo - Lhaimagu - Maaungoodhoo"
 const viaList = v => String(v || '').split(/\s*(?:,|;|→|->|–|—|\s-\s|-|\n)\s*/).map(x => x.trim()).filter(Boolean);
-// [label, place] for each point of the trip: FROM, the stops, TO
+// [label, place] for each point of the trip: FROM, the stops, TO, and RETURN (back to the start) on a return trip
 const routePts = it => { const via = viaList(it.via), out = [];
   if (it.from) out.push(['FROM', it.from]);
   via.forEach((v, i) => out.push([via.length > 1 ? 'STOP ' + (i + 1) : 'VIA', v]));
   if (it.to) out.push(['TO', it.to]);
+  if (it.ret && it.from && out.length > 1) out.push(['RETURN', it.from]);
   return out; };
 // Boat hire line on the document: description, then FROM → stops → TO and DATE (each part only when filled in)
 const hireCell = it => {
@@ -785,7 +797,7 @@ const hireCell = it => {
   return `<div class="hire"><div class="hdesc ${hasThaana(it.desc) ? 'dv' : ''}">${nl(it.desc)}</div>${route || it.when ? `<div class="route">${route}${it.when ? `<span class="pt when"><small>DATE</small><b>${esc(it.when)}</b></span>` : ''}</div>` : ''}</div>`;
 };
 const hireLines = it => [it.desc,
-  routePts(it).length ? routePts(it).map(([l, v]) => l === 'FROM' ? 'From: ' + v : l === 'TO' ? 'To: ' + v : v).join('  →  ') : '',
+  routePts(it).length ? routePts(it).map(([l, v]) => l === 'FROM' ? 'From: ' + v : l === 'TO' ? 'To: ' + v : l === 'RETURN' ? 'Return: ' + v : v).join('  →  ') : '',
   it.when ? 'Date: ' + it.when : ''].filter(x => String(x||'').trim()).join('\n');
 const subtotal = d => r2((d.items||[]).reduce((s,it) => s + lineAmt(d,it), 0));
 // optional discount: a percentage or a fixed MVR amount, taken off before GST
@@ -1535,7 +1547,7 @@ function syncTermDays(text, type, days){
   const re = type === 'quotation' ? /(valid\s+(?:for|within)\s+)\d+(\s+)days?\b/i : type === 'invoice' ? /(due\s+(?:within|in)\s+)\d+(\s+)days?\b/i : null;
   return re ? String(text || '').replace(re, (m, a, sp) => a + n + sp + unit) : text;
 }
-const blankItem = () => ({desc:'', unit:'', qty:'', rate:'', amount:'', from:'', via:'', to:'', when:''});
+const blankItem = () => ({desc:'', unit:'', qty:'', rate:'', amount:'', from:'', via:'', to:'', ret:false, when:''});
 function newDraft(type, kind){
   const s = S.settings, t = todayISO();
   kind = type === 'delivery' ? null : (kind === 'hire' ? 'hire' : 'goods');
@@ -1658,11 +1670,11 @@ function viewEditor(main, d, isEdit){
     $('#ititle').textContent = hire ? 'Trips / hire charges' : 'Items';
     if (hire){
       $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:14%">From <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:19%">Stops <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:14%">To <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:13%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
-      $('#ibody').innerHTML = d.items.map((it,i) => `<tr>
+      $('#ibody').innerHTML = d.items.map((it,i) => `<tr class="trip">
         <td class="d"><textarea rows="1" data-i="${i}" data-k="desc" placeholder="Cargo or job" aria-label="Description">${esc(it.desc)}</textarea></td>
         <td><input data-i="${i}" data-k="from" value="${esc(it.from)}" placeholder="Loading point" aria-label="From (loading point, optional)"></td>
         <td><input data-i="${i}" data-k="via" value="${esc(it.via || '')}" placeholder="e.g. Funadhoo, Lhaimagu" aria-label="Stops in between, separated by commas (optional)" title="Islands in between, separated by commas or dashes"></td>
-        <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Unloading point" aria-label="To (unloading point, optional)"></td>
+        <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Unloading point" aria-label="To (unloading point, optional)"><button type="button" class="ret${it.ret ? ' on' : ''}" data-ret="${i}" aria-pressed="${!!it.ret}" title="Return trip: the boat comes back to the From island">⇄ Return trip</button></td>
         <td><input data-i="${i}" data-k="when" value="${esc(it.when)}" placeholder="Date" aria-label="Date or period"></td>
         <td><input class="n" inputmode="decimal" data-i="${i}" data-k="amount" value="${esc(it.amount)}" placeholder="0.00" aria-label="Amount"></td>
         <td><button type="button" class="x" data-rm="${i}" aria-label="Remove line" title="Remove line">×</button></td></tr>`).join('');
@@ -1725,7 +1737,10 @@ function viewEditor(main, d, isEdit){
   });
   $('#pq').addEventListener('input', drawPicker);
   $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
-  $('#ibody').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (!b) return; d.items.splice(+b.dataset.rm, 1); if (!d.items.length) d.items.push(blankItem()); drawItems(); });
+  $('#ibody').addEventListener('click', e => {
+    const rt = e.target.closest('[data-ret]');
+    if (rt){ const it = d.items[+rt.dataset.ret]; it.ret = !it.ret; rt.classList.toggle('on', it.ret); rt.setAttribute('aria-pressed', it.ret); return; }
+    const b = e.target.closest('[data-rm]'); if (!b) return; d.items.splice(+b.dataset.rm, 1); if (!d.items.length) d.items.push(blankItem()); drawItems(); });
   $('#add').addEventListener('click', () => { d.items.push(blankItem()); drawItems(); const t = $('#ibody').querySelectorAll('textarea'); t[t.length-1].focus(); });
   const kp = $('#kind');
   const markKind = () => kp && kp.querySelectorAll('[data-kind]').forEach(x => { const on = x.dataset.kind === d.kind; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
