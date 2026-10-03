@@ -154,6 +154,21 @@ table.items td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line
 table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
+/* island picker (From / Stops / To on boat trips) */
+.ipop{position:absolute;z-index:90;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.2);max-height:min(340px,60vh);display:flex;flex-direction:column;overflow:hidden;font-size:14px}
+.ipop .ip-list{overflow:auto;padding:4px;flex:1;min-height:0}
+.ipop .ip-list button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:6px;color:var(--ink);cursor:pointer;font:inherit}
+.ipop .ip-list button:hover,.ipop .ip-list button.act{background:var(--brand-soft)}
+.ipop .ip-list button.new{color:var(--brand);font-weight:600}
+.ipop .tick{color:var(--brand);font-weight:700}
+.ipop .ord{display:inline-flex;gap:3px}
+.ipop .ord b,.ipop .ip-h .s b{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font-size:11px;display:inline-grid;place-items:center}
+.ipop .ip-h{padding:8px 10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:5px 6px;font-size:13px}
+.ipop .ip-h .s{display:inline-flex;align-items:center;gap:5px;background:var(--brand-soft);color:var(--brand);border-radius:999px;padding:2px 9px 2px 3px;font-weight:600}
+.ipop .ip-act{display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--line);justify-content:flex-end}
+.ipop .ip-act button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
+.ipop .ip-act button:disabled{opacity:.45;cursor:default}
+.ipop .ip-act button.pri{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
 table.items .ret{display:inline-flex;align-items:center;margin-top:5px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
 table.items .ret.on{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);font-weight:600}
 table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
@@ -964,6 +979,82 @@ function nextNumber(type, date){
   Object.values(S.docs).forEach(d => { if (d.type === type && (d.number||'').startsWith(pre)){ const n = parseInt(d.number.slice(pre.length),10); if (n > max) max = n; } });
   return pre + String(max+1).padStart(T.pad,'0');
 }
+// Islands for the trip pickers: names already used on documents first, then the islands of Shaviyani atoll
+const ISLANDS = ['Milandhoo','Funadhoo','Lhaimagu','Maaungoodhoo','Komandoo','Narudhoo','Maroshi','Foakaidhoo','Bileffahi','Feevah','Feydhoo','Goidhoo','Noomaraa','Kanditheemu'];
+function islandList(){
+  const seen = new Map(), add = v => { v = String(v || '').trim(); if (v && v.length <= 40 && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v); };
+  Object.values(S.docs).forEach(d => (d.items || []).forEach(it => { add(it.from); viaList(it.via).forEach(add); add(it.to); }));
+  ISLANDS.forEach(add);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+// Dropdown for From / Stops / To: tap an island to fill the box. In Stops every tap adds the next stop (1st, 2nd, …).
+function islandPicker(box){
+  let pop = null, inp = null, names = [], act = 0;
+  const SEP = /(?:,|;|→|->|–|—|-|\n)\s*$/;
+  const multi = () => inp.dataset.k === 'via';
+  const parts = () => { const v = inp.value, ps = viaList(v); let q = '';
+    if (multi()){ if (v.trim() && !SEP.test(v)) q = ps.pop() || ''; } else q = v.trim();
+    return {ps, q}; };
+  const set = v => { inp.value = v; inp.dispatchEvent(new Event('input', {bubbles:true})); };
+  const close = () => {
+    if (inp && multi()){ const v = viaList(inp.value).join(', '); if (v !== inp.value) set(v); }
+    if (pop) pop.remove(); pop = null; inp = null; };
+  const place = () => { const r = inp.getBoundingClientRect(), w = Math.min(Math.max(r.width, 240), innerWidth - 16);
+    pop.style.width = w + 'px'; pop.style.left = (Math.max(8, Math.min(r.left, innerWidth - w - 8)) + scrollX) + 'px'; pop.style.top = (r.bottom + scrollY + 4) + 'px'; };
+  const draw = () => {
+    const {ps, q} = parts(), ql = q.toLowerCase();
+    const list = names.filter(n => !ql || n.toLowerCase().includes(ql));
+    const opts = [...list.map(v => ({v})), ...(q && !names.some(n => n.toLowerCase() === ql) ? [{v:q, add:true}] : [])];
+    act = Math.min(act, Math.max(opts.length - 1, 0));
+    const cur = inp.value.trim().toLowerCase();
+    const mark = v => { if (!multi()) return cur === v.toLowerCase() ? '<span class="tick">✓</span>' : '';
+      const nums = ps.map((p, i) => p.toLowerCase() === v.toLowerCase() ? i + 1 : 0).filter(Boolean);
+      return nums.length ? `<span class="ord">${nums.map(n => `<b>${n}</b>`).join('')}</span>` : ''; };
+    pop.innerHTML = (multi() ? `<div class="ip-h">${ps.length ? ps.map((p, i) => `<span class="s"><b>${i + 1}</b>${esc(p)}</span>`).join('') : '<span class="dim">Tap islands in order: 1st stop, 2nd stop…</span>'}</div>` : '')
+      + `<div class="ip-list" role="listbox">${opts.length ? opts.map((o, i) => `<button type="button" role="option" class="${o.add ? 'new' : ''}${i === act ? ' act' : ''}" data-v="${esc(o.v)}">${o.add ? `+ Use “${esc(o.v)}”` : `<span>${esc(o.v)}</span>${mark(o.v)}`}</button>`).join('') : '<div class="dim" style="padding:10px">Type an island name</div>'}</div>`
+      + (multi() ? `<div class="ip-act"><button type="button" data-a="undo"${ps.length ? '' : ' disabled'}>Undo last</button><button type="button" data-a="clear"${ps.length ? '' : ' disabled'}>Clear</button><button type="button" class="pri" data-a="done">Done</button></div>` : '');
+    const a = pop.querySelector('.ip-list .act'); if (a) a.scrollIntoView({block:'nearest'});
+  };
+  const pick = v => {
+    if (multi()){ const {ps} = parts(); ps.push(v); set(ps.join(', ') + ', '); act = 0; draw(); }
+    else { set(v); const el = inp; close(); el.blur(); }
+  };
+  const open = el => {
+    if (pop && inp === el) return; close();
+    inp = el; names = islandList(); act = 0;
+    // Stops: the next island is added after the ones already there, so open with the list ready for the next pick
+    if (multi()){ const ps = viaList(el.value); if (ps.length && !SEP.test(el.value)) set(ps.join(', ') + ', '); }
+    pop = document.createElement('div'); pop.className = 'ipop'; document.body.appendChild(pop);
+    pop.addEventListener('mousedown', e => e.preventDefault());   // keep the cursor in the box
+    pop.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || !inp) return;
+      if (b.dataset.v != null) return pick(b.dataset.v);
+      const {ps} = parts();
+      if (b.dataset.a === 'undo'){ ps.pop(); set(ps.length ? ps.join(', ') + ', ' : ''); draw(); }
+      else if (b.dataset.a === 'clear'){ set(''); draw(); }
+      else if (b.dataset.a === 'done'){ const el = inp; close(); el.blur(); }
+    });
+    draw(); place(); caret(el);
+    // the browser places the cursor where the box was tapped after it gets focus, so set it again once the tap ends
+    const again = () => { if (inp === el) caret(el); };
+    setTimeout(again, 0); document.addEventListener('mouseup', () => setTimeout(again, 0), {once:true}); document.addEventListener('touchend', () => setTimeout(again, 0), {once:true});
+  };
+  const isTrip = el => el && el.matches && el.matches('input[data-k="from"],input[data-k="via"],input[data-k="to"]');
+  box.addEventListener('focusin', e => { if (isTrip(e.target)) open(e.target); });
+  // Stops: keep the cursor at the end so a tap adds the next stop; From / To: select the name so typing replaces it
+  const caret = el => { try { if (el.dataset.k === 'via'){ const n = el.value.length; el.setSelectionRange(n, n); } else el.select(); } catch(e){} };
+  box.addEventListener('click', e => { if (!isTrip(e.target)) return; if (!pop) open(e.target); if (inp === e.target) caret(e.target); });
+  box.addEventListener('focusout', e => { if (e.target === inp) setTimeout(() => { if (inp && document.activeElement !== inp) close(); }, 120); });
+  box.addEventListener('input', e => { if (pop && e.target === inp && e.isTrusted){ act = 0; draw(); } });
+  box.addEventListener('keydown', e => {
+    if (!pop || e.target !== inp) return;
+    const bs = [...pop.querySelectorAll('.ip-list button')];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); act = (act + (e.key === 'ArrowDown' ? 1 : bs.length - 1)) % Math.max(bs.length, 1); draw(); }
+    else if (e.key === 'Enter'){ e.preventDefault(); if (bs[act]) pick(bs[act].dataset.v); else if (multi()){ const el = inp; close(); el.blur(); } }
+    else if (e.key === 'Escape'){ e.preventDefault(); const el = inp; close(); el.blur(); }
+  });
+  addEventListener('resize', () => { if (pop) place(); });
+}
 function itemMemory(){
   const m = {};
   Object.values(S.docs).sort((a,b) => (a.date||'').localeCompare(b.date||'')).forEach(d => (d.items||[]).forEach(it => {
@@ -1678,9 +1769,9 @@ function viewEditor(main, d, isEdit){
       $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:14%">From <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:19%">Stops <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:14%">To <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:13%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
       $('#ibody').innerHTML = d.items.map((it,i) => `<tr class="trip">
         <td class="d"><textarea rows="1" data-i="${i}" data-k="desc" placeholder="Cargo or job" aria-label="Description">${esc(it.desc)}</textarea></td>
-        <td><input data-i="${i}" data-k="from" value="${esc(it.from)}" placeholder="Loading point" aria-label="From (loading point, optional)"></td>
-        <td><input data-i="${i}" data-k="via" value="${esc(it.via || '')}" placeholder="e.g. Funadhoo, Lhaimagu" aria-label="Stops in between, separated by commas (optional)" title="Islands in between, separated by commas or dashes"></td>
-        <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Unloading point" aria-label="To (unloading point, optional)"><button type="button" class="ret${it.ret ? ' on' : ''}" data-ret="${i}" aria-pressed="${!!it.ret}" title="Return trip: the boat comes back to the From island">⇄ Return trip</button></td>
+        <td><input data-i="${i}" data-k="from" value="${esc(it.from)}" placeholder="Loading point" autocomplete="off" aria-label="From (loading point, optional)"></td>
+        <td><input data-i="${i}" data-k="via" value="${esc(it.via || '')}" placeholder="Tap to pick islands" autocomplete="off" aria-label="Stops in between, separated by commas (optional)" title="Islands in between, separated by commas or dashes"></td>
+        <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Unloading point" autocomplete="off" aria-label="To (unloading point, optional)"><button type="button" class="ret${it.ret ? ' on' : ''}" data-ret="${i}" aria-pressed="${!!it.ret}" title="Return trip: the boat comes back to the From island">⇄ Return trip</button></td>
         <td><input data-i="${i}" data-k="when" value="${esc(it.when)}" placeholder="Date" aria-label="Date or period"></td>
         <td><input class="n" inputmode="decimal" data-i="${i}" data-k="amount" value="${esc(it.amount)}" placeholder="0.00" aria-label="Amount"></td>
         <td><button type="button" class="x" data-rm="${i}" aria-label="Remove line" title="Remove line">×</button></td></tr>`).join('');
@@ -1742,6 +1833,7 @@ function viewEditor(main, d, isEdit){
     custNote(); if (v === '__new') $('#f-cname').focus();
   });
   $('#pq').addEventListener('input', drawPicker);
+  islandPicker($('#ibody'));
   $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
   $('#ibody').addEventListener('click', e => {
     const rt = e.target.closest('[data-ret]');
