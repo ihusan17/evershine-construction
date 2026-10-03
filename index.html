@@ -374,6 +374,9 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.tg svg{color:#229ED9}
 .m-only{display:none}
+.stampopt{display:grid;gap:6px;padding:0 18px 14px}
+.stampopt .seg{display:grid;grid-template-columns:repeat(3,1fr);width:100%}
+.stampopt .seg button{padding:7px 6px;text-align:center}
 /* reports & expenses */
 :root{--c-sales:#2f6199;--c-exp:#d0782f}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-sales:#4f8fd6;--c-exp:#c97832}}
@@ -779,6 +782,8 @@ function statusOf(d){
   }
   return d.status === 'delivered' ? 'delivered' : 'pending';
 }
+// PAID stamp on invoices: 'auto' = when fully paid (default), 'show' = always, 'hide' = never
+const showPaidStamp = d => d.type === 'invoice' && !isVoid(d) && (d.paidStamp === 'show' || (d.paidStamp !== 'hide' && statusOf(d) === 'paid'));
 const badge = st => { const [l,t] = STATUS[st] || [st,'neutral']; return `<span class="badge b-${t}">${esc(l)}</span>`; };
 
 /* ---------- store ---------- */
@@ -1754,7 +1759,7 @@ function viewDoc(main, d){
     <div class="docview">
       <div class="sheet-fit">${sheetHTML(d)}</div>
       <div class="sidecol">
-        <section class="panel"><div class="facts">${facts}</div><div class="acts" data-need="edit">${acts}</div></section>
+        <section class="panel"><div class="facts">${facts}</div>${d.type === 'invoice' && st !== 'void' ? `<div class="stampopt" data-need="edit"><span class="k">PAID stamp</span><div class="seg" role="radiogroup" aria-label="PAID stamp">${[['auto','Auto','Shown when the invoice is fully paid'],['show','Show','Always show the PAID stamp'],['hide','Hide','Never show the PAID stamp']].map(([v,l,t]) => `<button type="button" role="radio" title="${t}" aria-checked="${(d.paidStamp || 'auto') === v}" class="${(d.paidStamp || 'auto') === v ? 'on' : ''}" data-stamp="${v}">${l}</button>`).join('')}</div></div>` : ''}<div class="acts" data-need="edit">${acts}</div></section>
         ${d.type === 'invoice' ? `<section class="panel"><h2>Payments</h2>${(d.payments||[]).length ? `<ul class="plist">${d.payments.map((p,i) => `<li><span><b>${money(p.amount)}</b><br><span class="dim">${fmtDate(p.date)} · ${esc(p.method||'')}${p.ref ? ' · '+esc(p.ref) : ''}</span></span><button class="x" data-rmpay="${i}" data-need="edit" aria-label="Remove payment" title="Remove payment">×</button></li>`).join('')}</ul>` : `<div class="empty" style="padding:16px">No payments recorded yet.</div>`}</section>` : ''}
         ${d.type !== 'delivery' && canEdit() ? jobCostsPanel(d) : ''}
         ${src || kids.length ? `<section class="panel"><h2>Linked documents</h2><div class="links">${src ? `<a href="#/doc/${src.id}"><span class="dim">Created from</span><br><b>${TYPES[src.type].label} ${esc(src.number)}</b></a>` : ''}${kids.map(k => `<a href="#/doc/${k.id}"><span class="dim">${TYPES[k.type].label}</span><br><b>${esc(k.number)}</b> ${badge(statusOf(k))}</a>`).join('')}</div></section>` : ''}
@@ -1765,6 +1770,11 @@ function viewDoc(main, d){
   $('#pdf').addEventListener('click', e => makePDF(d, e.currentTarget));
   $('#tg').addEventListener('click', e => shareTelegram(d, e.currentTarget));
   $('#em').addEventListener('click', e => emailDoc(d, e.currentTarget));
+  main.querySelectorAll('[data-stamp]').forEach(b => b.addEventListener('click', async () => {
+    const v = b.dataset.stamp; if ((d.paidStamp || 'auto') === v || !canEdit()) return;
+    await put('docs', d.id, {...clone(d), paidStamp: v, updatedAt: new Date().toISOString()});
+    toast(v === 'show' ? 'PAID stamp shown' : v === 'hide' ? 'PAID stamp hidden' : 'PAID stamp shows when fully paid');
+  }));
   const jc = main.querySelector('#jobcosts');
   if (jc) jc.addEventListener('click', e => {
     const a = e.target.closest('[data-addcost]'); if (a) return expenseBox(null, {docId: d.id});
@@ -1924,7 +1934,7 @@ function sheetHTML(d){
     </div>
     ${d.project ? `<div class="project">PROJECT: ${esc(d.project)}</div>` : ''}
     <div class="itbox"><table class="it"><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table><div class="itfill"></div></div>
-    ${sum.replace('<div class="sum">', `<div class="sum">${d.type === 'invoice' && st === 'paid' ? `<img class="stamp" src="${STAMP}" alt="Paid">` : ''}`)}
+    ${sum.replace('<div class="sum">', `<div class="sum">${showPaidStamp(d) ? `<img class="stamp" src="${STAMP}" alt="Paid">` : ''}`)}
     ${isDN ? `<div class="msg">${d.message ? `<p>${nl(d.message)}</p>` : ''}${s.deliveryNote ? `<p>${nl(s.deliveryNote)}</p>` : ''}</div>
       <div class="signs">
         ${[['Delivered by:', sg.byName, sg.byDate, s.signDelivery && signImg()], ['Received by:', sg.toName, sg.toDate, '']].map(([t, nm, dt, img]) =>
@@ -2159,7 +2169,7 @@ function drawPDF(pdf, d, fill){
     pdf.text(line, x, wy);
     y = Math.max(y, wy + 2);
   }
-  if (d.type === 'invoice' && st === 'paid') pdf.addImage(STAMP, 'PNG', R - 38, y + 4, 33, 34.5, 'stamp', 'NONE');
+  if (showPaidStamp(d)) pdf.addImage(STAMP, 'PNG', R - 38, y + 4, 33, 34.5, 'stamp', 'NONE');
 
   const ensure = need => { if (y + need > BOTTOM){ pdf.addPage(); y = 16; } };
   if (isDN){
