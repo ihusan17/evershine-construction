@@ -272,7 +272,7 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .foot .ct span{display:inline-flex;align-items:center;gap:10px}
 .sheet .foot .ct svg{width:28px;height:28px;flex:none}
 .sheet .sum{position:relative}
-.sheet .stamp{position:absolute;width:128px;right:24px;top:70px;opacity:.9;transform:rotate(-12deg);pointer-events:none}
+.sheet .stamp{position:absolute;width:190px;right:6px;top:62px;pointer-events:none}
 .sheet .void{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:700 110px/1 var(--serif);color:rgba(178,55,44,.14);transform:rotate(-24deg);letter-spacing:.08em}
 .sheet [lang="dv"],.sheet .dv{font-family:"Noto Sans Thaana",var(--serif)}
 
@@ -791,6 +791,27 @@ function statusOf(d){
 }
 // PAID stamp on invoices: off unless switched on for that invoice
 const showPaidStamp = d => d.type === 'invoice' && !isVoid(d) && d.paidStamp === 'show';
+// Evershine PAID stamp (pill with the footer's dark/blue bars), dated with the last payment or the day it was switched on
+const stampDate = d => { const p = (d.payments || []).map(x => x.date).filter(Boolean).sort().pop(); return (p || d.paidStampDate || d.date || todayISO()); };
+function stampSVG(d){
+  const B = '#2f6199', K = '#1d2733', when = esc(fmtDate(stampDate(d)).toUpperCase());
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="-10 -20 300 200"><defs><filter id="ink" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.75" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter></defs>
+<g filter="url(#ink)" transform="rotate(-12 140 80)" font-family="Arial, Helvetica, sans-serif" font-weight="700">
+<rect x="10" y="20" width="260" height="120" rx="60" fill="none" stroke="${B}" stroke-width="6"/>
+<path d="M52 56 H140" stroke="${K}" stroke-width="4"/><path d="M140 56 H228" stroke="${B}" stroke-width="4"/>
+<text x="140" y="104" text-anchor="middle" font-family="'Arial Black', Arial, Helvetica, sans-serif" font-weight="900" font-size="50" letter-spacing="8" fill="${B}">PAID</text>
+<path d="M52 114 H140" stroke="${B}" stroke-width="4"/><path d="M140 114 H228" stroke="${K}" stroke-width="4"/>
+<text x="140" y="45" text-anchor="middle" font-size="10.5" letter-spacing="1.6" fill="${K}">EVERSHINE CONSTRUCTION</text>
+<text x="140" y="130" text-anchor="middle" font-size="11" letter-spacing="1.6" fill="${K}">${when}</text>
+</g></svg>`;
+}
+const stampURL = d => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(stampSVG(d));
+let STAMP_PNG = null;   // the stamp drawn as a PNG for the PDF
+function stampPNG(d){
+  return new Promise(res => { const im = new Image();
+    im.onload = () => { const c = document.createElement('canvas'); c.width = 900; c.height = 600; c.getContext('2d').drawImage(im, 0, 0, 900, 600); try { res(c.toDataURL('image/png')); } catch(e){ res(null); } };
+    im.onerror = () => res(null); im.src = stampURL(d); });
+}
 const badge = st => { const [l,t] = STATUS[st] || [st,'neutral']; return `<span class="badge b-${t}">${esc(l)}</span>`; };
 
 /* ---------- store ---------- */
@@ -1781,7 +1802,7 @@ function viewDoc(main, d){
   const sw = main.querySelector('#stampsw');
   if (sw) sw.addEventListener('change', async () => {
     if (!canEdit()){ sw.checked = !sw.checked; return; }
-    await put('docs', d.id, {...clone(d), paidStamp: sw.checked ? 'show' : 'hide', updatedAt: new Date().toISOString()});
+    await put('docs', d.id, {...clone(d), paidStamp: sw.checked ? 'show' : 'hide', paidStampDate: sw.checked ? todayISO() : (d.paidStampDate || ''), updatedAt: new Date().toISOString()});
     toast(sw.checked ? 'PAID stamp on' : 'PAID stamp off');
   });
   const jc = main.querySelector('#jobcosts');
@@ -1943,7 +1964,7 @@ function sheetHTML(d){
     </div>
     ${d.project ? `<div class="project">PROJECT: ${esc(d.project)}</div>` : ''}
     <div class="itbox"><table class="it"><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table><div class="itfill"></div></div>
-    ${sum.replace('<div class="sum">', `<div class="sum">${showPaidStamp(d) ? `<img class="stamp" src="${STAMP}" alt="Paid">` : ''}`)}
+    ${sum.replace('<div class="sum">', `<div class="sum">${showPaidStamp(d) ? `<img class="stamp" src="${stampURL(d)}" alt="Paid">` : ''}`)}
     ${isDN ? `<div class="msg">${d.message ? `<p>${nl(d.message)}</p>` : ''}${s.deliveryNote ? `<p>${nl(s.deliveryNote)}</p>` : ''}</div>
       <div class="signs">
         ${[['Delivered by:', sg.byName, sg.byDate, s.signDelivery && signImg()], ['Received by:', sg.toName, sg.toDate, '']].map(([t, nm, dt, img]) =>
@@ -2178,7 +2199,7 @@ function drawPDF(pdf, d, fill){
     pdf.text(line, x, wy);
     y = Math.max(y, wy + 2);
   }
-  if (showPaidStamp(d)) pdf.addImage(STAMP, 'PNG', R - 38, y + 4, 33, 34.5, 'stamp', 'NONE');
+  if (showPaidStamp(d) && STAMP_PNG) pdf.addImage(STAMP_PNG, 'PNG', R - 50, y + 1, 48, 32, 'stamp-' + d.id, 'NONE');
 
   const ensure = need => { if (y + need > BOTTOM){ pdf.addPage(); y = 16; } };
   if (isDN){
@@ -2242,6 +2263,7 @@ function newPDF(title, subject){
 async function buildPDF(d){
   await loadScript(JSPDF_URL);
   await footIcons(); await loadSignInfo();
+  STAMP_PNG = showPaidStamp(d) ? await stampPNG(d) : null;
   const title = `${TYPES[d.type].label} ${d.number}`;
   // draw once to measure, then again with the item table stretched so a one-page document reaches the footer
   const probe = drawPDF(newPDF(title), d, 0);
