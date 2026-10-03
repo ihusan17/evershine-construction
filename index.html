@@ -1262,13 +1262,21 @@ function previewDoc(id, ids){
 }
 
 /* ---------- drafts ---------- */
+// Keep the number of days in the terms in step with "Valid for" (quotations) and "Payment due in" (invoices).
+// Only the sentence that says "valid for/within N days" or "due within/in N days" changes; other terms are left alone.
+function syncTermDays(text, type, days){
+  if (String(days ?? '').trim() === '') return text;
+  const n = Math.max(0, Math.round(num(days))), unit = n === 1 ? 'day' : 'days';
+  const re = type === 'quotation' ? /(valid\s+(?:for|within)\s+)\d+(\s+)days?\b/i : type === 'invoice' ? /(due\s+(?:within|in)\s+)\d+(\s+)days?\b/i : null;
+  return re ? String(text || '').replace(re, (m, a, sp) => a + n + sp + unit) : text;
+}
 const blankItem = () => ({desc:'', unit:'', qty:'', rate:'', amount:'', from:'', to:'', when:''});
 function newDraft(type, kind){
   const s = S.settings, t = todayISO();
   kind = type === 'delivery' ? null : (kind === 'hire' ? 'hire' : 'goods');
   return { id:uid(), type, number:nextNumber(type,t), _auto:true, date:t, customerId:'', customer:{name:'',address:'',phone:''},
     po:'', project: kind === 'hire' ? hireProject() : '', deliveryAddress:'', kind, layout: kind === 'hire' ? 'lump' : 'items', items:[blankItem()], taxRate:0,
-    terms: type==='quotation' ? s.quoteTerms : type==='invoice' ? s.invoiceTerms : '',
+    terms: type==='quotation' ? syncTermDays(s.quoteTerms, 'quotation', num(s.quoteValidDays)||20) : type==='invoice' ? syncTermDays(s.invoiceTerms, 'invoice', num(s.invoiceDueDays)||20) : '',
     message: type==='delivery' ? s.deliveryMessage : '',
     status: type==='quotation' ? 'draft' : type==='delivery' ? 'pending' : 'issued',
     payments:[], validDays:num(s.quoteValidDays)||20, dueDays:num(s.invoiceDueDays)||20, sourceId:null, createdAt:new Date().toISOString(),
@@ -1416,6 +1424,9 @@ function viewEditor(main, d, isEdit){
     if (el.dataset.f){
       d[el.dataset.f] = el.value;
       if (el.dataset.f === 'number') d._auto = false;
+      if ((el.dataset.f === 'validDays' && d.type === 'quotation') || (el.dataset.f === 'dueDays' && d.type === 'invoice')){
+        d.terms = syncTermDays(d.terms, d.type, el.value); const ta = $('#f-terms'); if (ta) ta.value = d.terms;
+      }
       if (el.dataset.f === 'date' && d._auto && !isEdit){ d.number = nextNumber(d.type, d.date); $('#f-number').value = d.number; }
       if (el.dataset.f === 'taxRate') drawTotals();
       hints();
@@ -2403,7 +2414,12 @@ function viewSettings(main){
       </div></section>
       <div class="stickybar"><button type="button" class="btn primary" id="ss">Save settings</button></div>
     </form>`;
-  $('#sf').addEventListener('input', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
+  $('#sf').addEventListener('input', e => {
+    const k = e.target.dataset.s; if (!k) return; s[k] = e.target.value;
+    // the default terms follow the default number of days
+    const sync = k === 'quoteValidDays' ? ['quoteTerms', 'quotation'] : k === 'invoiceDueDays' ? ['invoiceTerms', 'invoice'] : null;
+    if (sync){ s[sync[0]] = syncTermDays(s[sync[0]], sync[1], e.target.value); const ta = $('#s-' + sync[0]); if (ta) ta.value = s[sync[0]]; }
+  });
   if (S.mode === 'cloud') teamPanel();
   const sigShow = () => { $('#sig-prev').innerHTML = `<img src="${s.signImage || SIGN}" alt="Signature" style="max-height:${Math.round(78 * signScale(s))}px">`; $('#sig-rm').hidden = !s.signImage; };
   sigShow();
