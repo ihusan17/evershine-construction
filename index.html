@@ -87,6 +87,26 @@ main{padding:28px 32px 60px;min-width:0}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+/* Settings: summary list; a section opens underneath its line */
+.slist{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.srow+.srow{border-top:1px solid var(--line)}
+.shead{display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;border:0;background:none;text-align:left;cursor:pointer;color:var(--ink);font:inherit}
+.shead:hover{background:var(--surface-2)}
+.srow.open>.shead{background:var(--brand-soft)}
+.sico{width:38px;height:38px;border-radius:10px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;flex:none}
+.srow.open .sico{background:var(--surface)}
+.sico svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.shead .t{display:grid;gap:2px;min-width:0;flex:1}
+.shead .t b{font-size:15px}
+.shead .sum{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shead .chev{font-style:normal;color:var(--muted);font-size:22px;line-height:1;transition:transform .15s}
+.srow.open .shead .chev{transform:rotate(90deg)}
+.sbody{border-top:1px solid var(--line)}
+.sbar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 18px 0;font-size:13px}
+.srow.editing .lockmsg{color:var(--brand);font-weight:600}
+.sact{display:flex;justify-content:flex-end;gap:8px;padding:0 18px 16px}
+.srow .rules{border-top:1px solid var(--line)}
+.srow [hidden]{display:none!important}
 /* Settings: locked sections read like plain text until Edit is clicked */
 fieldset.lockset{border:0;margin:0;padding:0;min-width:0}
 fieldset.lockset.inline{display:contents}
@@ -2795,7 +2815,10 @@ function teamPanel(){
       + (rows.length ? '' : '<li class="dim">No one else yet. Add a Gmail address below.</li>');
   };
   const col = db.collection('team');
-  const unsub = col.onSnapshot(snap => { members = {}; snap.docs.forEach(x => members[x.id] = {...x.data(), email:x.id}); draw(); },
+  const unsub = col.onSnapshot(snap => { if (!list.isConnected){ if (typeof unsub === 'function') unsub(); return; }
+      members = {}; snap.docs.forEach(x => members[x.id] = {...x.data(), email:x.id}); draw();
+      const sm = $('#sum-team'), all = [{role:'owner'}, ...Object.values(members).filter(m => m.email !== OWNER_EMAIL)], c = r => all.filter(m => m.role === r).length;
+      if (sm) sm.textContent = `${all.length} ${all.length === 1 ? 'person' : 'people'} · ${['owner','staff','viewer'].map(r => c(r) ? `${c(r)} ${ROLES[r][0].toLowerCase()}` : '').filter(Boolean).join(', ')}`; },
     () => { list.innerHTML = '<li class="dim">The team list can\'t be loaded until the security rules below are published in Firebase.</li>'; });
   window.addEventListener('hashchange', () => { if (typeof unsub === 'function') unsub(); }, {once:true});
   const save = async (email, role) => { try { await col.doc(email).set({role, addedAt:(members[email] && members[email].addedAt) || new Date().toISOString(), addedBy:S.user || ''}); return true; } catch(e){ dbErr(e); return false; } };
@@ -2919,42 +2942,63 @@ function signaturePad(done){
 }
 
 /* ---------- settings ---------- */
-function viewSettings(main){
+function viewSettings(main, openKey){
   const s = {...S.settings};
   const F = (k, label, opts={}) => `<div class="fld ${opts.span||''}"><label for="s-${k}">${label}</label>${opts.area ? `<textarea id="s-${k}" data-s="${k}" rows="${opts.rows||3}">${esc(s[k])}</textarea>` : `<input id="s-${k}" data-s="${k}" ${opts.type ? `type="${opts.type}"` : ''} value="${esc(s[k])}">`}${opts.hint ? `<span class="hint">${opts.hint}</span>` : ''}</div>`;
-  // every section is locked (a disabled fieldset) until its Edit button is clicked, so nothing changes by a stray click
-  const EB = '<button type="button" class="btn sm sec-edit" aria-pressed="false">✎ Edit</button>';
+  // Design B: one line per section with a summary; tapping a line opens it underneath (one at a time).
+  // An open section is locked (a disabled fieldset) until Edit; then Save / Cancel apply to it.
+  const lines = t => String(t || '').split('\n').filter(x => x.trim()).length;
+  const days = n => `${num(n) || 20} day${num(n) === 1 ? '' : 's'}`;
+  const SUM = {
+    co: [s.name, String(s.address || '').split('\n').map(x => x.trim()).filter(Boolean).join(', '), s.phone].filter(Boolean).join(' · '),
+    bank: [s.bankName, s.accNo, s.accName].filter(Boolean).join(' · ') || 'Not filled in yet',
+    num: `${esc(s.prefix || 'ESC')}/INV/${todayISO().slice(2,4)}/… · quotes valid ${days(s.quoteValidDays)} · invoices due ${days(s.invoiceDueDays)}`,
+    sig: `${s.signImage ? 'Your signature' : 'Default signature'} · quotations & invoices: ${s.signDocs !== false ? 'printed' : 'sign by hand'} · delivery notes: ${s.signDelivery ? 'printed' : 'sign by hand'}`,
+    txt: `${lines(s.quoteTerms)} quotation terms · ${lines(s.invoiceTerms)} invoice terms · footer “${s.thanks || ''}”`,
+    team: S.mode === 'cloud' ? 'Who can use the portal and what they can do' : 'Works when the portal is connected to Firebase',
+    bk: 'Download a backup, restore one, or sign out',
+  };
+  const ICO = {co:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>', bank:'<path d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 21h18M12 3l9 5H3z"/>',
+    num:'<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>', sig:'<path d="M3 17c3-6 5-9 6-7s-2 7 1 7 4-6 6-6 1 5 5 5"/><path d="M3 21h18"/>',
+    txt:'<path d="M4 6h16M4 12h16M4 18h10"/>', team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/>',
+    bk:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>'};
+  const ROW = (k, title, body, o = {}) => `<section class="srow" data-sec="${k}"${o.id ? ` id="${o.id}"` : ''}>
+      <button type="button" class="shead" aria-expanded="false"><span class="sico"><svg viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg></span><span class="t"><b>${title}</b><span class="sum" id="sum-${k}">${o.raw ? SUM[k] : esc(SUM[k])}</span></span><i class="chev" aria-hidden="true">›</i></button>
+      <div class="sbody" hidden>${o.noEdit ? '' : `<div class="sbar"><span class="dim lockmsg">Locked so nothing changes by mistake.</span><button type="button" class="btn sm sec-edit">✎ Edit</button></div>`}
+        ${body}
+        ${o.save ? '<div class="sact" hidden><button type="button" class="btn s-cancel">Cancel</button><button type="button" class="btn primary s-save">Save</button></div>' : ''}
+      </div></section>`;
   main.innerHTML = `
-    <div class="pagehead"><div><h1>Settings</h1><p>These details print on every new document. Each section is locked so nothing changes by mistake. Click <b>Edit</b> on a section to change it, then <b>Save settings</b>.</p></div></div>
-    <form class="form" id="sf" onsubmit="return false">
-      <section class="panel"><h2>Company ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid two">
+    <div class="pagehead"><div><h1>Settings</h1><p>These details print on every new document. Tap a section to see it, then <b>Edit</b> to change it.</p></div></div>
+    <form class="form" id="sf" onsubmit="return false"><div class="slist">
+      ${ROW('co', 'Company profile', `<fieldset class="lockset" disabled><div class="fgrid two">
         ${F('name','Company name')}${F('address','Address',{area:true,rows:2})}${F('phone','Phone')}${F('email','Email')}
-      </div></fieldset></section>
-      <section class="panel"><h2>Bank details ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid">
+      </div></fieldset>`, {save:true})}
+      ${ROW('bank', 'Bank details', `<fieldset class="lockset" disabled><div class="fgrid">
         ${F('bankName','Bank name',{span:'span2'})}${F('accNo','Account number')}${F('accName','Account name')}
-      </div></fieldset></section>
-      <section class="panel"><h2>Numbering &amp; timing ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid">
+      </div></fieldset>`, {save:true})}
+      ${ROW('num', 'Numbering &amp; timing', `<fieldset class="lockset" disabled><div class="fgrid">
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
         ${F('prefix','Number prefix',{hint:'Numbers look like ' + esc((s.prefix||'ESC')) + '/INV/' + todayISO().slice(2,4) + '/21'})}
         <div class="fld"><label for="s-quoteValidDays-s">Quotes valid for</label>${daysPick('s-quoteValidDays', 'data-s="quoteValidDays"', s.quoteValidDays)}</div>
         <div class="fld"><label for="s-invoiceDueDays-s">Invoices due in</label>${daysPick('s-invoiceDueDays', 'data-s="invoiceDueDays"', s.invoiceDueDays)}</div>
-      </div></fieldset></section>
-      <section class="panel"><h2>Signature ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid two">
+      </div></fieldset>`, {save:true, raw:true})}
+      ${ROW('sig', 'Signature', `<fieldset class="lockset" disabled><div class="fgrid two">
         <div class="fld"><span class="lbl2">Your signature</span><div class="sigbox" id="sig-prev"></div>
           <div class="row"><button type="button" class="btn sm" id="sig-draw">Draw signature</button><button type="button" class="btn sm" id="sig-up">Upload image…</button><button type="button" class="btn sm" id="sig-adj">Adjust size &amp; background</button><button type="button" class="btn sm danger" id="sig-rm">Use default</button><input type="file" id="sig-file" accept="image/*" hidden></div>
-          <span class="hint">Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save settings to keep it.</span></div>
+          <span class="hint">Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save to keep it.</span></div>
         <div style="display:grid;gap:14px;align-content:start">
           <div class="fld"><label for="s-sign">Signature on delivery notes</label><select id="s-sign" data-s="signDelivery"><option value="1" ${s.signDelivery?'selected':''}>Place on the "Delivered by" line</option><option value="" ${!s.signDelivery?'selected':''}>Leave blank to sign by hand</option></select></div>
           <div class="fld"><label for="s-signdocs">Signature on quotations &amp; invoices</label><select id="s-signdocs" data-s="signDocs"><option value="1" ${s.signDocs !== false ? 'selected' : ''}>Place on the "Authorised signature" line</option><option value="" ${s.signDocs === false ? 'selected' : ''}>Leave blank to sign by hand</option></select></div>
           ${F('signName','Your name (printed under your signature)',{hint:'Shown under "Authorised signature" on quotations and invoices, and filled in as "Delivered by" on new delivery notes.'})}
         </div>
-      </div></fieldset></section>
-      <section class="panel" id="wording"><h2>Default wording ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid two">
+      </div></fieldset>`, {save:true})}
+      ${ROW('txt', 'Default wording', `<fieldset class="lockset" disabled><div class="fgrid two">
         ${F('quoteTerms','Quotation terms (one per line)',{area:true,rows:4})}${F('invoiceTerms','Invoice terms (one per line)',{area:true,rows:4})}
         ${F('deliveryMessage','Delivery note confirmation',{area:true})}${F('deliveryNote','Delivery note reminder',{area:true})}
         ${F('thanks','Footer line',{span:'span4'})}
-      </div></fieldset><p class="dim" style="padding:0 18px 16px;margin:0">Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p></section>
-      <section class="panel" id="teampanel"><h2>Team ${S.mode === 'cloud' ? EB : ''}</h2>
+      </div></fieldset><p class="dim" style="padding:0 18px 16px;margin:0">Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p>`, {save:true, id:'wording'})}
+      ${ROW('team', 'Team', `
         ${S.mode !== 'cloud' ? '<p class="dim" style="padding:14px 18px;margin:0">The team list works when the portal is connected to Firebase.</p>' : `
         ${S.legacyRules ? '<div class="warnbox"><b>One step left:</b> paste the security rules below into Firebase. Until then, the team list can\'t be saved and the roles are not enforced.</div>' : ''}
         <p class="dim" style="padding:14px 18px 0;margin:0">Add the Google (Gmail) address of each person who should use the portal. They sign in with <b>Sign in with Google</b>. Anyone not on this list can't open the portal.</p>
@@ -2965,14 +3009,13 @@ function viewSettings(main){
           <ol><li>Open <b>console.firebase.google.com</b> → project <b>${esc((window.FIREBASE_CONFIG||{}).projectId || '')}</b>.</li><li>Go to <b>Firestore Database → Rules</b>.</li><li>Delete everything there, paste the text below, and click <b>Publish</b>.</li></ol>
           <textarea id="rules-text" readonly>${esc(FIRESTORE_RULES)}</textarea>
           <div class="row"><button type="button" class="btn" id="rules-copy">Copy rules</button></div></details>`}
-      </section>
-      <section class="panel"><h2>Backup &amp; move ${EB}</h2><div style="padding:16px 18px;display:grid;gap:12px">
+      `, {id:'teampanel', noEdit: S.mode !== 'cloud'})}
+      ${ROW('bk', 'Backup &amp; move', `<div style="padding:16px 18px;display:grid;gap:12px">
         <p class="dim" style="margin:0">Download every quotation, invoice, delivery note, customer and setting as one file. Keep it as a backup, or restore it into another copy of this portal (for example your own website).</p>
         <div class="row"><button type="button" class="btn" id="bk-exp">Download backup</button><fieldset class="lockset inline" disabled><button type="button" class="btn" id="bk-imp">Restore from backup…</button></fieldset><input type="file" id="bk-file" accept=".json,application/json" hidden>
         ${window.__signOut ? '<button type="button" class="btn danger" id="so2">Sign out</button>' : ''}</div>
-      </div></section>
-      <div class="stickybar"><button type="button" class="btn primary" id="ss">Save settings</button></div>
-    </form>`;
+      </div>`)}
+    </div></form>`;
   $('#sf').addEventListener('input', e => {
     const k = e.target.dataset.s; if (!k) return; s[k] = e.target.value;
     // the default terms follow the default number of days
@@ -2989,17 +3032,41 @@ function viewSettings(main){
     if (!url || !await cleanSignature(url, false)) return toast('That image could not be used. Try a PNG or JPG.');
     signatureEditor(url, {bg:true, size:s.signScale}, useSig);
   });
-  $('#sig-rm').addEventListener('click', () => { s.signImage = ''; s.signScale = 1; sigShow(); toast('Back to the default signature. Click Save settings to keep it.'); });
-  const useSig = (img, scale) => { s.signImage = img; s.signScale = scale; sigShow(); toast('Signature ready. Click Save settings to keep it.'); };
+  $('#sig-rm').addEventListener('click', () => { s.signImage = ''; s.signScale = 1; sigShow(); toast('Back to the default signature. Click Save to keep it.'); dirty = true; });
+  const useSig = (img, scale) => { s.signImage = img; s.signScale = scale; sigShow(); toast('Signature ready. Click Save to keep it.'); dirty = true; };
   const fitWording = () => $('#wording').querySelectorAll('textarea').forEach(t => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; });
   fitWording(); $('#wording').addEventListener('input', fitWording);   // show the whole text, no inner scrolling
-  // Edit / Lock on each section
-  main.querySelectorAll('.sec-edit').forEach(b => b.addEventListener('click', () => {
-    const sec = b.closest('section'), sets = sec.querySelectorAll('.lockset'), on = sets[0] && sets[0].disabled;
-    sets.forEach(f => { f.disabled = !on; });
-    b.textContent = on ? '🔒 Lock' : '✎ Edit'; b.setAttribute('aria-pressed', on); b.classList.toggle('on', on);
-    if (on){ const f = sec.querySelector('.lockset input:not([hidden]):not([type=file]),.lockset textarea'); if (f) f.focus(); fitWording(); }
+  // open / close a section (one at a time); an unsaved edit asks before it is dropped
+  let dirty = false;
+  $('#sf').addEventListener('input', e => { if (!e.target.closest('#teampanel')) dirty = true; }); $('#sf').addEventListener('change', e => { if (!e.target.closest('#teampanel')) dirty = true; });
+  const editing = () => main.querySelector('.srow.editing');
+  const setOpen = (row, on) => { row.classList.toggle('open', on); row.querySelector('.shead').setAttribute('aria-expanded', on); row.querySelector('.sbody').hidden = !on; if (on) fitWording(); };
+  const lock = (row, on) => { row.classList.toggle('editing', !on); row.querySelectorAll('.lockset').forEach(f => { f.disabled = on; });
+    const e = row.querySelector('.sec-edit'), a = row.querySelector('.sact'); if (a) a.hidden = on;
+    if (e){ e.hidden = !on && !!a; e.textContent = on ? '✎ Edit' : '🔒 Lock'; } const m = row.querySelector('.lockmsg'); if (m) m.textContent = on ? 'Locked so nothing changes by mistake.' : 'Editing…'; };
+  const again = k => { const y = scrollY; viewSettings(main, k); scrollTo(0, y); };   // fresh copy of the saved settings
+  main.querySelectorAll('.shead').forEach(h => h.addEventListener('click', () => {
+    const row = h.closest('.srow'), on = !row.classList.contains('open'), ed = editing();
+    if (ed && dirty && !confirm('Discard the changes you haven\'t saved?')) return;
+    if (ed && dirty) return again(on ? row.dataset.sec : null);
+    if (ed) lock(ed, true);
+    main.querySelectorAll('.srow.open').forEach(r => setOpen(r, false));
+    if (on){ setOpen(row, true); const t = row.getBoundingClientRect().top; if (t < 70 || t > innerHeight - 120) row.scrollIntoView({block:'start', behavior:'smooth'}); }
   }));
+  main.querySelectorAll('.sec-edit').forEach(b => b.addEventListener('click', () => {
+    const row = b.closest('.srow'), on = row.classList.contains('editing');
+    lock(row, on);
+    if (!on){ const f = row.querySelector('.lockset input:not([hidden]):not([type=file]),.lockset textarea'); if (f) f.focus(); fitWording(); }
+  }));
+  main.querySelectorAll('.s-cancel').forEach(b => b.addEventListener('click', () => again(b.closest('.srow').dataset.sec)));
+  main.querySelectorAll('.s-save').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery; s.signDocs = !!s.signDocs;
+    s.prefix = (s.prefix||'ESC').trim().replace(/[\/\s]+/g,'') || 'ESC';
+    s.products = S.settings.products || [];
+    try { await saveSettings(s); toast('Saved'); again(b.closest('.srow').dataset.sec); } catch(err){ b.disabled = false; }
+  }));
+  if (openKey){ const r = main.querySelector(`.srow[data-sec="${openKey}"]`); if (r) setOpen(r, true); }
   $('#sig-draw').addEventListener('click', () => signaturePad(url => setTimeout(() => signatureEditor(url, {bg:true, size:s.signScale}, useSig), 0)));
   $('#sig-adj').addEventListener('click', () => signatureEditor(s.signImage || SIGN, {bg:true, size:s.signScale}, useSig));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
@@ -3022,14 +3089,6 @@ function viewSettings(main){
       if (data.settings) await saveSettings(data.settings);
       toast(`Backup restored: ${nd} documents, ${nc} customers`);
     });
-  });
-  $('#ss').addEventListener('click', async e => {
-    const b = e.currentTarget; b.disabled = true;
-    s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery; s.signDocs = !!s.signDocs;
-    s.prefix = (s.prefix||'ESC').trim().replace(/[\/\s]+/g,'') || 'ESC';
-    s.products = S.settings.products || [];
-    try { await saveSettings(s); toast('Settings saved'); } catch(err){}
-    b.disabled = false;
   });
 }
 
