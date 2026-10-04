@@ -87,9 +87,13 @@ main{padding:28px 32px 60px;min-width:0}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
-.panel.wording.locked [data-s]{background:var(--surface-2);border-color:transparent;color:var(--ink);cursor:default;resize:none}
-.panel.wording.locked [data-s]:focus{outline:none;box-shadow:none}
-.panel.wording:not(.locked) .w-lock{display:none}
+/* Settings: locked sections read like plain text until Edit is clicked */
+fieldset.lockset{border:0;margin:0;padding:0;min-width:0}
+fieldset.lockset.inline{display:contents}
+fieldset.lockset:disabled input,fieldset.lockset:disabled textarea,fieldset.lockset:disabled select{background:var(--surface-2);border-color:transparent;color:var(--ink);-webkit-text-fill-color:var(--ink);opacity:1;cursor:default;resize:none}
+fieldset.lockset:disabled select{appearance:none;-webkit-appearance:none;background-image:none}
+fieldset.lockset:disabled button{opacity:.45;cursor:default}
+.sec-edit.on{background:var(--brand-soft);color:var(--brand);border-color:var(--brand)}
 .panel>h2,.sec-title{font-size:17px;margin:0;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .empty{padding:28px 18px;color:var(--muted);text-align:center}
 
@@ -2917,23 +2921,25 @@ function signaturePad(done){
 /* ---------- settings ---------- */
 function viewSettings(main){
   const s = {...S.settings};
-  const F = (k, label, opts={}) => `<div class="fld ${opts.span||''}"><label for="s-${k}">${label}</label>${opts.area ? `<textarea id="s-${k}" data-s="${k}" rows="${opts.rows||3}"${opts.ro ? ' readonly' : ''}>${esc(s[k])}</textarea>` : `<input id="s-${k}" data-s="${k}" ${opts.type ? `type="${opts.type}"` : ''} value="${esc(s[k])}"${opts.ro ? ' readonly' : ''}>`}${opts.hint ? `<span class="hint">${opts.hint}</span>` : ''}</div>`;
+  const F = (k, label, opts={}) => `<div class="fld ${opts.span||''}"><label for="s-${k}">${label}</label>${opts.area ? `<textarea id="s-${k}" data-s="${k}" rows="${opts.rows||3}">${esc(s[k])}</textarea>` : `<input id="s-${k}" data-s="${k}" ${opts.type ? `type="${opts.type}"` : ''} value="${esc(s[k])}">`}${opts.hint ? `<span class="hint">${opts.hint}</span>` : ''}</div>`;
+  // every section is locked (a disabled fieldset) until its Edit button is clicked, so nothing changes by a stray click
+  const EB = '<button type="button" class="btn sm sec-edit" aria-pressed="false">✎ Edit</button>';
   main.innerHTML = `
-    <div class="pagehead"><div><h1>Settings</h1><p>These details print on every new document.</p></div></div>
+    <div class="pagehead"><div><h1>Settings</h1><p>These details print on every new document. Each section is locked so nothing changes by mistake. Click <b>Edit</b> on a section to change it, then <b>Save settings</b>.</p></div></div>
     <form class="form" id="sf" onsubmit="return false">
-      <section class="panel"><h2>Company</h2><div class="fgrid two">
+      <section class="panel"><h2>Company ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid two">
         ${F('name','Company name')}${F('address','Address',{area:true,rows:2})}${F('phone','Phone')}${F('email','Email')}
-      </div></section>
-      <section class="panel"><h2>Bank details</h2><div class="fgrid">
+      </div></fieldset></section>
+      <section class="panel"><h2>Bank details ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid">
         ${F('bankName','Bank name',{span:'span2'})}${F('accNo','Account number')}${F('accName','Account name')}
-      </div></section>
-      <section class="panel"><h2>Numbering &amp; timing</h2><div class="fgrid">
+      </div></fieldset></section>
+      <section class="panel"><h2>Numbering &amp; timing ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid">
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
         ${F('prefix','Number prefix',{hint:'Numbers look like ' + esc((s.prefix||'ESC')) + '/INV/' + todayISO().slice(2,4) + '/21'})}
         <div class="fld"><label for="s-quoteValidDays-s">Quotes valid for</label>${daysPick('s-quoteValidDays', 'data-s="quoteValidDays"', s.quoteValidDays)}</div>
         <div class="fld"><label for="s-invoiceDueDays-s">Invoices due in</label>${daysPick('s-invoiceDueDays', 'data-s="invoiceDueDays"', s.invoiceDueDays)}</div>
-      </div></section>
-      <section class="panel"><h2>Signature</h2><div class="fgrid two">
+      </div></fieldset></section>
+      <section class="panel"><h2>Signature ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid two">
         <div class="fld"><span class="lbl2">Your signature</span><div class="sigbox" id="sig-prev"></div>
           <div class="row"><button type="button" class="btn sm" id="sig-draw">Draw signature</button><button type="button" class="btn sm" id="sig-up">Upload image…</button><button type="button" class="btn sm" id="sig-adj">Adjust size &amp; background</button><button type="button" class="btn sm danger" id="sig-rm">Use default</button><input type="file" id="sig-file" accept="image/*" hidden></div>
           <span class="hint">Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save settings to keep it.</span></div>
@@ -2942,27 +2948,27 @@ function viewSettings(main){
           <div class="fld"><label for="s-signdocs">Signature on quotations &amp; invoices</label><select id="s-signdocs" data-s="signDocs"><option value="1" ${s.signDocs !== false ? 'selected' : ''}>Place on the "Authorised signature" line</option><option value="" ${s.signDocs === false ? 'selected' : ''}>Leave blank to sign by hand</option></select></div>
           ${F('signName','Your name (printed under your signature)',{hint:'Shown under "Authorised signature" on quotations and invoices, and filled in as "Delivered by" on new delivery notes.'})}
         </div>
-      </div></section>
-      <section class="panel wording locked" id="wording"><h2>Default wording <button type="button" class="btn sm" id="w-edit" aria-pressed="false">✎ Edit wording</button></h2><div class="fgrid two">
-        ${F('quoteTerms','Quotation terms (one per line)',{area:true,rows:4,ro:true})}${F('invoiceTerms','Invoice terms (one per line)',{area:true,rows:4,ro:true})}
-        ${F('deliveryMessage','Delivery note confirmation',{area:true,ro:true})}${F('deliveryNote','Delivery note reminder',{area:true,ro:true})}
-        ${F('thanks','Footer line',{span:'span4',ro:true})}
-      </div><p class="dim" style="padding:0 18px 16px;margin:0"><span class="w-lock">Locked so it can't be changed by mistake. Click <b>Edit wording</b> to change it. </span>Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p></section>
-      <section class="panel" id="teampanel"><h2>Team</h2>
+      </div></fieldset></section>
+      <section class="panel" id="wording"><h2>Default wording ${EB}</h2><fieldset class="lockset" disabled><div class="fgrid two">
+        ${F('quoteTerms','Quotation terms (one per line)',{area:true,rows:4})}${F('invoiceTerms','Invoice terms (one per line)',{area:true,rows:4})}
+        ${F('deliveryMessage','Delivery note confirmation',{area:true})}${F('deliveryNote','Delivery note reminder',{area:true})}
+        ${F('thanks','Footer line',{span:'span4'})}
+      </div></fieldset><p class="dim" style="padding:0 18px 16px;margin:0">Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p></section>
+      <section class="panel" id="teampanel"><h2>Team ${S.mode === 'cloud' ? EB : ''}</h2>
         ${S.mode !== 'cloud' ? '<p class="dim" style="padding:14px 18px;margin:0">The team list works when the portal is connected to Firebase.</p>' : `
         ${S.legacyRules ? '<div class="warnbox"><b>One step left:</b> paste the security rules below into Firebase. Until then, the team list can\'t be saved and the roles are not enforced.</div>' : ''}
         <p class="dim" style="padding:14px 18px 0;margin:0">Add the Google (Gmail) address of each person who should use the portal. They sign in with <b>Sign in with Google</b>. Anyone not on this list can't open the portal.</p>
-        <ul class="team" id="teamlist"><li class="dim">Loading…</li></ul>
-        <div class="row" style="padding:12px 18px;border-top:1px solid var(--line)"><input id="tm-e" type="email" placeholder="name@gmail.com" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)" aria-label="Email to add"><select id="tm-r" aria-label="Role">${['staff','viewer','owner'].map(r => `<option value="${r}">${ROLES[r][0]}</option>`).join('')}</select><button type="button" class="btn primary" id="tm-add">Add person</button></div>
+        <fieldset class="lockset" disabled><ul class="team" id="teamlist"><li class="dim">Loading…</li></ul>
+        <div class="row" style="padding:12px 18px;border-top:1px solid var(--line)"><input id="tm-e" type="email" placeholder="name@gmail.com" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)" aria-label="Email to add"><select id="tm-r" aria-label="Role">${['staff','viewer','owner'].map(r => `<option value="${r}">${ROLES[r][0]}</option>`).join('')}</select><button type="button" class="btn primary" id="tm-add">Add person</button></div></fieldset>
         <p class="dim" style="padding:0 18px 12px;margin:0">${Object.entries(ROLES).map(([k,[l,d]]) => `<b>${l}:</b> ${d}`).join('<br>')}</p>
         <details class="rules"><summary><b>Security rules</b> (paste into Firebase once, and again if this text changes)</summary>
           <ol><li>Open <b>console.firebase.google.com</b> → project <b>${esc((window.FIREBASE_CONFIG||{}).projectId || '')}</b>.</li><li>Go to <b>Firestore Database → Rules</b>.</li><li>Delete everything there, paste the text below, and click <b>Publish</b>.</li></ol>
           <textarea id="rules-text" readonly>${esc(FIRESTORE_RULES)}</textarea>
           <div class="row"><button type="button" class="btn" id="rules-copy">Copy rules</button></div></details>`}
       </section>
-      <section class="panel"><h2>Backup &amp; move</h2><div style="padding:16px 18px;display:grid;gap:12px">
+      <section class="panel"><h2>Backup &amp; move ${EB}</h2><div style="padding:16px 18px;display:grid;gap:12px">
         <p class="dim" style="margin:0">Download every quotation, invoice, delivery note, customer and setting as one file. Keep it as a backup, or restore it into another copy of this portal (for example your own website).</p>
-        <div class="row"><button type="button" class="btn" id="bk-exp">Download backup</button><button type="button" class="btn" id="bk-imp">Restore from backup…</button><input type="file" id="bk-file" accept=".json,application/json" hidden>
+        <div class="row"><button type="button" class="btn" id="bk-exp">Download backup</button><fieldset class="lockset inline" disabled><button type="button" class="btn" id="bk-imp">Restore from backup…</button></fieldset><input type="file" id="bk-file" accept=".json,application/json" hidden>
         ${window.__signOut ? '<button type="button" class="btn danger" id="so2">Sign out</button>' : ''}</div>
       </div></section>
       <div class="stickybar"><button type="button" class="btn primary" id="ss">Save settings</button></div>
@@ -2985,15 +2991,15 @@ function viewSettings(main){
   });
   $('#sig-rm').addEventListener('click', () => { s.signImage = ''; s.signScale = 1; sigShow(); toast('Back to the default signature. Click Save settings to keep it.'); });
   const useSig = (img, scale) => { s.signImage = img; s.signScale = scale; sigShow(); toast('Signature ready. Click Save settings to keep it.'); };
-  // Default wording stays read-only until Edit wording is clicked, so a stray click or keypress can't change it
   const fitWording = () => $('#wording').querySelectorAll('textarea').forEach(t => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; });
   fitWording(); $('#wording').addEventListener('input', fitWording);   // show the whole text, no inner scrolling
-  $('#w-edit').addEventListener('click', e => {
-    const sec = $('#wording'), on = sec.classList.toggle('locked') === false;
-    sec.querySelectorAll('[data-s]').forEach(el => { el.readOnly = !on; });
-    e.currentTarget.textContent = on ? '🔒 Lock wording' : '✎ Edit wording'; e.currentTarget.setAttribute('aria-pressed', on);
-    if (on) $('#s-quoteTerms').focus();
-  });
+  // Edit / Lock on each section
+  main.querySelectorAll('.sec-edit').forEach(b => b.addEventListener('click', () => {
+    const sec = b.closest('section'), sets = sec.querySelectorAll('.lockset'), on = sets[0] && sets[0].disabled;
+    sets.forEach(f => { f.disabled = !on; });
+    b.textContent = on ? '🔒 Lock' : '✎ Edit'; b.setAttribute('aria-pressed', on); b.classList.toggle('on', on);
+    if (on){ const f = sec.querySelector('.lockset input:not([hidden]):not([type=file]),.lockset textarea'); if (f) f.focus(); fitWording(); }
+  }));
   $('#sig-draw').addEventListener('click', () => signaturePad(url => setTimeout(() => signatureEditor(url, {bg:true, size:s.signScale}, useSig), 0)));
   $('#sig-adj').addEventListener('click', () => signatureEditor(s.signImage || SIGN, {bg:true, size:s.signScale}, useSig));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
