@@ -164,7 +164,10 @@ table.items .n{text-align:right}
 .ipop .ip-list .grp .chev{font-style:normal;color:var(--muted);margin-left:6px;font-size:12px}
 .ipop .ip-list .kids{margin:0 0 4px 12px;padding-left:6px;border-left:2px solid var(--brand-soft)}
 .ipop .ip-list .opt small{font-size:11.5px}
-.ipop .ip-list .new{color:var(--brand);font-weight:600}
+.ipop .ip-list .new,.ipop .ip-list .add{color:var(--brand);font-weight:600}
+.ipop .ip-list .addto{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:4px 10px 8px;font-size:12.5px}
+.ipop .ip-list .addto .chip{border:1px solid var(--brand);color:var(--brand);border-radius:999px;padding:2px 9px;font-weight:600;cursor:pointer}
+.ipop .ip-list .addto .chip:hover,.ipop .ip-list .addto .chip.act{background:var(--brand);color:#fff}
 .ipop .ip-list .del{margin-left:auto;padding:0 6px;font-size:18px;line-height:1;color:var(--muted)}
 .ipop .ip-list .del:hover{color:var(--bad)}
 .ipop .cnt{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font-size:11px;display:inline-grid;place-items:center}
@@ -1000,8 +1003,10 @@ const ATOLLS = [
   ['R', 'Raa', ['Agolhitheemu','Alifushi','Dhuvaafaru','Fainu','Hulhudhuffaaru','Iguraidhoo','Innamaadhoo','Kinolhas','Maakurathu','Maduvvari','Meedhoo','Rasgetheemu','Rasmaadhoo','Ungoofaaru','Vaadhoo']],
   ['B', 'Baa', ['Dharavandhoo','Dhonfanu','Eydhafushi','Fehendhoo','Fulhadhoo','Goidhoo','Hithaadhoo','Kamadhoo','Kendhoo','Kihaadhoo','Kudarikilu','Maalhos','Thulhaadhoo']],
 ].map(([code, name, isl]) => ({code, name, islands: isl.map(i => code + '.' + i)}));
-// Custom places (resorts, harbours…) saved by the team in the "places" collection
+// Saved places in the "places" collection: custom places (resorts, harbours…), or extra islands of an atoll ({atoll:'Sh'})
 const customPlaces = () => Object.values(S.places || {}).filter(p => p && p.name).sort((a, b) => a.name.localeCompare(b.name));
+// Islands of an atoll for the picker: the built-in ones plus the ones the team added
+const atollItems = a => [...a.islands.map(v => ({v})), ...customPlaces().filter(p => p.atoll === a.code).map(p => ({v:p.name, p}))].sort((x, y) => x.v.localeCompare(y.v));
 const placeId = n => 'p-' + (n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || Date.now().toString(36));
 // Dropdown for From / Stops / To: islands grouped under their atoll (tap the atoll to open it), saved custom places,
 // and typing searches everything or saves a new custom name. In Stops every tap adds the next stop (1st, 2nd, …).
@@ -1031,16 +1036,25 @@ function islandPicker(box){
     const delBtn = p => canEdit() ? `<span class="del" data-del="${esc(p.id)}" title="Remove this saved place" aria-label="Remove ${esc(p.name)}">×</span>` : '';
     let html = '';
     if (q){
-      const all = [...custom.map(p => ({v:p.name, p})), ...ATOLLS.flatMap(a => a.islands.map(v => ({v, a})))];
+      const all = [...custom.filter(p => !p.atoll).map(p => ({v:p.name, p})), ...ATOLLS.flatMap(a => atollItems(a).map(o => ({...o, a})))];
       const hits = all.filter(o => o.v.toLowerCase().includes(ql));
-      html = hits.map(o => opt(o.v, o.p ? '<small class="dim">saved</small>' : `<small class="dim">${esc(o.a.name)}</small>`)).join('');
-      if (!all.some(o => o.v.toLowerCase() === ql)) html += `<div class="opt new${nav++ === act ? ' act' : ''}" data-nav data-new="${esc(q)}">+ Save “${esc(q)}” as a custom place</div>`;
+      html = hits.map(o => opt(o.v, `<small class="dim">${o.a ? esc(o.a.name) : 'saved'}</small>`)).join('');
+      if (!all.some(o => o.v.toLowerCase() === ql)){
+        const pre = atollOf(q), rest = pre ? q.slice(q.indexOf('.') + 1).trim() : '';
+        if (pre && rest){ const a = ATOLLS.find(x => x.code === pre);
+          html += `<div class="opt new${nav++ === act ? ' act' : ''}" data-nav data-addto="${esc(pre)}" data-name="${esc(rest)}">+ Add “${esc(islandName(pre, rest))}” to ${esc(a.name)}</div>`; }
+        else if (!pre){
+          html += `<div class="opt new${nav++ === act ? ' act' : ''}" data-nav data-new="${esc(q)}">+ Save “${esc(q)}” as a custom place</div>`
+            + `<div class="addto"><span class="dim">or add as an island in</span>${ATOLLS.map(a => `<span class="chip${nav++ === act ? ' act' : ''}" data-nav data-addto="${esc(a.code)}" data-name="${esc(q)}" title="${esc(a.name)}">${esc(a.code)}.</span>`).join('')}</div>`;
+        }
+      }
     } else {
       const grp = (key, label, sub, items) => { const on = openG === key, sel = multi() ? items.reduce((n, it) => n + nums(it.v).length, 0) : items.some(it => it.v.toLowerCase() === cur) ? 1 : 0;
         return `<div class="grp${on ? ' on' : ''}${nav++ === act ? ' act' : ''}" data-nav data-g="${esc(key)}"><span>${esc(label)} <small class="dim">${esc(sub)}</small></span><span>${sel ? `<b class="cnt">${sel}</b>` : ''}<i class="chev">${on ? '▾' : '▸'}</i></span></div>`
-          + (on ? `<div class="kids">${items.map(it => opt(it.v, it.p ? delBtn(it.p) : '')).join('') || '<div class="dim" style="padding:8px 10px">No saved places yet. Type a name above to add one.</div>'}</div>` : ''); };
-      html = grp('★', 'Custom places', 'resorts etc.', custom.map(p => ({v:p.name, p})))
-        + ATOLLS.map(a => grp(a.code, a.name, a.code + '.', a.islands.map(v => ({v})))).join('');
+          + (on ? `<div class="kids">${items.map(it => opt(it.v, it.p ? delBtn(it.p) : '')).join('')}${key === '★' ? (items.length ? '' : '<div class="dim" style="padding:8px 10px">No saved places yet. Type a name above to add one.</div>')
+            : `<div class="opt add${nav++ === act ? ' act' : ''}" data-nav data-prefix="${esc(key)}">+ Add an island to ${esc(label)}</div>`}</div>` : ''); };
+      html = grp('★', 'Custom places', 'resorts etc.', custom.filter(p => !p.atoll).map(p => ({v:p.name, p})))
+        + ATOLLS.map(a => grp(a.code, a.name, a.code + '.', atollItems(a))).join('');
     }
     pop.innerHTML = (multi() ? `<div class="ip-h">${ps.length ? ps.map((p, i) => `<span class="s"><b>${i + 1}</b>${esc(p)}</span>`).join('') : '<span class="dim">Tap islands in order: 1st stop, 2nd stop…</span>'}</div>` : '')
       + `<div class="ip-hint dim">${q ? 'Search results' : 'Tap an atoll to see its islands, or type to search / add a name'}</div>`
@@ -1062,6 +1076,14 @@ function islandPicker(box){
     }
     pick(name);
   };
+  // an extra island of an atoll (uninhabited islands, picnic islands…): saved as "Sh.Name" under that atoll
+  const islandName = (code, name) => code + '.' + name.trim().replace(/^\p{Ll}/u, c => c.toUpperCase());
+  const saveIsland = (code, name) => {
+    const full = islandName(code, name).slice(0, 60), a = ATOLLS.find(x => x.code === code);
+    if (!atollItems(a).some(o => o.v.toLowerCase() === full.toLowerCase()))
+      put('places', placeId(full), {name: full, atoll: code, by: S.user || '', at: new Date().toISOString()}).catch(() => toast('The island was used but not saved. The owner needs to update the security rules (Settings → Team).'));
+    openG = code; pick(full);
+  };
   const open = el => {
     if (pop && inp === el) return; close();
     inp = el; act = 0;
@@ -1075,6 +1097,11 @@ function islandPicker(box){
       if (d){ const p = (S.places || {})[d.dataset.del]; if (p && confirm(`Remove “${p.name}” from the saved places?`)) del('places', p.id).then(draw, () => {}); return; }
       const g = e.target.closest('[data-g]'); if (g){ openG = openG === g.dataset.g ? null : g.dataset.g; act = [...pop.querySelectorAll('[data-nav]')].indexOf(g); draw(false, openG); return; }
       const n = e.target.closest('[data-new]'); if (n) return saveCustom(n.dataset.new);
+      const at = e.target.closest('[data-addto]'); if (at) return saveIsland(at.dataset.addto, at.dataset.name);
+      const px = e.target.closest('[data-prefix]');
+      if (px){   // start the name with the atoll prefix; typing the rest offers "+ Add … to <atoll>"
+        const {ps} = parts(); set(multi() ? (ps.length ? ps.join(', ') + ', ' : '') + px.dataset.prefix + '.' : px.dataset.prefix + '.');
+        const n2 = inp.value.length; try { inp.setSelectionRange(n2, n2); } catch(e2){} act = 0; draw(true); return; }
       const o = e.target.closest('[data-v]'); if (o){ act = [...pop.querySelectorAll('[data-nav]')].indexOf(o); return pick(o.dataset.v); }
       const b = e.target.closest('[data-a]'); if (!b) return;
       const {ps} = parts();
