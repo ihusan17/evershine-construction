@@ -181,6 +181,28 @@ table.items td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line
 table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
+/* products: category tabs, chips and row actions */
+.ptabs{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 12px}
+.ptabs.mini{padding:0;margin:8px 0}
+.ptab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.ptab small{color:var(--muted);font-weight:600;margin-left:2px}
+.ptab.on{background:var(--brand);border-color:var(--brand);color:#fff}.ptab.on small{color:#fff;opacity:.8}
+.ptab.add{border-style:dashed;color:var(--brand)}
+.pcat{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.pdot{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
+.pacts{display:flex;gap:6px;justify-content:flex-end}
+.ia{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:inherit;font-size:14px;cursor:pointer}
+.ia:hover{color:var(--brand);border-color:var(--brand)}
+table.list.prods .p-used{font-size:13px}
+.pmenu{position:absolute;z-index:95;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:4px;min-width:170px;display:grid}
+.pmenu button{border:0;background:none;text-align:left;padding:9px 12px;border-radius:6px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
+.pmenu button:hover,.pmenu button:focus{background:var(--brand-soft);outline:none}
+.pmenu button.danger{color:var(--bad)}
+.pchips{display:flex;gap:6px;flex-wrap:wrap}
+.pchip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.pchip.on{background:var(--c,var(--brand));border-color:var(--c,var(--brand));color:#fff}
+.pchip.add{border-style:dashed;color:var(--brand)}
+.pcl{display:grid;gap:8px}
 /* island picker (From / Stops / To on boat trips) */
 .ipop{position:absolute;z-index:90;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.2);max-height:min(460px,70vh);display:flex;flex-direction:column;overflow:hidden;font-size:14px}
 .ipop .ip-list{overflow:auto;padding:4px;flex:1;min-height:0;position:relative}
@@ -545,9 +567,14 @@ body[data-role=viewer] .stbtn{cursor:default} body[data-role=viewer] .stbtn svg{
   table.list.custs .c-docs{grid-area:docs;font-size:12.5px;color:var(--muted)}
   table.list.custs .c-docs::after{content:attr(data-n)}
   table.list.custs .c-owed::before,table.list.custs .c-bill::before{content:attr(data-l);font-size:11px;font-weight:600;color:var(--muted)}
-  table.list.prods tr{grid-template-areas:"name rate" "unit rate"}
+  table.list.prods tr{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"name name rate" "cat unit act"}
   table.list.prods .p-name{grid-area:name} table.list.prods .p-name .cust{font-weight:600}
-  table.list.prods .p-unit{grid-area:unit;font-size:12.5px}
+  table.list.prods .p-cat{grid-area:cat}
+  table.list.prods .p-unit{grid-area:unit;font-size:12.5px;align-self:center}
+  table.list.prods .p-unit:not(:empty)::before{content:"· "}
+  table.list.prods .p-used{display:none!important}
+  table.list.prods .p-act{grid-area:act}
+  table.list.prods .pacts .pe{display:none}
   table.list.prods .p-rate{grid-area:rate;font-weight:700}
   table.list.prods .p-rate::before{content:"MVR ";font-size:11px;font-weight:600;color:var(--muted)}
 }
@@ -1012,6 +1039,17 @@ async function boot(){
 const docsOf = type => Object.values(S.docs).filter(d => d.type === type).sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.number||'').localeCompare(a.number||''));
 const products = () => (S.settings.products || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
 const saveProducts = list => saveSettings({...S.settings, products:list});
+// Product categories (Settings → productCats [{id, name}]); a product points to one with p.cat
+const CAT_COLORS = ['#3a78c2','#c2691f','#2e8b57','#8e44ad','#c0392b','#16858a','#9a7b00','#d6336c'];
+const prodCats = () => S.settings.productCats || [];
+const catOf = p => p && p.cat ? prodCats().find(c => c.id === p.cat) : null;
+const catColor = c => CAT_COLORS[Math.max(0, prodCats().indexOf(c)) % CAT_COLORS.length];
+const catChip = c => c ? `<span class="pcat" style="--c:${catColor(c)}">${esc(c.name)}</span>` : '<span class="dim">–</span>';
+async function newCategory(){
+  const name = (prompt('Name of the new category (e.g. Steel, Tiles, Boat hire)') || '').trim().slice(0, 40); if (!name) return null;
+  const have = prodCats().find(c => c.name.toLowerCase() === name.toLowerCase()); if (have) return have;
+  const c = {id: uid(), name}; await saveSettings({...S.settings, productCats: prodCats().concat(c)}); return c;
+}
 const custList = () => Object.values(S.customers).sort((a,b) => (a.name||'').localeCompare(b.name||''));
 
 function nextNumber(type, date){
@@ -1808,6 +1846,7 @@ function viewEditor(main, d, isEdit){
       <section class="panel"><h2><span id="ititle">Items</span></h2>
         <div class="ppick" id="ppick" hidden>
           <input id="pq" type="search" placeholder="Search products, then click one to add it" aria-label="Search products">
+          <div class="ptabs mini" id="pcat" hidden></div>
           <div class="pgrid" id="pgrid"></div>
         </div>
         <div style="padding:6px 12px 0" class="tablewrap"><table class="items"><thead id="ihead"></thead><tbody id="ibody"></tbody></table></div>
@@ -1846,12 +1885,15 @@ function viewEditor(main, d, isEdit){
     const sel = $('#f-cust').value;
     $('#c-note').textContent = sel === '__new' || (!sel && d.customer.name) ? 'This customer will be added to your customer list when you save.' : sel ? 'Changes here apply to this document only. Edit the saved customer under Customers.' : '';
   };
-  const plist = products();
+  const plist = products(), pcats = prodCats().filter(c => plist.some(p => p.cat === c.id));
+  let pickCat = 'all';
   const drawPicker = () => {
     const box = $('#ppick'); box.hidden = !isDN && d.kind === 'hire';
     if (!plist.length){ $('#pq').hidden = true; $('#pgrid').innerHTML = '<span class="dim">Save your products under <b>Products</b> and they appear here to add with one click.</span>'; return; }
     const q = $('#pq').value.trim().toLowerCase();
-    const shown = plist.filter(p => !q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q));
+    const ct = $('#pcat'); ct.hidden = !pcats.length;
+    if (pcats.length) ct.innerHTML = [['all', 'All'], ...pcats.map(c => [c.id, c.name])].map(([id, n]) => `<button type="button" class="ptab${pickCat === id ? ' on' : ''}" data-pc="${esc(id)}">${esc(n)}</button>`).join('');
+    const shown = plist.filter(p => (pickCat === 'all' || p.cat === pickCat) && (!q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q)));
     $('#pgrid').innerHTML = shown.length ? shown.map(p => `<button type="button" class="pbtn" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><span>${esc([p.unit, !isDN && String(p.rate ?? '') !== '' ? 'MVR ' + money(num(p.rate)) : ''].filter(Boolean).join(' · ') || 'Add')}</span></button>`).join('')
       : '<span class="dim">No products match.</span>';
   };
@@ -1935,6 +1977,7 @@ function viewEditor(main, d, isEdit){
     custNote(); if (v === '__new') $('#f-cname').focus();
   });
   $('#pq').addEventListener('input', drawPicker);
+  $('#pcat').addEventListener('click', e => { const b = e.target.closest('[data-pc]'); if (b){ pickCat = b.dataset.pc; drawPicker(); } });
   islandPicker($('#ibody'));
   $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
   $('#ibody').addEventListener('click', e => {
@@ -2698,25 +2741,51 @@ function customerBox(c){
 }
 
 /* ---------- products ---------- */
-let prodQ = '';
+let prodQ = '', prodCat = 'all';
 function viewProducts(main){
-  const list = products();
+  const list = products(), cats = prodCats(), own = isOwnerRole();
+  // how many documents use each product (matched by its name)
+  const used = {};
+  Object.values(S.docs).forEach(d => { if (isVoid(d)) return; const seen = new Set();
+    (d.items || []).forEach(it => { const k = (it.desc || '').trim().toLowerCase(); if (k && !seen.has(k)){ seen.add(k); used[k] = (used[k] || 0) + 1; } }); });
+  if (prodCat !== 'all' && prodCat !== 'none' && !cats.some(c => c.id === prodCat)) prodCat = 'all';
+  const nNone = list.filter(p => !catOf(p)).length;
   main.innerHTML = `
-    <div class="pagehead"><div><h1>Products</h1><p>${list.length} saved. Click a product in the quotation, invoice or delivery note editor to add it as a line.</p></div>
-      <div class="row"><button class="btn" id="impp" data-need="owner">Import from past documents</button><button class="btn primary" id="addp" data-need="owner">Add product</button></div></div>
+    <div class="pagehead"><div><h1>Products</h1><p>${list.length} product${list.length === 1 ? '' : 's'}${cats.length ? ` in ${cats.length} categor${cats.length === 1 ? 'y' : 'ies'}` : ''}. In the quotation, invoice or delivery note editor, click a product to add it as a line.</p></div>
+      <div class="row"><button class="btn" id="impp" data-need="owner">Import from past documents</button><button class="btn primary" id="addp" data-need="owner">+ Add product</button></div></div>
     <section class="panel">
       <div class="filters"><input id="pq2" type="search" placeholder="Search products" value="${esc(prodQ)}" aria-label="Search products"></div>
-      <div class="tablewrap"><table class="list prods"><thead><tr><th>Product</th><th>Unit</th><th class="num">Rate (MVR)</th></tr></thead><tbody id="prows"></tbody></table></div>
+      <div class="ptabs" id="ptabs" role="tablist" aria-label="Categories"></div>
+      <div class="tablewrap"><table class="list prods"><thead><tr><th>Product</th><th>Category</th><th>Unit</th><th class="num">Rate (MVR)</th><th>Used in</th><th></th></tr></thead><tbody id="prows"></tbody></table></div>
     </section>`;
+  const tabs = () => {
+    const t = (id, label, n) => `<button type="button" class="ptab${prodCat === id ? ' on' : ''}" role="tab" aria-selected="${prodCat === id}" data-cat="${esc(id)}">${esc(label)} <small>${n}</small></button>`;
+    $('#ptabs').innerHTML = t('all', 'All', list.length) + cats.map(c => t(c.id, c.name, list.filter(p => p.cat === c.id).length)).join('')
+      + (cats.length && nNone ? t('none', 'No category', nNone) : '') + (own ? '<button type="button" class="ptab add" id="pcats">+ Category</button>' : '');
+  };
   const draw = () => {
     const q = prodQ.trim().toLowerCase();
-    const shown = list.filter(p => !q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q));
-    $('#prows').innerHTML = shown.length ? shown.map(p => `<tr data-p="${esc(p.id)}"><td class="p-name"><div class="cust">${esc(p.name)}</div></td><td class="dim p-unit">${esc(p.unit)}</td><td class="num p-rate">${String(p.rate ?? '') === '' ? '–' : money(num(p.rate))}</td></tr>`).join('')
-      : `<tr><td colspan="3" class="empty">${list.length ? 'No products match.' : 'No products yet. Add one, or import the items you used in past documents.'}</td></tr>`;
-    $('#prows').querySelectorAll('[data-p]').forEach(r => r.addEventListener('click', () => productBox(list.find(p => p.id === r.dataset.p))));
+    const shown = list.filter(p => (prodCat === 'all' || (prodCat === 'none' ? !catOf(p) : p.cat === prodCat))
+      && (!q || [p.name, p.unit, (catOf(p) || {}).name].some(x => (x || '').toLowerCase().includes(q))));
+    $('#prows').innerHTML = shown.length ? shown.map(p => { const n = used[(p.name || '').trim().toLowerCase()] || 0;
+      return `<tr data-p="${esc(p.id)}"><td class="p-name"><div class="cust">${esc(p.name)}</div></td><td class="p-cat">${catChip(catOf(p))}</td><td class="dim p-unit">${esc(p.unit)}</td><td class="num p-rate">${String(p.rate ?? '') === '' ? '–' : money(num(p.rate))}</td>`
+        + `<td class="dim p-used">${n ? `${n} document${n === 1 ? '' : 's'}` : 'Not used yet'}</td>`
+        + `<td class="p-act">${own ? `<div class="pacts"><button type="button" class="ia pe" data-pe title="Edit" aria-label="Edit ${esc(p.name)}">✎</button><button type="button" class="ia" data-pd title="Duplicate" aria-label="Duplicate ${esc(p.name)}">⧉</button><button type="button" class="ia" data-pm title="More" aria-label="More for ${esc(p.name)}">⋯</button></div>` : ''}</td></tr>`; }).join('')
+      : `<tr><td colspan="6" class="empty">${list.length ? 'No products match.' : 'No products yet. Add one, or import the items you used in past documents.'}</td></tr>`;
   };
   $('#pq2').addEventListener('input', e => { prodQ = e.target.value; draw(); });
-  $('#addp').addEventListener('click', () => productBox(null));
+  $('#ptabs').addEventListener('click', async e => {
+    if (e.target.closest('#pcats')) return categoriesBox();
+    const b = e.target.closest('[data-cat]'); if (!b) return; prodCat = b.dataset.cat; tabs(); draw();
+  });
+  $('#prows').addEventListener('click', e => {
+    const r = e.target.closest('[data-p]'); if (!r) return; const p = list.find(x => x.id === r.dataset.p); if (!p) return;
+    if (e.target.closest('[data-pd]')) return productBox({...p, id:'', name: p.name + ' (copy)'}, true);
+    const m = e.target.closest('[data-pm]');
+    if (m) return popMenu(m, [['✎ Edit', () => productBox(p)], ['⧉ Duplicate', () => productBox({...p, id:'', name: p.name + ' (copy)'}, true)], ['Delete product', () => delProduct(p), 'danger']]);
+    productBox(p);
+  });
+  $('#addp').addEventListener('click', () => productBox(prodCat !== 'all' && prodCat !== 'none' ? {name:'', unit:'', rate:'', cat:prodCat} : null, true));
   $('#impp').addEventListener('click', () => {
     const have = new Set(list.map(p => (p.name||'').trim().toLowerCase()));
     const past = {};
@@ -2733,28 +2802,82 @@ function viewProducts(main){
       toast(`${add.length} product${add.length === 1 ? '' : 's'} imported`);
     });
   });
-  draw();
+  tabs(); draw();
 }
-function productBox(p){
-  const isNew = !p; p = p || {name:'', unit:'', rate:''};
-  const w = modal(isNew ? 'Add product' : p.name, `
-    <div class="fld"><label for="p-n">Name / description</label><textarea id="p-n" rows="2">${esc(p.name)}</textarea></div>
-    <div class="fgrid two" style="padding:0"><div class="fld"><label for="p-u">Unit</label><input id="p-u" list="punits" value="${esc(p.unit)}" placeholder="Nos, Bags, CUM…"></div><div class="fld"><label for="p-r">Rate (MVR)</label><input id="p-r" inputmode="decimal" value="${esc(p.rate)}" placeholder="0.00"></div></div>
-    <datalist id="punits">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>
-    ${isNew ? '' : '<div class="row"><button class="btn sm danger" data-delp>Delete product</button></div>'}`,
-    'Save product', async w => {
-      if (!isOwnerRole()){ toast('Only the owner can change products.'); return false; }
-      const name = w.querySelector('#p-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
-      const all = S.settings.products || [];
-      if (all.some(x => x.id !== p.id && (x.name||'').trim().toLowerCase() === name.toLowerCase())){ toast('A product with that name already exists.'); return false; }
-      const rv = w.querySelector('#p-r').value.trim();
-      const item = {id:p.id || uid(), name, unit:w.querySelector('#p-u').value.trim(), rate: rv === '' ? '' : String(num(rv))};
-      await saveProducts(isNew ? all.concat(item) : all.map(x => x.id === p.id ? item : x));
-      toast('Product saved');
+// small menu next to a button: items are [label, action, 'danger'?]
+function popMenu(btn, items){
+  document.querySelectorAll('.pmenu').forEach(x => x.remove());
+  const m = document.createElement('div'); m.className = 'pmenu'; m.setAttribute('role', 'menu');
+  m.innerHTML = items.map(([l, , k], i) => `<button type="button" role="menuitem" class="${k || ''}" data-i="${i}">${esc(l)}</button>`).join('');
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect(); m.style.top = (r.bottom + scrollY + 4) + 'px'; m.style.left = (Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8)) + scrollX) + 'px';
+  const off = e => { if (!m.contains(e.target)){ m.remove(); document.removeEventListener('click', off, true); } };
+  setTimeout(() => document.addEventListener('click', off, true), 0);
+  m.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; m.remove(); document.removeEventListener('click', off, true); items[+b.dataset.i][1](); });
+  m.querySelector('button').focus();
+}
+function delProduct(p){
+  confirmBox(`Delete ${p.name}?`, 'The product is removed from your list. Existing documents are not changed.', 'Delete product', async () => { await saveProducts((S.settings.products || []).filter(x => x.id !== p.id)); toast('Product deleted'); }, true);
+}
+// Add / edit categories: rename in place, × removes (its products become "No category")
+function categoriesBox(){
+  let cats = prodCats().map(c => ({...c}));
+  const w = modal('Categories', `<p class="dim" style="margin:0 0 10px">Group your products, e.g. Cement, Blocks, Sand &amp; aggregate, Steel.</p><div class="pcl" id="pcl"></div>
+    <div class="row" style="margin-top:10px"><input id="pc-new" placeholder="New category name" style="flex:1;min-width:0" aria-label="New category name"><button type="button" class="btn" id="pc-add">Add</button></div>`, 'Save categories', async () => {
+      const keep = cats.filter(c => c.name.trim()).map(c => ({id:c.id, name:c.name.trim().slice(0, 40)}));
+      const ids = new Set(keep.map(c => c.id));
+      await saveSettings({...S.settings, productCats: keep, products: (S.settings.products || []).map(p => p.cat && !ids.has(p.cat) ? {...p, cat:''} : p)});
+      toast('Categories saved');
     });
-  if (!isOwnerRole()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('[data-ok]').style.display = 'none'; const dl = w.querySelector('[data-delp]'); if (dl) dl.remove(); }
-  const dp = w.querySelector('[data-delp]');
-  if (dp) dp.addEventListener('click', () => { w.remove(); confirmBox(`Delete ${p.name}?`, 'The product is removed from your list. Existing documents are not changed.', 'Delete product', async () => { await saveProducts((S.settings.products || []).filter(x => x.id !== p.id)); toast('Product deleted'); }); });
+  const draw = () => { w.querySelector('#pcl').innerHTML = cats.length ? cats.map((c, i) => `<div class="row"><span class="pdot" style="--c:${CAT_COLORS[i % CAT_COLORS.length]}"></span><input data-ci="${i}" value="${esc(c.name)}" aria-label="Category name" style="flex:1;min-width:0"><span class="dim" style="font-size:12.5px;white-space:nowrap">${(S.settings.products || []).filter(p => p.cat === c.id).length} products</span><button type="button" class="x" data-cdel="${i}" title="Remove category" aria-label="Remove ${esc(c.name)}">×</button></div>`).join('') : '<p class="dim" style="margin:0">No categories yet.</p>'; };
+  w.querySelector('#pcl').addEventListener('input', e => { const i = e.target.dataset.ci; if (i != null) cats[+i].name = e.target.value; });
+  w.querySelector('#pcl').addEventListener('click', e => { const b = e.target.closest('[data-cdel]'); if (!b) return; cats.splice(+b.dataset.cdel, 1); draw(); });
+  const add = () => { const v = w.querySelector('#pc-new').value.trim(); if (!v) return; if (!cats.some(c => c.name.toLowerCase() === v.toLowerCase())) cats.push({id:uid(), name:v}); w.querySelector('#pc-new').value = ''; draw(); };
+  w.querySelector('#pc-add').addEventListener('click', add);
+  w.querySelector('#pc-new').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
+  draw(); w.querySelector('#pc-new').focus();
+}
+function productBox(p, asNew){
+  const isNew = !p || !!asNew; p = p || {name:'', unit:'', rate:''};
+  let cat = p.cat && prodCats().some(c => c.id === p.cat) ? p.cat : '';
+  const w = modal(isNew ? (p.name ? 'Duplicate product' : 'Add product') : p.name, `
+    <div class="fld"><label for="p-n">Name / description</label><textarea id="p-n" rows="2">${esc(p.name)}</textarea></div>
+    <div class="fld"><span class="lbl2">Category</span><div class="pchips" id="p-c"></div></div>
+    <div class="fgrid two" style="padding:0"><div class="fld"><label for="p-u">Unit</label><input id="p-u" list="punits" value="${esc(p.unit)}" placeholder="Nos, Bags, CUM…"></div><div class="fld"><label for="p-r">Rate (MVR)</label><input id="p-r" inputmode="decimal" value="${esc(p.rate)}" placeholder="0.00"></div></div>
+    <div class="fld" data-need="owner"><label for="p-k">Cost price (optional, only you see it)</label><input id="p-k" inputmode="decimal" value="${esc(p.cost ?? '')}" placeholder="What it costs you per unit"><span class="hint" id="p-pf"></span></div>
+    <datalist id="punits">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>
+    ${isNew ? '' : '<div class="row"><button type="button" class="btn sm" data-dupp>⧉ Duplicate</button><button type="button" class="btn sm danger" data-delp>Delete product</button></div>'}`,
+    'Save product', async w => { if (!await save(w)) return false; toast('Product saved'); });
+  const chips = () => { w.querySelector('#p-c').innerHTML = [['', 'None'], ...prodCats().map(c => [c.id, c.name])].map(([id, n]) => `<button type="button" class="pchip${cat === id ? ' on' : ''}" data-c="${esc(id)}"${id ? ` style="--c:${catColor(prodCats().find(c => c.id === id))}"` : ''}>${esc(n)}</button>`).join('')
+    + (isOwnerRole() ? '<button type="button" class="pchip add" data-cnew>+ New</button>' : ''); };
+  const profit = () => { const r = num(w.querySelector('#p-r').value), k = w.querySelector('#p-k').value.trim(), el = w.querySelector('#p-pf'); if (!el) return;
+    el.textContent = k === '' || !r ? '' : `Profit ${money(r - num(k))} per unit (${Math.round((r - num(k)) / r * 100)}% of the rate)`; };
+  const save = async w => {
+    if (!isOwnerRole()){ toast('Only the owner can change products.'); return false; }
+    const name = w.querySelector('#p-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
+    const all = S.settings.products || [];
+    if (all.some(x => x.id !== p.id && (x.name||'').trim().toLowerCase() === name.toLowerCase())){ toast('A product with that name already exists. Change the name a little (e.g. the size).'); return false; }
+    const rv = w.querySelector('#p-r').value.trim(), kv = w.querySelector('#p-k').value.trim();
+    const item = {id: isNew ? uid() : p.id, name, unit:w.querySelector('#p-u').value.trim(), rate: rv === '' ? '' : String(num(rv)), cat, cost: kv === '' ? '' : String(num(kv))};
+    await saveProducts(isNew ? all.concat(item) : all.map(x => x.id === p.id ? item : x));
+    return true;
+  };
+  chips(); profit();
+  w.querySelector('#p-c').addEventListener('click', async e => {
+    if (e.target.closest('[data-cnew]')){ const c = await newCategory(); if (c){ cat = c.id; chips(); } return; }
+    const b = e.target.closest('[data-c]'); if (b){ cat = b.dataset.c; chips(); }
+  });
+  ['#p-r', '#p-k'].forEach(q => w.querySelector(q).addEventListener('input', profit));
+  if (isNew && isOwnerRole()){   // Save & add another: keeps the category and unit, clears the rest
+    const again = document.createElement('button'); again.type = 'button'; again.className = 'btn'; again.textContent = 'Save & add another';
+    w.querySelector('[data-ok]').before(again);
+    again.addEventListener('click', async () => { again.disabled = true;
+      if (await save(w)){ toast(`${w.querySelector('#p-n').value.trim()} saved. Add the next one.`); ['#p-n', '#p-r', '#p-k'].forEach(q => w.querySelector(q).value = ''); profit(); w.querySelector('#p-n').focus(); }
+      again.disabled = false; });
+  }
+  if (!isOwnerRole()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelectorAll('[data-c],[data-cnew],[data-delp],[data-dupp]').forEach(x => x.disabled = true); w.querySelector('[data-ok]').style.display = 'none'; const dl = w.querySelector('[data-delp]'); if (dl) dl.remove(); }
+  const dp = w.querySelector('[data-delp]'); if (dp) dp.addEventListener('click', () => { w.remove(); delProduct(p); });
+  const du = w.querySelector('[data-dupp]'); if (du) du.addEventListener('click', () => { w.remove(); productBox({...p, id:'', name: p.name + ' (copy)'}, true); });
 }
 
 /* ---------- team (Settings) ---------- */
