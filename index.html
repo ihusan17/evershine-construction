@@ -87,6 +87,9 @@ main{padding:28px 32px 60px;min-width:0}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.panel.wording.locked [data-s]{background:var(--surface-2);border-color:transparent;color:var(--ink);cursor:default;resize:none}
+.panel.wording.locked [data-s]:focus{outline:none;box-shadow:none}
+.panel.wording:not(.locked) .w-lock{display:none}
 .panel>h2,.sec-title{font-size:17px;margin:0;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .empty{padding:28px 18px;color:var(--muted);text-align:center}
 
@@ -2914,7 +2917,7 @@ function signaturePad(done){
 /* ---------- settings ---------- */
 function viewSettings(main){
   const s = {...S.settings};
-  const F = (k, label, opts={}) => `<div class="fld ${opts.span||''}"><label for="s-${k}">${label}</label>${opts.area ? `<textarea id="s-${k}" data-s="${k}" rows="${opts.rows||3}">${esc(s[k])}</textarea>` : `<input id="s-${k}" data-s="${k}" ${opts.type ? `type="${opts.type}"` : ''} value="${esc(s[k])}">`}${opts.hint ? `<span class="hint">${opts.hint}</span>` : ''}</div>`;
+  const F = (k, label, opts={}) => `<div class="fld ${opts.span||''}"><label for="s-${k}">${label}</label>${opts.area ? `<textarea id="s-${k}" data-s="${k}" rows="${opts.rows||3}"${opts.ro ? ' readonly' : ''}>${esc(s[k])}</textarea>` : `<input id="s-${k}" data-s="${k}" ${opts.type ? `type="${opts.type}"` : ''} value="${esc(s[k])}"${opts.ro ? ' readonly' : ''}>`}${opts.hint ? `<span class="hint">${opts.hint}</span>` : ''}</div>`;
   main.innerHTML = `
     <div class="pagehead"><div><h1>Settings</h1><p>These details print on every new document.</p></div></div>
     <form class="form" id="sf" onsubmit="return false">
@@ -2940,11 +2943,11 @@ function viewSettings(main){
           ${F('signName','Your name (printed under your signature)',{hint:'Shown under "Authorised signature" on quotations and invoices, and filled in as "Delivered by" on new delivery notes.'})}
         </div>
       </div></section>
-      <section class="panel"><h2>Default wording</h2><div class="fgrid two">
-        ${F('quoteTerms','Quotation terms (one per line)',{area:true,rows:4})}${F('invoiceTerms','Invoice terms (one per line)',{area:true,rows:4})}
-        ${F('deliveryMessage','Delivery note confirmation',{area:true})}${F('deliveryNote','Delivery note reminder',{area:true})}
-        ${F('thanks','Footer line',{span:'span4'})}
-      </div><p class="dim" style="padding:0 18px 16px;margin:0">Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p></section>
+      <section class="panel wording locked" id="wording"><h2>Default wording <button type="button" class="btn sm" id="w-edit" aria-pressed="false">✎ Edit wording</button></h2><div class="fgrid two">
+        ${F('quoteTerms','Quotation terms (one per line)',{area:true,rows:4,ro:true})}${F('invoiceTerms','Invoice terms (one per line)',{area:true,rows:4,ro:true})}
+        ${F('deliveryMessage','Delivery note confirmation',{area:true,ro:true})}${F('deliveryNote','Delivery note reminder',{area:true,ro:true})}
+        ${F('thanks','Footer line',{span:'span4',ro:true})}
+      </div><p class="dim" style="padding:0 18px 16px;margin:0"><span class="w-lock">Locked so it can't be changed by mistake. Click <b>Edit wording</b> to change it. </span>Changing wording here affects new documents only. Existing documents keep the terms they were saved with.</p></section>
       <section class="panel" id="teampanel"><h2>Team</h2>
         ${S.mode !== 'cloud' ? '<p class="dim" style="padding:14px 18px;margin:0">The team list works when the portal is connected to Firebase.</p>' : `
         ${S.legacyRules ? '<div class="warnbox"><b>One step left:</b> paste the security rules below into Firebase. Until then, the team list can\'t be saved and the roles are not enforced.</div>' : ''}
@@ -2982,6 +2985,15 @@ function viewSettings(main){
   });
   $('#sig-rm').addEventListener('click', () => { s.signImage = ''; s.signScale = 1; sigShow(); toast('Back to the default signature. Click Save settings to keep it.'); });
   const useSig = (img, scale) => { s.signImage = img; s.signScale = scale; sigShow(); toast('Signature ready. Click Save settings to keep it.'); };
+  // Default wording stays read-only until Edit wording is clicked, so a stray click or keypress can't change it
+  const fitWording = () => $('#wording').querySelectorAll('textarea').forEach(t => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; });
+  fitWording(); $('#wording').addEventListener('input', fitWording);   // show the whole text, no inner scrolling
+  $('#w-edit').addEventListener('click', e => {
+    const sec = $('#wording'), on = sec.classList.toggle('locked') === false;
+    sec.querySelectorAll('[data-s]').forEach(el => { el.readOnly = !on; });
+    e.currentTarget.textContent = on ? '🔒 Lock wording' : '✎ Edit wording'; e.currentTarget.setAttribute('aria-pressed', on);
+    if (on) $('#s-quoteTerms').focus();
+  });
   $('#sig-draw').addEventListener('click', () => signaturePad(url => setTimeout(() => signatureEditor(url, {bg:true, size:s.signScale}, useSig), 0)));
   $('#sig-adj').addEventListener('click', () => signatureEditor(s.signImage || SIGN, {bg:true, size:s.signScale}, useSig));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
