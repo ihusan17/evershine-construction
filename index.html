@@ -305,7 +305,7 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .hire .stn small{display:block;height:12px;font-size:9.5px;letter-spacing:.08em;color:#33669b;font-weight:700}
 .sheet .hire .stn i{width:11px;height:11px;margin:3px 0 4px;border-radius:50%;border:2px solid #33669b;background:#fff;box-sizing:border-box;position:relative;z-index:1}
 .sheet .hire .stn.end i{background:#33669b}
-.sheet .hire .stn b{font-size:13px;font-weight:600;white-space:nowrap}
+.sheet .hire .stn b{font-size:13px;font-weight:600;max-width:112px;overflow-wrap:break-word}
 .sheet .hire .stn::before,.sheet .hire .stn::after{content:"";position:absolute;top:19.5px;height:2px;background:#33669b}
 .sheet .hire .stn::before{left:0;right:50%}.sheet .hire .stn::after{left:50%;right:0}
 .sheet .hire .stn:first-child::before,.sheet .hire .stn:last-child::after{display:none}
@@ -2336,21 +2336,23 @@ function drawPDF(pdf, d, fill){
     const lines = wrap(hire ? it.desc : vals[dIdx], cols[dIdx].w - PAD*2);
     // lay the route map out first: each island is a station (label, dot, name); rows wrap when there are many stops
     let rLines = [];
-    const SP = 2.8, RH = 12;
+    const SP = 2.8, RH = 12, NW = 28, NLH = lh(9.4);   // long place names wrap at NW mm under their dot
     if (hasRoute){
       const k0 = cols[dIdx], x0 = cellX(k0) - SP, right = k0.x + k0.w - PAD;
       font(9.4, true); const dw = it.when ? Math.max(tw(it.when), 8) : 0;
       let cur = [], rx = x0, limit = it.when ? right - dw - 7 : right;
       pts.forEach((p, i) => {
-        font(9.4, true); const nw = tw(p[1]); font(6.8, true); const lw = tw(p[0]);
+        font(9.4, true); const nl = tw(p[1]) > NW ? wrap(p[1], NW) : [vis(p[1])], nw = Math.max(...nl.map(t => pdf.getTextWidth(t)));
+        font(6.8, true); const lw = tw(p[0]);
         const w = Math.max(nw, lw, 15.5) + SP * 2;
         if (cur.length && rx + w > limit){ rLines.push(cur); cur = []; rx = x0; limit = right; }
-        cur.push({lab:p[0], v:p[1], g:i, x:rx, w}); rx += w;
+        cur.push({lab:p[0], nl, g:i, x:rx, w}); rx += w;
       });
       if (cur.length || it.when) rLines.push(cur);
+      rLines.forEach(row => { row.h = RH + (Math.max(1, ...row.map(p => p.nl.length)) - 1) * NLH; });
       rLines.dw = dw;
     }
-    const rh = Math.max(1, lines.length) * lh(9.75) + 3.8 + rLines.length * RH + (rLines.length ? 1.2 : 0);
+    const rh = Math.max(1, lines.length) * lh(9.75) + 3.8 + rLines.reduce((a, row) => a + row.h, 0) + (rLines.length ? 1.2 : 0);
     if (y + rh > BOTTOM){ pdf.addPage(); y = 16; headRow(); }
     if (i % 2){ pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, rh, 'F'); }
     font(9.75, hire);
@@ -2364,14 +2366,15 @@ function drawPDF(pdf, d, fill){
       const seg = (x1, x2, yy, ret) => { if (x2 - x1 < 0.2) return; pdf.setLineWidth(0.5);
         if (ret){ pdf.setDrawColor(...ORANGE); pdf.setLineDashPattern([1.1, 0.8], 0); } else pdf.setDrawColor(...BLUE);
         pdf.line(x1, yy, x2, yy); pdf.setLineDashPattern([], 0); };
+      let ry = y + 5.2 + lines.length * lh(9.75) + 1.6;
       rLines.forEach((row, li) => {
-        const ly = y + 5.2 + lines.length * lh(9.75) + 1.6 + li * RH, dy = ly + 2.6, vy = ly + 7.3;
+        const ly = ry, dy = ly + 2.6, vy = ly + 7.3; ry += row.h;
         row.forEach(p => { const cx = p.x + p.w / 2;
           if (p.g > 0) seg(p.x, cx, dy, p.lab === 'RETURN');
           if (p.g < last) seg(cx, p.x + p.w, dy, (pts[p.g + 1] || [])[0] === 'RETURN'); });
         row.forEach(p => { const cx = p.x + p.w / 2, ret = p.lab === 'RETURN', end = p.lab === 'FROM' || p.lab === 'TO', col = ret ? ORANGE : BLUE;
           pdf.setLineWidth(0.55); pdf.setDrawColor(...col); pdf.setFillColor(...(end ? col : WHITE)); pdf.circle(cx, dy, 1.25, 'FD');
-          font(6.8, true, col); pdf.text(p.lab, cx, ly, {align:'center'}); font(9.4, true); txt(p.v, cx, vy, {align:'center'}); });
+          font(6.8, true, col); pdf.text(p.lab, cx, ly, {align:'center'}); font(9.4, true); p.nl.forEach((t, j) => pdf.text(t, cx, vy + j * NLH, {align:'center'})); });
         if (li === 0 && it.when){
           const wx = k0.x + k0.w - PAD - rLines.dw;
           pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(wx - 3.5, ly - 2.2, wx - 3.5, vy + 0.8);
