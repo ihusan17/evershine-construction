@@ -361,6 +361,9 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .hire .route{display:flex;align-items:flex-start;gap:10px;margin-top:6px}
 /* route map: islands on a line, dots filled at FROM / TO, open at stops, orange dashed leg for the return */
 .sheet .hire .map{display:flex;flex-wrap:wrap;row-gap:8px;min-width:0}
+.sheet .hire .map.wide{min-width:calc(100% - 125px)}   /* short routes: the last dot reaches the middle of the page */
+.sheet .hire .map .lnk{flex:1 1 0;min-width:0;height:2px;margin-top:19.5px;background:#33669b}
+.sheet .hire .map .lnk.ret{background:repeating-linear-gradient(90deg,#d0782f 0 5px,transparent 5px 9px)}
 .sheet .hire .stn{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:70px;padding:0 8px;position:relative;line-height:1.2}
 .sheet .hire .stn small{display:block;height:12px;font-size:9.5px;letter-spacing:.08em;color:#33669b;font-weight:700}
 .sheet .hire .stn i{width:11px;height:11px;margin:3px 0 4px;border-radius:50%;border:2px solid #33669b;background:#fff;box-sizing:border-box;position:relative;z-index:1}
@@ -891,8 +894,9 @@ const routePts = it => { const via = viaList(it.via), out = [];
 const hireCell = it => {
   const pts = routePts(it);
   const map = pts.map(([lab, v], i) => { const cls = ['stn', lab === 'FROM' || lab === 'TO' ? 'end' : '', lab === 'RETURN' ? 'ret' : '', (pts[i+1]||[])[0] === 'RETURN' ? 'toret' : ''].filter(Boolean).join(' ');
-    return `<span class="${cls}"><small>${lab}</small><i></i><b class="${hasThaana(v) ? 'dv' : ''}">${esc(v)}</b></span>`; }).join('');
-  return `<div class="hire"><div class="hdesc ${hasThaana(it.desc) ? 'dv' : ''}">${nl(it.desc)}</div>${map || it.when ? `<div class="route"><div class="map">${map}</div>${it.when ? `<span class="when"><small>DATE</small><b>${esc(it.when)}</b></span>` : ''}</div>` : ''}</div>`;
+    // between two places: a line that stretches so a short route still reaches the middle of the page
+    return (i ? `<i class="lnk${lab === 'RETURN' ? ' ret' : ''}"></i>` : '') + `<span class="${cls}"><small>${lab}</small><i></i><b class="${hasThaana(v) ? 'dv' : ''}">${esc(v)}</b></span>`; }).join('');
+  return `<div class="hire"><div class="hdesc ${hasThaana(it.desc) ? 'dv' : ''}">${nl(it.desc)}</div>${map || it.when ? `<div class="route"><div class="map${pts.length > 1 ? ' wide' : ''}">${map}</div>${it.when ? `<span class="when"><small>DATE</small><b>${esc(it.when)}</b></span>` : ''}</div>` : ''}</div>`;
 };
 const hireLines = it => [it.desc,
   routePts(it).length ? routePts(it).map(([l, v]) => l === 'FROM' ? 'From: ' + v : l === 'TO' ? 'To: ' + v : l === 'RETURN' ? 'Return: ' + v : v).join('  →  ') : '',
@@ -2449,15 +2453,23 @@ function drawPDF(pdf, d, fill){
     if (hasRoute){
       const k0 = cols[dIdx], x0 = cellX(k0) - SP, right = k0.x + k0.w - PAD;
       font(9.4, true); const dw = it.when ? Math.max(tw(it.when), 8) : 0;
-      let cur = [], rx = x0, limit = it.when ? right - dw - 7 : right;
+      let cur = [], rx = x0, limit = it.when ? right - dw - 7 : right; const lim0 = limit;
       pts.forEach((p, i) => {
         font(9.4, true); const nl = tw(p[1]) > NW ? wrap(p[1], NW) : [vis(p[1])], nw = Math.max(...nl.map(t => pdf.getTextWidth(t)));
         font(6.8, true); const lw = tw(p[0]);
         const w = Math.max(nw, lw, 15.5) + SP * 2;
         if (cur.length && rx + w > limit){ rLines.push(cur); cur = []; rx = x0; limit = right; }
-        cur.push({lab:p[0], nl, g:i, x:rx, w}); rx += w;
+        cur.push({lab:p[0], nl, g:i, x:rx, w, c:w / 2}); rx += w;   // c: where the dot sits inside the station
       });
       if (cur.length || it.when) rLines.push(cur);
+      // a short route (one row, 2+ places) is stretched so it reaches at least the middle of the page
+      const r0 = rLines[0];
+      if (rLines.length === 1 && r0.length > 1){
+        // lengthen the line after each place (the names stay put) so the last dot sits at the middle of the page, never into the DATE column
+        const n = r0.length, lw = r0[n - 1].w, end = r0[n - 1].x + lw;
+        const add = Math.min((W / 2 - (end - lw / 2)) / (n - 1), (lim0 - end) / (n - 1));
+        if (add > 0){ let x = x0; r0.forEach((p, i) => { if (i < n - 1) p.w += add; p.x = x; x += p.w; }); }
+      }
       rLines.forEach(row => { row.h = RH + (Math.max(1, ...row.map(p => p.nl.length)) - 1) * NLH; });
       rLines.dw = dw;
     }
@@ -2478,10 +2490,10 @@ function drawPDF(pdf, d, fill){
       let ry = y + 5.2 + lines.length * lh(9.75) + 1.6;
       rLines.forEach((row, li) => {
         const ly = ry, dy = ly + 2.6, vy = ly + 7.3; ry += row.h;
-        row.forEach(p => { const cx = p.x + p.w / 2;
+        row.forEach(p => { const cx = p.x + p.c;
           if (p.g > 0) seg(p.x, cx, dy, p.lab === 'RETURN');
           if (p.g < last) seg(cx, p.x + p.w, dy, (pts[p.g + 1] || [])[0] === 'RETURN'); });
-        row.forEach(p => { const cx = p.x + p.w / 2, ret = p.lab === 'RETURN', end = p.lab === 'FROM' || p.lab === 'TO', col = ret ? ORANGE : BLUE;
+        row.forEach(p => { const cx = p.x + p.c, ret = p.lab === 'RETURN', end = p.lab === 'FROM' || p.lab === 'TO', col = ret ? ORANGE : BLUE;
           pdf.setLineWidth(0.55); pdf.setDrawColor(...col); pdf.setFillColor(...(end ? col : WHITE)); pdf.circle(cx, dy, 1.25, 'FD');
           font(6.8, true, col); pdf.text(p.lab, cx, ly, {align:'center'}); font(9.4, true); p.nl.forEach((t, j) => pdf.text(t, cx, vy + j * NLH, {align:'center'})); });
         if (li === 0 && it.when){
