@@ -237,6 +237,12 @@ table.list.prods tr.picked,table.list.prods tr.picked td{background:var(--brand-
 .ipop .ip-act button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
 .ipop .ip-act button:disabled{opacity:.45;cursor:default}
 .ipop .ip-act button.pri{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+table.items .whenbox{position:relative;display:flex}
+table.items .whenbox input[data-k="when"]{padding-right:34px}
+table.items .whenbox .cal{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:6px;background:none;color:var(--brand);display:grid;place-items:center;cursor:pointer}
+table.items .whenbox .cal:hover{background:var(--brand-soft)}
+table.items .whenbox .cal svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+table.items .whenbox .calpick{position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}
 table.items .ret{display:inline-flex;align-items:center;margin-top:5px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
 table.items .ret.on{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);font-weight:600}
 table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
@@ -1926,13 +1932,13 @@ function viewEditor(main, d, isEdit){
     drawPicker();
     $('#ititle').textContent = hire ? 'Trips / hire charges' : 'Items';
     if (hire){
-      $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:14%">From <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:19%">Stops <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:14%">To <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:13%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
+      $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:14%">From <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:17%">Stops <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:14%">To <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:15%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
       $('#ibody').innerHTML = d.items.map((it,i) => `<tr class="trip">
         <td class="d"><textarea rows="1" data-i="${i}" data-k="desc" placeholder="Cargo or job" aria-label="Description">${esc(it.desc)}</textarea></td>
         <td><input data-i="${i}" data-k="from" value="${esc(it.from)}" placeholder="Loading point" autocomplete="off" aria-label="From (loading point, optional)"></td>
         <td><input data-i="${i}" data-k="via" value="${esc(it.via || '')}" placeholder="Tap to pick islands" autocomplete="off" aria-label="Stops in between, separated by commas (optional)" title="Islands in between, separated by commas or dashes"></td>
         <td><input data-i="${i}" data-k="to" value="${esc(it.to)}" placeholder="Unloading point" autocomplete="off" aria-label="To (unloading point, optional)"><button type="button" class="ret${it.ret ? ' on' : ''}" data-ret="${i}" aria-pressed="${!!it.ret}" title="Return trip: the boat comes back to the From island">⇄ Return trip</button></td>
-        <td><input data-i="${i}" data-k="when" value="${esc(it.when)}" placeholder="Date" aria-label="Date or period"></td>
+        <td><div class="whenbox"><input data-i="${i}" data-k="when" value="${esc(it.when)}" placeholder="Pick date" autocomplete="off" aria-label="Date or period"><button type="button" class="cal" data-cal="${i}" title="Pick a date" aria-label="Pick a date"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button><input type="date" class="calpick" data-calp="${i}" tabindex="-1" aria-hidden="true"></div></td>
         <td><input class="n" inputmode="decimal" data-i="${i}" data-k="amount" value="${esc(it.amount)}" placeholder="0.00" aria-label="Amount"></td>
         <td><button type="button" class="x" data-rm="${i}" aria-label="Remove line" title="Remove line">×</button></td></tr>`).join('');
       $('#add').textContent = 'Add trip';
@@ -1996,7 +2002,19 @@ function viewEditor(main, d, isEdit){
   $('#pcat').addEventListener('click', e => { const b = e.target.closest('[data-pc]'); if (b){ pickCat = b.dataset.pc; drawPicker(); } });
   islandPicker($('#ibody'));
   $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
+  // trip date: a calendar fills the box as dd/mm/yyyy (typing a period like "13–15 Sep" still works)
+  const openCal = i => { const pk = $('#ibody').querySelector(`[data-calp="${i}"]`); if (!pk) return;
+    const m = String(d.items[i].when || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    pk.value = m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : todayISO();
+    try { pk.showPicker(); } catch(err){ pk.focus(); pk.click(); } };
+  $('#ibody').addEventListener('change', e => {
+    const pk = e.target.closest('[data-calp]'); if (!pk || !pk.value) return;
+    const [y, mo, da] = pk.value.split('-'), box = $('#ibody').querySelector(`[data-i="${pk.dataset.calp}"][data-k="when"]`);
+    box.value = `${da}/${mo}/${y}`; box.dispatchEvent(new Event('input', {bubbles:true}));
+  });
   $('#ibody').addEventListener('click', e => {
+    const cb = e.target.closest('[data-cal]'); if (cb) return openCal(+cb.dataset.cal);
+    const wb = e.target.closest('input[data-k="when"]'); if (wb && !wb.value.trim()) return openCal(+wb.dataset.i);
     const rt = e.target.closest('[data-ret]');
     if (rt){ const it = d.items[+rt.dataset.ret]; it.ret = !it.ret; rt.classList.toggle('on', it.ret); rt.setAttribute('aria-pressed', it.ret); return; }
     const b = e.target.closest('[data-rm]'); if (!b) return; d.items.splice(+b.dataset.rm, 1); if (!d.items.length) d.items.push(blankItem()); drawItems(); });
