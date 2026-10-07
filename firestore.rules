@@ -31,7 +31,7 @@ service cloud.firestore {
       allow read: if canRead();
       allow create: if canWrite() && !isVoid(request.resource.data);
       allow update: if isOwner() || (canWrite() && !isVoid(resource.data) && !isVoid(request.resource.data));
-      allow delete: if false;   // documents are voided, never deleted
+      allow delete: if isOwner();   // single documents are voided; only the owner's "Delete all documents" (Settings → Backup) deletes
     }
     match /expenses/{id} {
       allow read, create, update: if canWrite();   // owner and staff; viewers don't see costs
