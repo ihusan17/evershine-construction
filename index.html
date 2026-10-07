@@ -821,7 +821,7 @@ const SIGN = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP0AAACiCAYAAACK7cve
 
 const TYPES = {
   quotation:{label:'Quotation', plural:'Quotations', code:'QTN', pad:3, route:'quotations', title:'QUOTATION', numLabel:'Quotation #', dateLabel:'Date'},
-  invoice:  {label:'Invoice', plural:'Invoices', code:'INV', pad:2, route:'invoices', title:'Invoice', numLabel:'Invoice #', dateLabel:'Invoice Date'},
+  invoice:  {label:'Invoice', plural:'Invoices', code:'INV', pad:3, route:'invoices', title:'Invoice', numLabel:'Invoice #', dateLabel:'Invoice Date'},
   delivery: {label:'Delivery note', plural:'Delivery notes', code:'DN', pad:2, route:'delivery', title:'Delivery Note', numLabel:'Delivery Note #', dateLabel:'Date'}
 };
 const ROUTE_TYPE = {quotations:'quotation', invoices:'invoice', delivery:'delivery'};
@@ -1079,7 +1079,8 @@ function nextNumber(type, date){
   const pre = `${S.settings.prefix || 'ESC'}/${T.code}/${yy}/`;
   let max = 0;
   Object.values(S.docs).forEach(d => { if (d.type === type && (d.number||'').startsWith(pre)){ const n = parseInt(d.number.slice(pre.length),10); if (n > max) max = n; } });
-  return pre + String(max+1).padStart(T.pad,'0');
+  const start = S.settings.startYY === yy ? num(S.settings['start' + T.code]) : 0;   // Settings → Numbering: "next number"
+  return pre + String(Math.max(max + 1, start || 1)).padStart(T.pad,'0');
 }
 // Inhabited islands of the northern atolls, north to south; shown as "Sh.Milandhoo"
 const ATOLLS = [
@@ -2980,7 +2981,7 @@ service cloud.firestore {
       allow read: if canRead();
       allow create: if canWrite() && !isVoid(request.resource.data);
       allow update: if isOwner() || (canWrite() && !isVoid(resource.data) && !isVoid(request.resource.data));
-      allow delete: if false;   // documents are voided, never deleted
+      allow delete: if isOwner();   // single documents are voided; only the owner's "Delete all documents" (Settings → Backup) deletes
     }
     match /expenses/{id} {
       allow read, create, update: if canWrite();   // owner and staff; viewers don't see costs
@@ -3141,7 +3142,7 @@ function viewSettings(main, openKey){
   const SUM = {
     co: [s.name, String(s.address || '').split('\n').map(x => x.trim()).filter(Boolean).join(', '), s.phone].filter(Boolean).join(' · '),
     bank: [s.bankName, s.accNo, s.accName].filter(Boolean).join(' · ') || 'Not filled in yet',
-    num: `${esc(s.prefix || 'ESC')}/INV/${todayISO().slice(2,4)}/… · quotes valid ${days(s.quoteValidDays)} · invoices due ${days(s.invoiceDueDays)}`,
+    num: `next ${['quotation', 'invoice', 'delivery'].map(t => esc(nextNumber(t))).join(', ')} · quotes valid ${days(s.quoteValidDays)} · invoices due ${days(s.invoiceDueDays)}`,
     sig: `${s.signImage ? 'Your signature' : 'Default signature'} · quotations & invoices: ${s.signDocs !== false ? 'printed' : 'sign by hand'} · delivery notes: ${s.signDelivery ? 'printed' : 'sign by hand'}`,
     txt: `${lines(s.quoteTerms)} quotation terms · ${lines(s.invoiceTerms)} invoice terms · footer “${s.thanks || ''}”`,
     team: S.mode === 'cloud' ? 'Who can use the portal and what they can do' : 'Works when the portal is connected to Firebase',
@@ -3168,10 +3169,12 @@ function viewSettings(main, openKey){
       </div></fieldset>`, {save:true})}
       ${ROW('num', 'Numbering &amp; timing', `<fieldset class="lockset" disabled><div class="fgrid">
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
-        ${F('prefix','Number prefix',{hint:'Numbers look like ' + esc((s.prefix||'ESC')) + '/INV/' + todayISO().slice(2,4) + '/21'})}
+        ${F('prefix','Number prefix',{hint:'Numbers look like ' + esc((s.prefix||'ESC')) + '/INV/' + todayISO().slice(2,4) + '/021'})}
         <div class="fld"><label for="s-quoteValidDays-s">Quotes valid for</label>${daysPick('s-quoteValidDays', 'data-s="quoteValidDays"', s.quoteValidDays)}</div>
         <div class="fld"><label for="s-invoiceDueDays-s">Invoices due in</label>${daysPick('s-invoiceDueDays', 'data-s="invoiceDueDays"', s.invoiceDueDays)}</div>
-      </div></fieldset>`, {save:true, raw:true})}
+        ${['quotation', 'invoice', 'delivery'].map(t => { const k = 'start' + TYPES[t].code;
+          return `<div class="fld"><label for="s-${k}">Next ${TYPES[t].label.toLowerCase()} number</label><input id="s-${k}" data-s="${k}" type="number" min="1" step="1" inputmode="numeric" value="${esc(s.startYY === todayISO().slice(2,4) ? (s[k] || '') : '')}" placeholder="Automatic"><span class="hint">Next: ${esc(nextNumber(t))}</span></div>`; }).join('')}
+      </div><p class="dim" style="padding:0 18px 16px;margin:-6px 0 0">Next numbers: leave empty to simply continue after your last document. A number you set here is used for the next new document this year (it never goes below a number already used).</p></fieldset>`, {save:true, raw:true})}
       ${ROW('sig', 'Signature', `<fieldset class="lockset" disabled><div class="fgrid two">
         <div class="fld"><span class="lbl2">Your signature</span><div class="sigbox" id="sig-prev"></div>
           <div class="row"><button type="button" class="btn sm" id="sig-draw">Draw signature</button><button type="button" class="btn sm" id="sig-up">Upload image…</button><button type="button" class="btn sm" id="sig-adj">Adjust size &amp; background</button><button type="button" class="btn sm danger" id="sig-rm">Use default</button><input type="file" id="sig-file" accept="image/*" hidden></div>
@@ -3201,7 +3204,7 @@ function viewSettings(main, openKey){
       `, {id:'teampanel', noEdit: S.mode !== 'cloud'})}
       ${ROW('bk', 'Backup &amp; move', `<div style="padding:16px 18px;display:grid;gap:12px">
         <p class="dim" style="margin:0">Download every quotation, invoice, delivery note, customer and setting as one file. Keep it as a backup, or restore it into another copy of this portal (for example your own website).</p>
-        <div class="row"><button type="button" class="btn" id="bk-exp">Download backup</button><fieldset class="lockset inline" disabled><button type="button" class="btn" id="bk-imp">Restore from backup…</button></fieldset><input type="file" id="bk-file" accept=".json,application/json" hidden>
+        <div class="row"><button type="button" class="btn" id="bk-exp">Download backup</button><fieldset class="lockset inline" disabled><button type="button" class="btn" id="bk-imp">Restore from backup…</button><button type="button" class="btn danger" id="bk-wipe" data-need="owner">Delete all documents…</button></fieldset><input type="file" id="bk-file" accept=".json,application/json" hidden>
         ${window.__signOut ? '<button type="button" class="btn danger" id="so2">Sign out</button>' : ''}</div>
       </div>`)}
     </div></form>`;
@@ -3252,6 +3255,8 @@ function viewSettings(main, openKey){
     b.disabled = true;
     s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery; s.signDocs = !!s.signDocs;
     s.prefix = (s.prefix||'ESC').trim().replace(/[\/\s]+/g,'') || 'ESC';
+    ['QTN', 'INV', 'DN'].forEach(c => { const v = Math.floor(num(s['start' + c])); s['start' + c] = v > 0 ? v : ''; });
+    s.startYY = todayISO().slice(2,4);   // the next numbers apply to this year
     s.products = S.settings.products || [];
     try { await saveSettings(s); toast('Saved'); again(b.closest('.srow').dataset.sec); } catch(err){ b.disabled = false; }
   }));
@@ -3259,9 +3264,28 @@ function viewSettings(main, openKey){
   $('#sig-draw').addEventListener('click', () => signaturePad(url => setTimeout(() => signatureEditor(url, {bg:true, size:s.signScale}, useSig), 0)));
   $('#sig-adj').addEventListener('click', () => signatureEditor(s.signImage || SIGN, {bg:true, size:s.signScale}, useSig));
   $('#sf').addEventListener('change', e => { const k = e.target.dataset.s; if (k) s[k] = e.target.value; });
-  $('#bk-exp').addEventListener('click', () => {
+  const backup = () => {
     const data = {app:'evershine-portal', version:1, exportedAt:new Date().toISOString(), settings:S.settings, customers:S.customers, docs:S.docs, expenses:S.expenses};
     saveFile(`evershine-backup-${todayISO()}.json`, JSON.stringify(data, null, 1));
+  };
+  $('#bk-exp').addEventListener('click', backup);
+  // Owner only: remove every quotation, invoice and delivery note (e.g. to start fresh). A backup downloads first.
+  $('#bk-wipe').addEventListener('click', () => {
+    if (!isOwnerRole()) return toast('Only the owner can do this.');
+    const all = Object.values(S.docs), c = t => all.filter(d => d.type === t).length;
+    if (!all.length) return toast('There are no documents to delete.');
+    modal('Delete all documents?', `<p style="margin:0 0 10px">This permanently deletes <b>${c('quotation')} quotations, ${c('invoice')} invoices and ${c('delivery')} delivery notes</b>. Customers, products, expenses and settings stay.</p>
+      <p style="margin:0 0 12px">A backup file downloads first, so they can be restored later with <b>Restore from backup</b> if ever needed.</p>
+      <div class="fld"><label for="wipe-t">Type DELETE to confirm</label><input id="wipe-t" autocomplete="off" autocapitalize="characters"></div>`, 'Delete all documents', async w => {
+        if (w.querySelector('#wipe-t').value.trim().toUpperCase() !== 'DELETE'){ toast('Type DELETE to confirm.'); return false; }
+        backup();
+        let n = 0;
+        for (const d of all){
+          try { await del('docs', d.id); n++; if (n % 10 === 0) toast(`Deleting… ${n} of ${all.length}`); }
+          catch(e){ toast(n ? `Stopped after ${n} documents. Firebase refused the rest: paste the updated security rules (Settings → Team) and try again.` : 'Firebase refused to delete. Paste the updated security rules (Settings → Team → Security rules) into Firebase, then try again.'); return; }
+        }
+        toast(`${n} documents deleted`);
+      }, true);
   });
   $('#bk-imp').addEventListener('click', () => $('#bk-file').click());
   const so2 = $('#so2'); if (so2) so2.addEventListener('click', () => window.__signOut());
