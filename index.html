@@ -312,7 +312,7 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .parties{display:flex;justify-content:space-between;gap:24px;margin-top:28px}
 .sheet .parties .lab{font-size:12px;font-weight:700;color:#33669b;letter-spacing:.04em;margin-bottom:4px}
 .sheet .parties .nm{font-weight:700;font-size:14.5px}
-.sheet .project{margin-top:18px;font-weight:700}
+.sheet .project{margin-top:30px;font-weight:700}
 .sheet table.it{width:100%;border-collapse:collapse;margin-top:16px}
 .sheet table.it th{background:#33669b;color:#fff;font-weight:700;text-align:left;padding:7px 10px;font-size:13px}
 .sheet table.it td{padding:8px 10px;border-bottom:1px solid #dde3ea;vertical-align:top}
@@ -2437,7 +2437,7 @@ function drawPDF(pdf, d, fill){
     font(9.75, false); wrap(d.deliveryAddress, 70).forEach(t => { txt(t, R, ry, {align:'right'}); ry += lh(9.75); });
     y = Math.max(y, ry);
   }
-  if (d.project){ y += 3; font(10, true); wrap('PROJECT: ' + d.project, CW).forEach(t => { txt(t, L, y); y += lh(10); }); }
+  if (d.project){ y += 6.5; font(10, true); wrap('PROJECT: ' + d.project, CW).forEach(t => { txt(t, L, y); y += lh(10); }); }
   y += 2.5;
 
   // items table
