@@ -215,6 +215,25 @@ table.list.docs:not(.sel) .c-sel,table.list.prods:not(.sel) .p-sel{display:none!
 table.list.docs .c-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
 table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-soft)}
 .pbulk[hidden]{display:none!important}
+/* notifications */
+.ibtn.bell{position:relative}
+.ibtn .nbadge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--bad);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;line-height:1;border:2px solid var(--shell)}
+.notepanel{position:fixed;z-index:120;width:min(390px,calc(100vw - 16px));max-height:min(560px,calc(100vh - 90px));display:flex;flex-direction:column;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.22);overflow:hidden}
+.notepanel .np-hd{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);font-size:15px}
+.notepanel .np-list{overflow:auto;padding:4px}
+.notepanel .np-it{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;color:var(--ink);text-decoration:none}
+.notepanel .np-it:hover{background:var(--surface-2)}
+.notepanel .np-it.un{background:var(--brand-soft)}
+.notepanel .np-ic{flex:none;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--surface-2)}
+.notepanel .np-ic.t-ok{color:#2e7d4f;background:color-mix(in srgb,#2e7d4f 13%,transparent)}
+.notepanel .np-ic.t-bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
+.notepanel .np-ic.t-brand{color:var(--brand);background:var(--brand-soft)}
+.notepanel .np-tx{flex:1;min-width:0;display:grid;gap:2px}
+.notepanel .np-tx b{font-size:14px;font-weight:600}
+.notepanel .np-tx small{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notepanel .np-t{flex:none;font-size:11.5px;color:var(--muted);white-space:nowrap;margin-top:2px}
+@media (max-width:520px){ .top .ibtn[data-theme-set]{display:none} }   /* theme is also in the account menu; makes room for the bell */
+.notepanel .np-ft{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px}
 .pbulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 18px 12px;padding:8px 12px;border-radius:12px;background:var(--brand);color:#fff;font-size:14px}
 .pbulk b{margin-right:4px}
 .pbulk .btn{background:var(--surface);color:var(--ink);border-color:transparent}
@@ -773,7 +792,6 @@ table.items th{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
   .top .brand small{display:none}
   .top .brand b{font-size:16px}
   .top .brand .tile{width:48px;height:38px}
-  .ibtn.bell{display:none}
   .side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;z-index:35;flex-direction:row;background:var(--surface);border:0;border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(16,24,40,.06);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));margin:0;overflow:visible}
   .side h6{display:none}
   .nav{flex-direction:row;gap:0;justify-content:space-between}
@@ -1077,7 +1095,7 @@ async function boot(){
   let got = null;
   if (c && typeof c.use === 'function'){ try { got = await c.use('db'); } catch(e){} }
   if (got){ db = got; S.mode = 'cloud'; subscribe(); }
-  else { S.mode = 'local'; loadLocal(); S.ready = true; fixWording(); render(true); }
+  else { S.mode = 'local'; loadLocal(); S.ready = true; fixWording(); noteLive(); render(true); }
   if (c && typeof c.use === 'function') c.use('downloads').then(d => { downloads = d; }).catch(() => {});
 }
 
@@ -1322,7 +1340,7 @@ function applyDvFont(){
   st.textContent = f ? `@font-face{font-family:"Faruma";src:url(data:font/ttf;base64,${f}) format("truetype");unicode-range:U+0780-07BF,U+FDF2,U+060C,U+061B,U+061F}` : '';
 }
 function onData(){
-  renderSide(); fixWording(); applyDvFont();
+  renderSide(); fixWording(); applyDvFont(); noteLive();
   const r = route();
   if (!S.ready) return;
   if (FORM_VIEWS.includes(r.a)) return;           // never wipe a form someone is typing in
@@ -1431,7 +1449,7 @@ function renderSide(){
       <details class="menu" data-need="edit"><summary class="ibtn primary" title="Create" aria-label="Create a document">${icon('plus',22)}</summary>
         <div class="pop"><a href="#/new/quotation">${icon('file')}New quotation</a><a href="#/new/invoice">${icon('receipt')}New invoice</a><a href="#/new/delivery">${icon('truck')}New delivery note</a></div></details>
       <button type="button" class="ibtn" data-theme-set="toggle" title="${themeNow() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}" aria-label="${themeNow() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}">${icon(themeNow() === 'dark' ? 'sun' : 'moon', 20)}</button>
-      <a class="ibtn bell" href="#/dashboard" title="${overdue ? overdue + ' overdue invoice' + (overdue===1?'':'s') : 'Nothing overdue'}" aria-label="Needs attention">${icon('bell',21)}${overdue ? '<span class="dot"></span>' : ''}</a>
+      ${(() => { const n = S.ready ? noteUnread().length : 0; return `<button type="button" class="ibtn bell" data-notes title="Notifications" aria-label="Notifications${n ? ', ' + n + ' new' : ''}">${icon('bell',21)}${n ? `<span class="nbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; })()}
       <details class="menu acct"><summary class="avatar" title="Account" aria-label="Account">${esc((who || S.settings.name || 'E').trim().charAt(0).toUpperCase())}</summary>
         <div class="pop"><div class="who">${who ? `<b>${esc(who)}</b>` : `<b>${esc(S.settings.name || 'Evershine')}</b>`}${S.role && S.mode === 'cloud' ? `<span class="rolechip">${esc(ROLES[S.role][0])}</span><br>` : ''}<i class="${S.mode}"></i>${modeText}</div>
           <div class="thm"><span>Theme</span><div class="seg" role="radiogroup" aria-label="Theme">${[['light','sun','Light'],['dark','moon','Dark'],['auto','monitor','Auto']].map(([k,ic,l]) => `<button type="button" role="radio" aria-checked="${themePref()===k}" class="${themePref()===k?'on':''}" data-theme-set="${k}" title="${k==='auto' ? 'Follow this device' : l + ' theme'}">${icon(ic,15)}${l}</button>`).join('')}</div></div>
@@ -1440,6 +1458,80 @@ function renderSide(){
   const t = $('#top');
   if (t.dataset.v !== top){ t.dataset.v = top; t.innerHTML = top; }
 }
+
+/* ---------- notifications ----------
+   Built from the documents themselves (no extra storage): new documents, payments, paid in full, overdue, accepted, delivered.
+   "Read" is remembered per browser. Live: when a team member's change arrives, a toast (and a desktop alert if allowed) shows. */
+const NOTE_SEEN = 'evershine-notes-seen';
+const noteSeen = () => { try { return localStorage.getItem(NOTE_SEEN) || ''; } catch(e){ return ''; } };
+const setNoteSeen = v => { try { localStorage.setItem(NOTE_SEEN, v); } catch(e){} };
+const NOTE_ICON = {new:['file','brand'], pay:['receipt','ok'], paid:['check','ok'], overdue:['clock','bad'], accepted:['check','ok'], delivered:['truck','ok'], void:['file','neutral']};
+function noteEvents(){
+  const ev = [], who = e => e ? String(e).split('@')[0] : '';
+  Object.values(S.docs).forEach(d => {
+    const T = TYPES[d.type]; if (!T || !d.number) return;
+    const cust = d.customer?.name || '';
+    if (d.createdAt) ev.push({id:'c:' + d.id, at:d.createdAt, kind:'new', doc:d.id, by:d.createdBy || '',
+      text:`New ${T.label.toLowerCase()} ${d.number}`, sub:[cust, d.type !== 'delivery' ? 'MVR ' + money(total(d)) : '', d.createdBy ? 'by ' + who(d.createdBy) : ''].filter(Boolean).join(' · ')});
+    if (isVoid(d)){ if (d.voided?.date) ev.push({id:'v:' + d.id, at:d.voided.date + 'T12:00:00', kind:'void', doc:d.id, text:`${d.number} was voided`, sub:cust}); return; }
+    if (d.type === 'invoice'){
+      const ps = d.payments || [], full = statusOf(d) === 'paid';
+      ps.forEach((p, i) => { const last = i === ps.length - 1 && full;
+        ev.push({id:`p:${d.id}:${i}`, at:p.at || ((p.date || d.date) + 'T12:00:00'), kind:last ? 'paid' : 'pay', doc:d.id, by:p.by || '',
+          text:last ? `${d.number} is paid in full` : `Payment received · ${d.number}`, sub:[`MVR ${money(num(p.amount))}`, cust, p.by ? 'by ' + who(p.by) : ''].filter(Boolean).join(' · ')}); });
+      const due = addDays(d.date, d.dueDays);
+      if (!full && balance(d) > 0 && due < todayISO())
+        ev.push({id:`od:${d.id}:${due}`, at:addDays(due, 1) + 'T00:00:00', kind:'overdue', doc:d.id, text:`${d.number} is overdue`, sub:`MVR ${money(balance(d))} was due ${fmtDate(due)} · ${cust}`});
+    }
+    if (d.type === 'quotation' && d.status === 'accepted') ev.push({id:'a:' + d.id, at:d.updatedAt || d.createdAt || d.date + 'T12:00:00', kind:'accepted', doc:d.id, text:`Quotation ${d.number} accepted`, sub:cust});
+    if (d.type === 'delivery' && d.status === 'delivered' && d.delivered?.date) ev.push({id:'dl:' + d.id, at:d.delivered.date + 'T12:00:00', kind:'delivered', doc:d.id, text:`${d.number} delivered`, sub:cust});
+  });
+  return ev.filter(e => e.at).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 80);
+}
+const noteUnread = (ev = noteEvents()) => { const seen = noteSeen(); return ev.filter(e => e.at > seen && (!e.by || e.by !== S.user)); };
+const ago = iso => { const t = Date.parse(iso); if (!t) return ''; const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : m < 2880 ? 'yesterday' : fmtDate(iso.slice(0, 10)); };
+let noteKnown = null;
+function noteLive(){   // called on every data change: toast (and desktop alert) for events that just appeared
+  if (!S.ready) return;
+  const ev = noteEvents(), ids = new Set(ev.map(e => e.id));
+  if (!noteSeen()) setNoteSeen(new Date(Date.now() - 3 * 864e5).toISOString());   // first visit: the last 3 days count as new
+  if (noteKnown){
+    ev.filter(e => !noteKnown.has(e.id) && (!e.by || e.by !== S.user) && Date.now() - Date.parse(e.at) < 6 * 3600e3).slice(0, 3).forEach(e => {
+      toast(`🔔 ${e.text}`);
+      try { if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification(e.text, {body:e.sub, tag:e.id, icon:LOGO}); } catch(err){}
+    });
+  }
+  noteKnown = ids;
+  const p = document.getElementById('notepanel'); if (p) drawNotes(p);
+}
+function drawNotes(p){
+  const ev = noteEvents(), seen = noteSeen();
+  const canAsk = 'Notification' in window && Notification.permission === 'default';
+  p.innerHTML = `<div class="np-hd"><b>Notifications</b><button type="button" class="btn sm" data-nread>Mark all read</button></div>
+    <div class="np-list">${ev.length ? ev.map(e => { const [ic, tone] = NOTE_ICON[e.kind] || NOTE_ICON.new, un = e.at > seen && (!e.by || e.by !== S.user);
+      return `<a href="#/doc/${esc(e.doc)}" class="np-it${un ? ' un' : ''}"><span class="np-ic t-${tone}">${icon(ic, 17)}</span><span class="np-tx"><b>${esc(e.text)}</b><small>${esc(e.sub)}</small></span><span class="np-t">${ago(e.at)}</span></a>`; }).join('')
+      : '<p class="dim" style="padding:18px;margin:0;text-align:center">No notifications yet.</p>'}</div>
+    ${canAsk ? '<div class="np-ft"><button type="button" class="btn sm" data-nalert>🔔 Turn on desktop alerts</button><span class="dim">so you see changes even when this tab is in the background</span></div>' : ''}`;
+}
+function toggleNotes(btn){
+  let p = document.getElementById('notepanel');
+  if (p){ p._close(); return; }
+  p = document.createElement('div'); p.id = 'notepanel'; p.className = 'notepanel'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Notifications');
+  document.body.appendChild(p); drawNotes(p);
+  const r = btn.getBoundingClientRect(), w = p.offsetWidth; p.style.top = (r.bottom + 8) + 'px'; p.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  const close = () => { p.remove(); document.removeEventListener('mousedown', out, true); document.removeEventListener('keydown', key); setNoteSeen(new Date().toISOString()); renderSide(); };
+  const out = e => { if (!p.contains(e.target) && !btn.contains(e.target)) close(); };
+  const key = e => { if (e.key === 'Escape') close(); };
+  p._close = close;
+  document.addEventListener('mousedown', out, true); document.addEventListener('keydown', key);
+  p.addEventListener('click', async e => {
+    if (e.target.closest('[data-nread]')){ setNoteSeen(new Date().toISOString()); drawNotes(p); renderSide(); return; }
+    if (e.target.closest('[data-nalert]')){ try { await Notification.requestPermission(); } catch(err){} drawNotes(p); return; }
+    if (e.target.closest('a')) close();
+  });
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-notes]'); if (b){ e.preventDefault(); toggleNotes(b); } });
 
 /* ---------- dashboard ---------- */
 function viewDashboard(main){
@@ -1567,7 +1659,7 @@ function viewList(main, type){
       'Mark as ' + label, async () => {
         const now = new Date().toISOString();
         for (const d of todo){
-          const body = act === 'paid' ? {...clone(d), payments:[...(d.payments || []), {amount:r2(balance(d)), date:todayISO(), method:'Other', ref:'Marked as paid (bulk)'}], updatedAt:now}
+          const body = act === 'paid' ? {...clone(d), payments:[...(d.payments || []), {amount:r2(balance(d)), date:todayISO(), method:'Other', ref:'Marked as paid (bulk)', at:now, by:S.user || ''}], updatedAt:now}
             : act === 'delivered' ? {...clone(d), status:'delivered', delivered:{name:d.delivered?.name || '', date:todayISO()}, updatedAt:now}
             : act === 'pending' ? {...clone(d), status:'pending', delivered:null, updatedAt:now}
             : {...clone(d), status:act, updatedAt:now};
@@ -1660,7 +1752,7 @@ function statusMenu(btn){
     else if (a === 'undeliver') docAction(d, 'undeliver');
     else if (a === 'paidFull'){
       const amt = r2(balance(d)); if (amt <= 0) return;
-      put('docs', d.id, {...clone(d), payments:[...(d.payments || []), {amount:amt, date:todayISO(), method:'Other', ref:'Marked as paid from the list'}], updatedAt:new Date().toISOString()}).then(() => toast(`${d.number} marked as paid`));
+      put('docs', d.id, {...clone(d), payments:[...(d.payments || []), {amount:amt, date:todayISO(), method:'Other', ref:'Marked as paid from the list', at:new Date().toISOString(), by:S.user || ''}], updatedAt:new Date().toISOString()}).then(() => toast(`${d.number} marked as paid`));
     }
     else docAction(d, a);
   });
@@ -2192,6 +2284,7 @@ function viewEditor(main, d, isEdit){
       const body = clone(d); delete body._auto;
       body.validDays = num(body.validDays); body.dueDays = num(body.dueDays); body.taxRate = num(body.taxRate); body.discount = num(body.discount) > 0 ? num(body.discount) : 0; body.discountType = body.discountType === 'amt' ? 'amt' : 'pct';
       body.updatedAt = new Date().toISOString();
+      if (!isEdit){ body.createdAt = body.updatedAt; body.createdBy = S.user || ''; }   // for notifications
       await put('docs', d.id, body);
       if (!isEdit && src && src.type === 'quotation' && d.type === 'invoice' && src.status !== 'accepted'){
         await put('docs', src.id, {...src, status:'accepted', updatedAt:new Date().toISOString()});
@@ -2333,7 +2426,7 @@ function paymentBox(d){
       const amt = r2(num(w.querySelector('#p-amt').value));
       if (amt <= 0){ toast('Enter an amount above zero.'); return false; }
       const n = clone(d); n.payments = n.payments || [];
-      n.payments.push({amount:amt, date:w.querySelector('#p-date').value || todayISO(), method:w.querySelector('#p-m').value, ref:w.querySelector('#p-ref').value.trim()});
+      n.payments.push({amount:amt, date:w.querySelector('#p-date').value || todayISO(), method:w.querySelector('#p-m').value, ref:w.querySelector('#p-ref').value.trim(), at:new Date().toISOString(), by:S.user || ''});
       n.updatedAt = new Date().toISOString();
       await put('docs', d.id, n);
       toast(statusOf(n) === 'paid' ? `${d.number} is paid in full` : `Payment recorded · MVR ${money(balance(n))} still due`);
