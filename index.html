@@ -215,6 +215,13 @@ table.list.docs:not(.sel) .c-sel,table.list.prods:not(.sel) .p-sel{display:none!
 table.list.docs .c-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
 table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-soft)}
 .pbulk[hidden]{display:none!important}
+/* customer balances report */
+.balsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.balsum div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:grid;gap:2px}
+.balsum small{font-size:12px;color:var(--muted)} .balsum b{font-size:16px}
+.balsum .bad,table.bals .bad{color:var(--bad)} .balsum .good,table.bals .good{color:#2e7d4f}
+table.bals tbody tr{cursor:pointer} table.bals tbody tr:hover{background:var(--surface-2)}
+@media (max-width:520px){ .balsum{grid-template-columns:1fr} }
 /* notifications */
 .ibtn.bell{position:relative}
 .ibtn .nbadge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--bad);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;line-height:1;border:2px solid var(--shell)}
@@ -1824,6 +1831,86 @@ function drawStatement(pdf, c){
   y = pdfBank(pdf, k, y + 2).y;
   return pdfFooter(pdf, k, y, 'statement', 'Statement · ' + (c.name || ''));
 }
+/* ---------- customer balances report: everyone who owes money or has a credit ---------- */
+function balanceData(){
+  const t = todayISO();
+  const rows = custList().map(c => { const sd = statementData(c);
+    const overdue = r2(sd.open.filter(d => addDays(d.date, d.dueDays) < t).reduce((a, d) => a + balance(d), 0));
+    return {c, due:sd.due, open:sd.open.length, overdue, oldest: sd.open.length ? sd.open[0].date : ''}; })
+    .filter(r => Math.abs(r.due) > 0.005).sort((a, b) => b.due - a.due);
+  const owed = r2(rows.filter(r => r.due > 0).reduce((a, r) => a + r.due, 0)), credit = r2(rows.filter(r => r.due < 0).reduce((a, r) => a - r.due, 0));
+  return {rows, owed, credit, overdue: r2(rows.reduce((a, r) => a + r.overdue, 0)), net: r2(owed - credit)};
+}
+const balText = v => v < 0 ? money(-v) + ' CR' : money(v);   // a credit (customer paid more than invoiced) shows as "… CR"
+function drawBalances(pdf, which){
+  const k = pdfKit(pdf), {BLUE, INK, GREY, LINE, ZEBRA, WHITE, L, R, CW, BOTTOM, font, lh, txt, wrap} = k;
+  const t = todayISO(), bd = balanceData(), rows = bd.rows.filter(r => which === 'owe' ? r.due > 0 : which === 'credit' ? r.due < 0 : true);
+  let y = pdfHeader(pdf, k, 'Customer Balances', [['Date:', fmtDate(t)], ['Customers:', String(rows.length)], ['Showing:', which === 'owe' ? 'Owing only' : which === 'credit' ? 'Credits only' : 'All balances']]);
+  y += 2;
+  const BW = (CW - 8) / 3, BH = 17;
+  [['Total owed to us', bd.owed, false], ['Of which overdue', bd.overdue, false], ['Customer credits', bd.credit, false]].forEach(([label, v], i) => {
+    const x = L + i * (BW + 4), hot = i === 0;
+    if (hot){ pdf.setFillColor(...BLUE); pdf.rect(x, y, BW, BH, 'F'); } else { pdf.setFillColor(...ZEBRA); pdf.rect(x, y, BW, BH, 'F'); pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.rect(x, y, BW, BH); }
+    font(8.6, false, hot ? WHITE : GREY); pdf.text(label + ' (MVR)', x + 4, y + 6);
+    font(13.5, true, hot ? WHITE : i === 1 && v ? [138,42,32] : INK); pdf.text(money(v), x + 4, y + 13.2);
+  });
+  y += BH + 9;
+  const cols = [{h:'Customer', w:0, a:'left'}, {h:'Phone', w:28, a:'left'}, {h:'Unpaid', w:16, a:'right'}, {h:'Oldest unpaid', w:27, a:'left'}, {h:'Overdue', w:27, a:'right'}, {h:'Balance (MVR)', w:31, a:'right'}];
+  const fixed = cols.reduce((a, c2) => a + c2.w, 0); cols[0].w = CW - fixed; let x0 = L; cols.forEach(c2 => { c2.x = x0; x0 += c2.w; });
+  const PAD = 2.4, cx = c2 => c2.a === 'right' ? c2.x + c2.w - PAD : c2.x + PAD;
+  const head = () => { pdf.setFillColor(...BLUE); pdf.rect(L, y, CW, 7.2, 'F'); font(9, true, WHITE); cols.forEach(c2 => pdf.text(c2.h, cx(c2), y + 4.9, {align:c2.a})); y += 7.2; };
+  head();
+  if (!rows.length){ font(9.5, false, GREY); pdf.text('No customer has an open balance.', L + PAD, y + 6); y += 10; }
+  rows.forEach((r, i) => {
+    font(9.2, true); const names = wrap(r.c.name || '', cols[0].w - PAD * 2), rh = Math.max(1, names.length) * lh(9.2) + 3.4;
+    if (y + rh > BOTTOM){ pdf.addPage(); y = 16; head(); }
+    if (i % 2){ pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, rh, 'F'); }
+    names.forEach((l, li) => pdf.text(l, cx(cols[0]), y + 4.9 + li * lh(9.2)));
+    font(9.2, false); txt(r.c.phone || '', cx(cols[1]), y + 4.9); txt(String(r.open || ''), cx(cols[2]), y + 4.9, {align:'right'});
+    txt(r.oldest ? fmtDate(r.oldest) : '', cx(cols[3]), y + 4.9);
+    font(9.2, false, r.overdue ? [138,42,32] : INK); txt(r.overdue ? money(r.overdue) : '–', cx(cols[4]), y + 4.9, {align:'right'});
+    font(9.2, true, r.due < 0 ? [46,125,79] : INK); txt(balText(r.due), cx(cols[5]), y + 4.9, {align:'right'});
+    y += rh; pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y);
+  });
+  if (rows.length){   // totals
+    const tot = r2(rows.reduce((a, r) => a + r.due, 0)), od = r2(rows.reduce((a, r) => a + r.overdue, 0));
+    if (y + 9 > BOTTOM){ pdf.addPage(); y = 16; }
+    pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, 8, 'F'); font(9.4, true); pdf.text('Net total', cx(cols[0]), y + 5.4);
+    pdf.text(od ? money(od) : '–', cx(cols[4]), y + 5.4, {align:'right'}); pdf.text(balText(tot), cx(cols[5]), y + 5.4, {align:'right'});
+    y += 8; font(8.4, false, GREY); y += 5; pdf.text('CR = credit: the customer has paid more than invoiced. Balances exclude voided invoices.', L, y);
+  }
+  return pdfFooter(pdf, k, y + 4, 'statement', 'Customer balances');
+}
+async function buildBalances(which){
+  await loadScript(JSPDF_URL); await footIcons();
+  const pdf = newPDF('Customer balances', S.settings.name); drawBalances(pdf, which);
+  return {name: `Customer balances ${todayISO()}.pdf`, blob: pdf.output('blob')};
+}
+function balancesBox(){
+  let which = 'all';
+  const w = modal('Customer balances', `<div class="balsum" id="bal-sum"></div>
+    <div class="seg" id="bal-seg" role="tablist" style="margin:12px 0 8px">${[['all','All balances'],['owe','Owes us'],['credit','Credits']].map(([k, l]) => `<button type="button" data-w="${k}" class="${k === 'all' ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="tablewrap" style="max-height:min(52vh,460px);overflow:auto"><table class="list bals"><thead><tr><th>Customer</th><th class="num">Unpaid</th><th class="num">Overdue</th><th class="num">Balance (MVR)</th></tr></thead><tbody id="bal-rows"></tbody></table></div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="btn" id="bal-csv">Export CSV</button><button type="button" class="btn" id="bal-share">Share…</button></div>`,
+    'Download PDF', async () => { const f = await buildBalances(which); await saveFile(f.name, f.blob); return false; });
+  w.querySelector('.modal').style.width = 'min(780px, 100%)';
+  const draw = () => {
+    const bd = balanceData(), rows = bd.rows.filter(r => which === 'owe' ? r.due > 0 : which === 'credit' ? r.due < 0 : true);
+    w.querySelector('#bal-sum').innerHTML = `<div><small>Owed to us</small><b>MVR ${money(bd.owed)}</b></div><div><small>Overdue</small><b class="${bd.overdue ? 'bad' : ''}">MVR ${money(bd.overdue)}</b></div><div><small>Customer credits</small><b class="${bd.credit ? 'good' : ''}">MVR ${money(bd.credit)}</b></div>`;
+    w.querySelector('#bal-rows').innerHTML = rows.length ? rows.map(r => `<tr data-go="customer/${esc(r.c.id)}"><td><b>${esc(r.c.name)}</b>${r.c.phone ? `<br><small class="dim">${esc(r.c.phone)}</small>` : ''}</td><td class="num">${r.open || ''}</td><td class="num ${r.overdue ? 'bad' : ''}">${r.overdue ? money(r.overdue) : '–'}</td><td class="num"><b class="${r.due < 0 ? 'good' : ''}">${balText(r.due)}</b></td></tr>`).join('')
+      : `<tr><td colspan="4" class="empty">${which === 'credit' ? 'No customer has a credit.' : 'No customer owes money.'}</td></tr>`;
+    w.querySelectorAll('#bal-rows [data-go]').forEach(tr => tr.addEventListener('click', () => { w.querySelector('[data-x]').click(); location.hash = '#/' + tr.dataset.go; }));
+  };
+  w.querySelector('#bal-seg').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b) return; which = b.dataset.w; w.querySelectorAll('#bal-seg button').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+  w.querySelector('#bal-csv').addEventListener('click', () => {
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, rows = balanceData().rows.filter(r => which === 'owe' ? r.due > 0 : which === 'credit' ? r.due < 0 : true);
+    saveFile(`customer-balances-${todayISO()}.csv`, '﻿' + [['Customer','Phone','Unpaid invoices','Oldest unpaid','Overdue (MVR)','Balance (MVR)','Type'].map(q).join(',')]
+      .concat(rows.map(r => [r.c.name, r.c.phone, r.open, r.oldest, r.overdue, Math.abs(r.due), r.due < 0 ? 'Credit' : 'Owes'].map(q).join(','))).join('\r\n'));
+  });
+  const sh = w.querySelector('#bal-share');
+  sh.addEventListener('click', () => { const bd = balanceData(); sharePDF('bal|' + Date.now(), () => buildBalances(which), `Customer balances – ${fmtDate(todayISO())}\nOwed to us: MVR ${money(bd.owed)} (overdue MVR ${money(bd.overdue)})\nCustomer credits: MVR ${money(bd.credit)}`, sh); });
+  draw();
+}
 async function buildStatement(c){
   await loadScript(JSPDF_URL); await footIcons();
   const pdf = newPDF('Statement ' + (c.name || ''), c.name);
@@ -2971,7 +3058,7 @@ function viewCustomers(main){
   const FL = [['all','All', () => true, ''], ['owing','Owes money', c => X[c.id].due > 0.005, 'bad'], ['active','Has documents', c => X[c.id].n > 0, ''], ['none','No documents', c => X[c.id].n === 0, 'neutral']];
   main.innerHTML = `
     <div class="pagehead"><div><h1>Customers</h1><p id="csum"></p></div>
-      <div class="row"><button class="btn primary" id="addc" data-need="edit">${icon('plus',18)}Add customer</button></div></div>
+      <div class="row"><button class="btn" id="balrep">${icon('chart',18)}Balances report</button><button class="btn primary" id="addc" data-need="edit">${icon('plus',18)}Add customer</button></div></div>
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="cq" type="search" placeholder="Search name, phone, email or address" value="${esc(st.q)}" aria-label="Search customers"></label>
         <select id="csort" aria-label="Sort"><option value="name">Name A–Z</option><option value="owed">Owes most</option><option value="billed">Invoiced most</option><option value="recent">Most recent</option></select>
@@ -2994,6 +3081,7 @@ function viewCustomers(main){
   $('#cq').addEventListener('input', e => { st.q = e.target.value; draw(); });
   $('#csort').addEventListener('change', e => { st.sort = e.target.value; draw(); });
   $('#cchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; main.querySelectorAll('#cchips .chip').forEach(c => c.classList.toggle('on', c === b)); draw(); });
+  $('#balrep').addEventListener('click', balancesBox);
   $('#addc').addEventListener('click', () => customerBox(null));
   draw();
 }
