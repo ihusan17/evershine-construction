@@ -182,6 +182,12 @@ table.items td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line
 table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
+/* editor: chosen customer summary */
+.ccard{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2);gap:2px!important;font-size:14.5px;line-height:1.45}
+.ccard .cc-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:2px}
+.ccard .cc-lab{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);font-weight:700}
+.ccard b{font-size:16px}
+#c-card[hidden],#c-fields[hidden],#c-donewrap[hidden]{display:none!important}
 /* editor: terms locked until Edit */
 textarea.lockta{background:var(--surface-2)!important;border-color:transparent!important;resize:none;cursor:default;color:var(--ink)}
 textarea.lockta:focus{box-shadow:none!important;outline:none}
@@ -1924,9 +1930,13 @@ function viewEditor(main, d, isEdit){
         <div class="fgrid two">
           <div class="fld span4"><label for="f-cust">Choose customer</label>
             <select id="f-cust"><option value="">Select a saved customer…</option>${custs.map(c => `<option value="${esc(c.id)}" ${c.id===d.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}<option value="__new" ${!d.customerId && d.customer?.name ? 'selected':''}>New customer…</option></select></div>
-          <div class="fld"><label for="f-cname">Name</label><input id="f-cname" data-c="name" value="${esc(d.customer?.name)}" required></div>
-          <div class="fld"><label for="f-cphone">Phone</label><input id="f-cphone" data-c="phone" value="${esc(d.customer?.phone)}"></div>
-          <div class="fld ${isDN?'':'span4'}"><label for="f-caddr">Address</label><textarea id="f-caddr" data-c="address" rows="3">${esc(d.customer?.address)}</textarea></div>
+          <div class="fld span4 ccard" id="c-card" hidden></div>
+          <div class="fld span4" id="c-fields" hidden><div class="fgrid two" style="padding:0">
+            <div class="fld"><label for="f-cname">Name</label><input id="f-cname" data-c="name" value="${esc(d.customer?.name)}" required></div>
+            <div class="fld"><label for="f-cphone">Phone</label><input id="f-cphone" data-c="phone" value="${esc(d.customer?.phone)}"></div>
+            <div class="fld span4"><label for="f-caddr">Address</label><textarea id="f-caddr" data-c="address" rows="3">${esc(d.customer?.address)}</textarea></div>
+            <div class="fld span4" id="c-donewrap" hidden><div class="row" style="justify-content:flex-end"><button type="button" class="btn sm" id="c-done">✓ Done</button></div></div>
+          </div></div>
           ${isDN ? `<div class="fld"><label for="f-daddr">Delivery address</label><textarea id="f-daddr" data-f="deliveryAddress" rows="3" placeholder="Site or location">${esc(d.deliveryAddress)}</textarea></div>` : ''}
           <div class="fld span4 dim" id="c-note"></div>
         </div>
@@ -1964,7 +1974,17 @@ function viewEditor(main, d, isEdit){
     if (d.type==='quotation') $('#h-valid').textContent = 'Valid until ' + fmtDate(addDays(d.date, d.validDays));
     if (d.type==='invoice') $('#h-due').textContent = 'Due ' + fmtDate(addDays(d.date, d.dueDays));
   };
+  // Customer: a saved customer shows as a summary card (like on the invoice) with Edit; the boxes only show for a new customer or Edit
+  let cEdit = false, cNew = false;   // cEdit: Edit details pressed; cNew: "New customer…" chosen in the list
+  const showCust = () => {
+    const sel = $('#f-cust').value, c = d.customer || {}, has = !!(c.name || '').trim();
+    const fields = cEdit || cNew, card = !fields && has;
+    $('#c-fields').hidden = !fields; $('#c-card').hidden = !card; $('#c-donewrap').hidden = !cEdit || cNew;
+    if (card) $('#c-card').innerHTML = `<div class="cc-top"><span class="cc-lab">Customer</span><button type="button" class="btn sm" id="c-edit">✎ Edit details</button></div>
+      <b class="${hasThaana(c.name) ? 'dv' : ''}">${esc(c.name)}</b>${String(c.address || '').trim() ? `<div class="${hasThaana(c.address) ? 'dv' : ''}">${nl(c.address)}</div>` : ''}${c.phone ? `<div>${esc(c.phone)}</div>` : ''}`;
+  };
   const custNote = () => {
+    showCust();
     const sel = $('#f-cust').value;
     $('#c-note').textContent = sel === '__new' || (!sel && d.customer.name) ? 'This customer will be added to your customer list when you save.' : sel ? 'Changes here apply to this document only. Edit the saved customer under Customers.' : '';
   };
@@ -2030,7 +2050,9 @@ function viewEditor(main, d, isEdit){
       drawTotals();
     }
   });
-  $('#f-cust').addEventListener('change', e => {
+  $('#c-card').addEventListener('click', e => { if (!e.target.closest('#c-edit')) return; cEdit = true; showCust(); $('#f-cname').focus(); });
+  $('#c-done').addEventListener('click', () => { cEdit = false; custNote(); });
+  $('#f-cust').addEventListener('change', e => { cEdit = false; cNew = e.target.value === '__new';
     const v = e.target.value;
     if (v && v !== '__new'){ const c = S.customers[v]; d.customerId = v; d.customer = {name:c.name||'', address:c.address||'', phone:c.phone||''}; }
     else { d.customerId = ''; if (v === '__new') d.customer = {name:'',address:'',phone:''}; }
@@ -2096,7 +2118,7 @@ function viewEditor(main, d, isEdit){
     d.number = (d.number||'').trim(); d.customer.name = (d.customer.name||'').trim();
     if (!d.number) return toast('Add a document number.'), $('#f-number').focus();
     if (!d.date) return toast('Pick a date.'), $('#f-date').focus();
-    if (!d.customer.name) return toast('Add the customer\'s name.'), $('#f-cname').focus();
+    if (!d.customer.name){ cNew = true; if ($('#f-cust').value !== '__new') $('#f-cust').value = '__new'; custNote(); return toast('Choose a customer or add the customer\'s name.'), $('#f-cname').focus(); }
     d.items = d.items.filter(it => (it.desc||'').trim() || (it.from||'').trim() || (it.via||'').trim() || (it.to||'').trim() || num(it.qty) || num(it.rate) || num(it.amount));
     if (!d.items.length){ d.items = [blankItem()]; drawItems(); return toast('Add at least one line.'); }
     const dup = Object.values(S.docs).find(x => x.type === d.type && x.id !== d.id && (x.number||'').trim().toLowerCase() === d.number.toLowerCase());
