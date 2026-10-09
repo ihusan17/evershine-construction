@@ -274,14 +274,6 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .kindpick button.on{border:2px solid var(--brand);padding:13px 15px;background:var(--brand-soft)}
 .kindpick button.on b{color:var(--brand)}
 @media (max-width:600px){.kindpick{grid-template-columns:minmax(0,1fr)}}
-.ppick{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;gap:10px}
-.ppick[hidden]{display:none}
-.ppick input{padding:7px 11px;border:1px solid var(--line);border-radius:7px;background:var(--surface);width:100%}
-.pgrid{display:flex;flex-wrap:wrap;gap:8px;max-height:236px;overflow:auto}
-.pbtn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer;text-align:left;max-width:100%}
-.pbtn:hover{border-color:var(--brand);background:var(--brand-soft)}
-.pbtn b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
-.pbtn span{font-size:13px;color:var(--muted)}
 /* doc view */
 .docview{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
 .sheet-fit{width:100%;overflow:hidden;border-radius:4px;box-shadow:0 1px 2px rgba(20,30,40,.08),0 8px 28px rgba(20,30,40,.10)}
@@ -716,13 +708,12 @@ table.list tbody tr:hover td{background:var(--surface-2)}
 .attn li:hover,.links a:hover{background:var(--surface-2)}
 
 /* forms */
-.fld input,.fld select,.fld textarea,table.items input,table.items textarea,.ppick input{border-radius:12px;border-color:var(--line);background:var(--surface)}
+.fld input,.fld select,.fld textarea,table.items input,table.items textarea{border-radius:12px;border-color:var(--line);background:var(--surface)}
 .fld input,.fld select{padding:10px 13px}
-.fld input:focus,.fld select:focus,.fld textarea:focus,table.items input:focus,table.items textarea:focus,.filters select:focus,.ppick input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.fld input:focus,.fld select:focus,.fld textarea:focus,table.items input:focus,table.items textarea:focus,.filters select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 table.items th{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
 .kindpick button{border-radius:18px;padding:16px 18px}
 .kindpick button.on{padding:15px 17px}
-.pbtn{border-radius:14px}
 .lbl2{font-size:14px;font-weight:600;color:var(--muted)}
 .sigbox{height:120px;border:1px dashed var(--line);border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;padding:10px;margin-bottom:6px;overflow:hidden}
 .sigbox img{display:block;max-height:98px;max-width:100%;width:auto;height:auto;object-fit:contain}
@@ -1938,11 +1929,6 @@ function viewEditor(main, d, isEdit){
         </div>
       </section>
       <section class="panel"><h2><span id="ititle">Items</span></h2>
-        <div class="ppick" id="ppick" hidden>
-          <input id="pq" type="search" placeholder="Search products, then click one to add it" aria-label="Search products">
-          <div class="ptabs mini" id="pcat" hidden></div>
-          <div class="pgrid" id="pgrid"></div>
-        </div>
         <div style="padding:6px 12px 0" class="tablewrap"><table class="items"><thead id="ihead"></thead><tbody id="ibody"></tbody></table></div>
         <div style="padding:10px 12px"><button type="button" class="btn sm" id="add">Add line</button></div>
         <div id="tot"></div>
@@ -1979,29 +1965,8 @@ function viewEditor(main, d, isEdit){
     const sel = $('#f-cust').value;
     $('#c-note').textContent = sel === '__new' || (!sel && d.customer.name) ? 'This customer will be added to your customer list when you save.' : sel ? 'Changes here apply to this document only. Edit the saved customer under Customers.' : '';
   };
-  const plist = products(), pcats = prodCats().filter(c => plist.some(p => p.cat === c.id));
-  let pickCat = 'all';
-  const drawPicker = () => {
-    const box = $('#ppick'); box.hidden = !isDN && d.kind === 'hire';
-    if (!plist.length){ $('#pq').hidden = true; $('#pgrid').innerHTML = '<span class="dim">Save your products under <b>Products</b> and they appear here to add with one click.</span>'; return; }
-    const q = $('#pq').value.trim().toLowerCase();
-    const ct = $('#pcat'); ct.hidden = !pcats.length;
-    if (pcats.length) ct.innerHTML = [['all', 'All'], ...pcats.map(c => [c.id, c.name])].map(([id, n]) => `<button type="button" class="ptab${pickCat === id ? ' on' : ''}" data-pc="${esc(id)}">${esc(n)}</button>`).join('');
-    const shown = plist.filter(p => (pickCat === 'all' || p.cat === pickCat) && (!q || (p.name||'').toLowerCase().includes(q) || (p.unit||'').toLowerCase().includes(q)));
-    $('#pgrid').innerHTML = shown.length ? shown.map(p => `<button type="button" class="pbtn" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><span>${esc([p.unit, !isDN && String(p.rate ?? '') !== '' ? 'MVR ' + money(num(p.rate)) : ''].filter(Boolean).join(' · ') || 'Add')}</span></button>`).join('')
-      : '<span class="dim">No products match.</span>';
-  };
-  const addProduct = p => {
-    const blank = it => !(it.desc||'').trim() && !(it.unit||'').trim() && !num(it.qty) && !num(it.rate) && !num(it.amount);
-    let i = d.items.findIndex(blank);
-    if (i < 0){ d.items.push(blankItem()); i = d.items.length - 1; }
-    d.items[i] = {...d.items[i], desc:p.name || '', unit:p.unit || '', qty:'1', rate: isDN ? '' : String(p.rate ?? '')};
-    drawItems();
-    const qty = $('#ibody').querySelector(`[data-i="${i}"][data-k="qty"]`); if (qty){ qty.focus(); qty.select(); }
-  };
   const drawItems = () => {
     const hire = !isDN && d.kind === 'hire';
-    drawPicker();
     $('#ititle').textContent = hire ? 'Trips / hire charges' : 'Items';
     if (hire){
       $('#ihead').innerHTML = `<tr><th>Description / cargo</th><th style="width:14%">From <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:17%">Stops <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:14%">To <span style="font-weight:400;text-transform:none">(optional)</span></th><th style="width:15%">Date</th><th style="width:14%" class="n">Amount</th><th style="width:36px"></th></tr>`;
@@ -2070,8 +2035,6 @@ function viewEditor(main, d, isEdit){
     if (isDN && v && v !== '__new' && !d.deliveryAddress){ /* leave delivery address for the user */ }
     custNote(); if (v === '__new') $('#f-cname').focus();
   });
-  $('#pq').addEventListener('input', drawPicker);
-  $('#pcat').addEventListener('click', e => { const b = e.target.closest('[data-pc]'); if (b){ pickCat = b.dataset.pc; drawPicker(); } });
   islandPicker($('#ibody'));
   // Description box: pick a saved product to fill the line (not for boat trips, where the description is the cargo)
   const fillLine = (it, p) => ({...it, desc: p.name || '', unit: p.unit || it.unit || '', qty: num(it.qty) ? it.qty : '1', rate: isDN ? (it.rate || '') : String(p.rate ?? '')});
@@ -2082,7 +2045,6 @@ function viewEditor(main, d, isEdit){
     pickMany: (i, list) => { const it = d.items[i]; if (!it) return;
       d.items.splice(i, 1, fillLine(it, list[0]), ...list.slice(1).map(p => fillLine(blankItem(), p)));
       drawItems(); focusQty(i); toast(`${list.length} products added`); }});
-  $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
   // trip date: a calendar fills the box as dd/mm/yyyy (typing a period like "13–15 Sep" still works)
   const openCal = i => { const pk = $('#ibody').querySelector(`[data-calp="${i}"]`); if (!pk) return;
     const m = String(d.items[i].when || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
