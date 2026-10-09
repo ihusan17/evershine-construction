@@ -210,8 +210,11 @@ table.list.prods .p-sel{width:34px;cursor:pointer}
 table.list.prods .p-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
 table.list.prods tr.picked,table.list.prods tr.picked td{background:var(--brand-soft)}
 table.list.docs .c-sel{width:34px;cursor:pointer}
+table.list.docs:not(.sel) .c-sel,table.list.prods:not(.sel) .p-sel{display:none!important}
+#selmode.on,#psel.on{background:var(--brand-soft);color:var(--brand);border-color:var(--brand)}
 table.list.docs .c-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
 table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-soft)}
+.pbulk[hidden]{display:none!important}
 .pbulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 18px 12px;padding:8px 12px;border-radius:12px;background:var(--brand);color:#fff;font-size:14px}
 .pbulk b{margin-right:4px}
 .pbulk .btn{background:var(--surface);color:var(--ink);border-color:transparent}
@@ -1334,14 +1337,14 @@ function render(force, keepScroll){
   const changed = r.key !== lastKey; lastKey = r.key;
   const main = $('#main'); const y = window.scrollY;
   if (r.a === 'dashboard') viewDashboard(main);
-  else if (ROUTE_TYPE[r.a]) viewList(main, ROUTE_TYPE[r.a]);
+  else if (ROUTE_TYPE[r.a]){ if (changed) listState[ROUTE_TYPE[r.a]].selMode = false; viewList(main, ROUTE_TYPE[r.a]); }   // Select mode survives live updates, not navigation
   else if (r.a === 'doc' && S.docs[r.b]) viewDoc(main, S.docs[r.b]);
   else if ((['new','edit','convert'].includes(r.a) && !canEdit()) || ((r.a === 'settings') && !isOwnerRole())) main.innerHTML = `<div class="empty">Your role (${esc((ROLES[S.role]||['No access'])[0])}) can't open this page. Ask the owner if you need access. <a href="#/dashboard">Go to the overview</a></div>`;
   else if (r.a === 'new' && TYPES[r.b]) viewEditor(main, newDraft(r.b, r.c), false);
   else if (r.a === 'edit' && S.docs[r.b]) viewEditor(main, clone(S.docs[r.b]), true);
   else if (r.a === 'convert' && S.docs[r.b] && TYPES[r.c]) viewEditor(main, convertDraft(S.docs[r.b], r.c), false);
   else if (r.a === 'customers') viewCustomers(main);
-  else if (r.a === 'products') viewProducts(main);
+  else if (r.a === 'products'){ if (changed) prodSelMode = false; viewProducts(main); }
   else if (r.a === 'reports') viewReports(main, r.b === 'expenses' && canEdit() ? 'expenses' : 'overview');
   else if (r.a === 'settings') viewSettings(main);
   else { main.innerHTML = `<div class="empty">That page doesn't exist or the document was deleted. <a href="#/dashboard">Go to the overview</a></div>`; }
@@ -1515,13 +1518,13 @@ function viewList(main, type){
   const T = TYPES[type], st = listState[type], ce = canEdit();
   main.innerHTML = `
     <div class="pagehead"><div><h1>${T.plural}</h1><p id="lsum"></p></div>
-      <div class="row"><button class="btn" id="csv">Export CSV</button><a class="btn primary" data-need="edit" href="#/new/${type}">${icon('plus',18)}New ${T.label.toLowerCase()}</a></div></div>
+      <div class="row"><button class="btn${st.selMode ? ' on' : ''}" id="selmode" data-need="edit" aria-pressed="${!!st.selMode}">${st.selMode ? '✓ Done' : '☑ Select'}</button><button class="btn" id="csv">Export CSV</button><a class="btn primary" data-need="edit" href="#/new/${type}">${icon('plus',18)}New ${T.label.toLowerCase()}</a></div></div>
     <div class="stats">${listStats(type)}</div>
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="q" type="search" placeholder="Search number, customer, project, PO, item or island" value="${esc(st.q)}" aria-label="Search"></label>${type !== 'delivery' ? `<select id="kf" aria-label="Type"><option value="all">All types</option><option value="goods" ${st.k==='goods'?'selected':''}>Goods &amp; materials</option><option value="hire" ${st.k==='hire'?'selected':''}>Boat hire</option></select>` : ''}
         <div class="chips" id="chips">${FILTERS[type].map(f => { const n = f === 'all' ? docsOf(type).length : docsOf(type).filter(d => statusOf(d) === f).length; return `<button class="chip ${st.f===f?'on':''}" data-f="${f}">${f==='all'?'All':STATUS[f][0]}${n ? `<span class="n ${f==='all' ? '' : STATUS[f][1]}">${n}</span>` : ''}</button>`; }).join('')}</div></div>
       <div class="pbulk" id="lbulk" hidden></div>
-      <div class="tablewrap"><table class="list docs${ce ? ' sel' : ''}"><thead><tr>${ce ? '<th class="c-sel"><input type="checkbox" id="lsall" aria-label="Select all shown"></th>' : ''}<th>Number</th><th>Date</th><th>Customer</th><th>${type==='delivery'?'Deliver to':'Project / PO'}</th>${type==='delivery'?'<th class="num">Qty</th>':'<th class="num">Amount (MVR)</th>'}${type==='invoice'?'<th class="num">Balance</th>':''}<th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="tablewrap"><table class="list docs${ce && st.selMode ? ' sel' : ''}" id="dtable"><thead><tr>${ce ? '<th class="c-sel"><input type="checkbox" id="lsall" aria-label="Select all shown"></th>' : ''}<th>Number</th><th>Date</th><th>Customer</th><th>${type==='delivery'?'Deliver to':'Project / PO'}</th>${type==='delivery'?'<th class="num">Qty</th>':'<th class="num">Amount (MVR)</th>'}${type==='invoice'?'<th class="num">Balance</th>':''}<th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
     </section>`;
   const rows = () => {
     const q = st.q.trim().toLowerCase();
@@ -1575,6 +1578,10 @@ function viewList(main, type){
   };
   let current = rows();
   if (ce){
+    // tick boxes only show after Select is pressed; Done hides them and clears the ticks
+    $('#selmode').addEventListener('click', e => { const on = st.selMode = !$('#dtable').classList.contains('sel');
+      $('#dtable').classList.toggle('sel', on); e.currentTarget.textContent = on ? '✓ Done' : '☑ Select'; e.currentTarget.setAttribute('aria-pressed', on); e.currentTarget.classList.toggle('on', on);
+      if (!on){ sel.clear(); current = rows(); } });
     $('#rows').addEventListener('change', e => { const c = e.target.closest('[data-sel]'); if (!c) return; c.checked ? sel.add(c.dataset.sel) : sel.delete(c.dataset.sel); c.closest('tr').classList.toggle('picked', c.checked); bulk(); });
     $('#rows').addEventListener('click', e => { const td = e.target.closest('td.c-sel'); if (td && e.target === td){ const c = td.querySelector('input'); c.checked = !c.checked; c.dispatchEvent(new Event('change', {bubbles:true})); } });
     $('#lsall').addEventListener('change', e => { shown.forEach(id => e.target.checked ? sel.add(id) : sel.delete(id)); current = rows(); });
@@ -2935,7 +2942,7 @@ function customerBox(c){
 }
 
 /* ---------- products ---------- */
-let prodQ = '', prodCat = 'all';
+let prodQ = '', prodCat = 'all', prodSelMode = false;
 function viewProducts(main){
   const list = products(), cats = prodCats(), own = isOwnerRole();
   // how many documents use each product (matched by its name)
@@ -2946,12 +2953,12 @@ function viewProducts(main){
   const nNone = list.filter(p => !catOf(p)).length;
   main.innerHTML = `
     <div class="pagehead"><div><h1>Products</h1><p>${list.length} product${list.length === 1 ? '' : 's'}${cats.length ? ` in ${cats.length} categor${cats.length === 1 ? 'y' : 'ies'}` : ''}. In the quotation, invoice or delivery note editor, click a product to add it as a line.</p></div>
-      <div class="row"><button class="btn" id="impp" data-need="owner">Import from past documents</button><button class="btn primary" id="addp" data-need="owner">+ Add product</button></div></div>
+      <div class="row"><button class="btn${prodSelMode ? ' on' : ''}" id="psel" data-need="owner" aria-pressed="${prodSelMode}">${prodSelMode ? '✓ Done' : '☑ Select'}</button><button class="btn" id="impp" data-need="owner">Import from past documents</button><button class="btn primary" id="addp" data-need="owner">+ Add product</button></div></div>
     <section class="panel">
       <div class="filters"><input id="pq2" type="search" placeholder="Search products" value="${esc(prodQ)}" aria-label="Search products"></div>
       <div class="ptabs" id="ptabs" role="tablist" aria-label="Categories"></div>
       <div class="pbulk" id="pbulk" hidden></div>
-      <div class="tablewrap"><table class="list prods${own ? ' sel' : ''}"><thead><tr>${own ? '<th class="p-sel"><input type="checkbox" id="psall" aria-label="Select all shown products"></th>' : ''}<th>Product</th><th>Category</th><th>Unit</th><th class="num">Rate (MVR)</th><th>Used in</th><th></th></tr></thead><tbody id="prows"></tbody></table></div>
+      <div class="tablewrap"><table class="list prods${own && prodSelMode ? ' sel' : ''}" id="ptable"><thead><tr>${own ? '<th class="p-sel"><input type="checkbox" id="psall" aria-label="Select all shown products"></th>' : ''}<th>Product</th><th>Category</th><th>Unit</th><th class="num">Rate (MVR)</th><th>Used in</th><th></th></tr></thead><tbody id="prows"></tbody></table></div>
     </section>`;
   const tabs = () => {
     const t = (id, label, n) => `<button type="button" class="ptab${prodCat === id ? ' on' : ''}" role="tab" aria-selected="${prodCat === id}" data-cat="${esc(id)}">${esc(label)} <small>${n}</small></button>`;
@@ -2981,6 +2988,10 @@ function viewProducts(main){
       : `<tr><td colspan="7" class="empty">${list.length ? 'No products match.' : 'No products yet. Add one, or import the items you used in past documents.'}</td></tr>`;
   };
   $('#pq2').addEventListener('input', e => { prodQ = e.target.value; draw(); bulk(); });
+  const pselb = $('#psel');
+  if (pselb) pselb.addEventListener('click', () => { const on = prodSelMode = !$('#ptable').classList.contains('sel');
+    $('#ptable').classList.toggle('sel', on); pselb.textContent = on ? '✓ Done' : '☑ Select'; pselb.setAttribute('aria-pressed', on); pselb.classList.toggle('on', on);
+    if (!on){ sel.clear(); draw(); bulk(); } });
   const psall = $('#psall');
   if (psall) psall.addEventListener('change', () => { const on = psall.checked; shown.forEach(p => on ? sel.add(p.id) : sel.delete(p.id)); draw(); bulk(); });
   $('#pbulk').addEventListener('click', e => {
