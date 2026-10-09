@@ -209,6 +209,9 @@ table.list.prods .p-used{font-size:13px}
 table.list.prods .p-sel{width:34px;cursor:pointer}
 table.list.prods .p-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
 table.list.prods tr.picked,table.list.prods tr.picked td{background:var(--brand-soft)}
+table.list.docs .c-sel{width:34px;cursor:pointer}
+table.list.docs .c-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
+table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-soft)}
 .pbulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 18px 12px;padding:8px 12px;border-radius:12px;background:var(--brand);color:#fff;font-size:14px}
 .pbulk b{margin-right:4px}
 .pbulk .btn{background:var(--surface);color:var(--ink);border-color:transparent}
@@ -658,6 +661,8 @@ body[data-role=viewer] .stbtn{cursor:default} body[data-role=viewer] .stbtn svg{
 @media (max-width:640px){
   table.list.docs thead{display:none}
   table.list.docs,table.list.docs tbody{display:block}
+  table.list.docs.sel tr{grid-template-columns:28px minmax(0,1fr) auto;grid-template-areas:"sel no amt" "sel cust st" "sel meta bal"}
+  table.list.docs .c-sel{grid-area:sel;align-self:center}
   table.list.docs tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"no amt" "cust st" "meta bal";column-gap:12px;row-gap:3px;padding:12px 6px;border-bottom:1px solid var(--line);align-items:center}
   table.list.docs tr:last-child{border-bottom:0}
   table.list.docs td{display:block;padding:0;border:0;min-width:0;background:none!important}
@@ -1475,7 +1480,7 @@ function viewDashboard(main){
     </div>`;
   bindGo(main);
 }
-function bindGo(root){ root.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => { if (e.target.closest('a,button')) return; location.hash = '#/' + el.dataset.go; })); }
+function bindGo(root){ root.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => { if (e.target.closest('a,button,input,label,.c-sel')) return; location.hash = '#/' + el.dataset.go; })); }
 
 /* ---------- lists ---------- */
 const listState = {quotation:{q:'',f:'all'}, invoice:{q:'',f:'all'}, delivery:{q:'',f:'all'}};
@@ -1507,7 +1512,7 @@ function listStats(type){
     + stat('box', qfmt(pend.reduce((s,d)=>s+qtyTotal(d),0)), '', 'Quantity to deliver', 'across pending notes');
 }
 function viewList(main, type){
-  const T = TYPES[type], st = listState[type];
+  const T = TYPES[type], st = listState[type], ce = canEdit();
   main.innerHTML = `
     <div class="pagehead"><div><h1>${T.plural}</h1><p id="lsum"></p></div>
       <div class="row"><button class="btn" id="csv">Export CSV</button><a class="btn primary" data-need="edit" href="#/new/${type}">${icon('plus',18)}New ${T.label.toLowerCase()}</a></div></div>
@@ -1515,14 +1520,15 @@ function viewList(main, type){
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="q" type="search" placeholder="Search number, customer, project, PO, item or island" value="${esc(st.q)}" aria-label="Search"></label>${type !== 'delivery' ? `<select id="kf" aria-label="Type"><option value="all">All types</option><option value="goods" ${st.k==='goods'?'selected':''}>Goods &amp; materials</option><option value="hire" ${st.k==='hire'?'selected':''}>Boat hire</option></select>` : ''}
         <div class="chips" id="chips">${FILTERS[type].map(f => { const n = f === 'all' ? docsOf(type).length : docsOf(type).filter(d => statusOf(d) === f).length; return `<button class="chip ${st.f===f?'on':''}" data-f="${f}">${f==='all'?'All':STATUS[f][0]}${n ? `<span class="n ${f==='all' ? '' : STATUS[f][1]}">${n}</span>` : ''}</button>`; }).join('')}</div></div>
-      <div class="tablewrap"><table class="list docs"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th>${type==='delivery'?'Deliver to':'Project / PO'}</th>${type==='delivery'?'<th class="num">Qty</th>':'<th class="num">Amount (MVR)</th>'}${type==='invoice'?'<th class="num">Balance</th>':''}<th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="pbulk" id="lbulk" hidden></div>
+      <div class="tablewrap"><table class="list docs${ce ? ' sel' : ''}"><thead><tr>${ce ? '<th class="c-sel"><input type="checkbox" id="lsall" aria-label="Select all shown"></th>' : ''}<th>Number</th><th>Date</th><th>Customer</th><th>${type==='delivery'?'Deliver to':'Project / PO'}</th>${type==='delivery'?'<th class="num">Qty</th>':'<th class="num">Amount (MVR)</th>'}${type==='invoice'?'<th class="num">Balance</th>':''}<th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
     </section>`;
   const rows = () => {
     const q = st.q.trim().toLowerCase();
     const list = docsOf(type).filter(d => (st.f === 'all' || statusOf(d) === st.f) && (!st.k || st.k === 'all' || kindOf(d) === st.k) && (!q || [d.number, d.customer?.name, d.project, d.po, d.deliveryAddress, ...(d.items||[]).map(i => [i.desc, i.from, i.to].join(' '))].join(' ').toLowerCase().includes(q)));
-    const cols = type === 'invoice' ? 7 : 6;
+    const cols = (type === 'invoice' ? 7 : 6) + (ce ? 1 : 0);
     $('#rows').innerHTML = list.length ? list.map(d => { const extra = type==='delivery' ? (d.deliveryAddress||'').split('\n')[0] : [d.project, d.po && d.po !== '-' ? 'PO '+d.po : ''].filter(Boolean).join(' · ');
-      return `<tr data-go="doc/${d.id}">
+      return `<tr data-go="doc/${d.id}"${sel.has(d.id) ? ' class="picked"' : ''}>${ce ? `<td class="c-sel"><input type="checkbox" data-sel="${esc(d.id)}" ${sel.has(d.id) ? 'checked' : ''} aria-label="Select ${esc(d.number)}"></td>` : ''}
       <td class="c-no"><div class="docno"><button type="button" class="pvlink" data-pv="${esc(d.id)}" title="Quick preview">${esc(d.number)}</button>${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</div></td><td class="c-date" style="white-space:nowrap">${fmtDate(d.date)}${extra ? `<span class="m-only"> · ${esc(extra)}</span>` : ''}</td><td class="cust c-cust">${esc(d.customer?.name)}</td>
       <td class="dim c-proj">${esc(extra)}</td>
       <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
@@ -1530,13 +1536,53 @@ function viewList(main, type){
       <td class="c-st"><button type="button" class="stbtn" data-stm="${esc(d.id)}" title="Change status" aria-haspopup="menu">${badge(statusOf(d))}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></td></tr>`; }).join('')
       : `<tr><td colspan="${cols}" class="empty">${docsOf(type).length ? 'No matches. Try a different search or filter.' : `No ${T.plural.toLowerCase()} yet. <a href="#/new/${type}">Create one</a>.`}</td></tr>`;
     bindGo($('#rows'));
-    shown = list.map(d => d.id);
+    shown = list.map(d => d.id); bulk();
     const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+total(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+balance(d),0))} unpaid` : '');
     $('#lsum').textContent = sum;
     return list;
   };
   let shown = [];
+  // ticked documents: change the status of several at once
+  const sel = new Set();
+  const BULK = {quotation:[['Draft', 'draft'], ['Sent', 'sent'], ['Accepted', 'accepted'], ['Rejected', 'rejected']],
+    invoice:[['Mark as paid (full balance)', 'paid']], delivery:[['Delivered (today)', 'delivered'], ['To deliver', 'pending']]}[type];
+  const bulk = () => {
+    [...sel].forEach(id => { if (!S.docs[id]) sel.delete(id); });
+    const n = sel.size, bar = $('#lbulk'); if (!bar) return; bar.hidden = !n;
+    if (n) bar.innerHTML = `<b>${n} selected</b><button type="button" class="btn sm" data-bs>Set status ▾</button><button type="button" class="btn sm ghost" data-bx>Clear</button>`;
+    const all = $('#lsall'); if (all){ const k = shown.filter(id => sel.has(id)).length; all.checked = !!k && k === shown.length; all.indeterminate = !!k && k < shown.length; }
+  };
+  const applyBulk = act => {
+    const docs = [...sel].map(id => S.docs[id]).filter(d => d && !isVoid(d));
+    const todo = act === 'paid' ? docs.filter(d => r2(balance(d)) > 0) : docs.filter(d => statusOf(d) !== act);
+    const skipped = sel.size - todo.length;
+    if (!todo.length) return toast(`Nothing to change: the selected ${T.plural.toLowerCase()} are already ${act === 'paid' ? 'paid' : STATUS[act][0].toLowerCase()} or void.`);
+    const label = act === 'paid' ? 'paid' : STATUS[act][0].toLowerCase(), amt = act === 'paid' ? todo.reduce((a, d) => a + r2(balance(d)), 0) : 0;
+    confirmBox(`Mark ${todo.length} ${todo.length === 1 ? T.label.toLowerCase() : T.plural.toLowerCase()} as ${label}?`,
+      (act === 'paid' ? `A payment for each invoice's full balance is recorded with today's date (MVR ${money(amt)} in total). ` : act === 'delivered' ? 'They are marked delivered today. ' : '')
+      + todo.map(d => d.number).slice(0, 8).join(', ') + (todo.length > 8 ? '…' : '') + (skipped ? ` (${skipped} skipped: already ${label} or void)` : ''),
+      'Mark as ' + label, async () => {
+        const now = new Date().toISOString();
+        for (const d of todo){
+          const body = act === 'paid' ? {...clone(d), payments:[...(d.payments || []), {amount:r2(balance(d)), date:todayISO(), method:'Other', ref:'Marked as paid (bulk)'}], updatedAt:now}
+            : act === 'delivered' ? {...clone(d), status:'delivered', delivered:{name:d.delivered?.name || '', date:todayISO()}, updatedAt:now}
+            : act === 'pending' ? {...clone(d), status:'pending', delivered:null, updatedAt:now}
+            : {...clone(d), status:act, updatedAt:now};
+          await put('docs', d.id, body);
+        }
+        sel.clear(); toast(`${todo.length} ${todo.length === 1 ? T.label.toLowerCase() : T.plural.toLowerCase()} marked as ${label}`);
+      });
+  };
   let current = rows();
+  if (ce){
+    $('#rows').addEventListener('change', e => { const c = e.target.closest('[data-sel]'); if (!c) return; c.checked ? sel.add(c.dataset.sel) : sel.delete(c.dataset.sel); c.closest('tr').classList.toggle('picked', c.checked); bulk(); });
+    $('#rows').addEventListener('click', e => { const td = e.target.closest('td.c-sel'); if (td && e.target === td){ const c = td.querySelector('input'); c.checked = !c.checked; c.dispatchEvent(new Event('change', {bubbles:true})); } });
+    $('#lsall').addEventListener('change', e => { shown.forEach(id => e.target.checked ? sel.add(id) : sel.delete(id)); current = rows(); });
+    $('#lbulk').addEventListener('click', e => {
+      if (e.target.closest('[data-bx]')){ sel.clear(); current = rows(); return; }
+      const b = e.target.closest('[data-bs]'); if (b) popMenu(b, BULK.map(([l, a]) => [l, () => applyBulk(a)]));
+    });
+  }
   $('#rows').addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) previewDoc(b.dataset.pv, shown); const m = e.target.closest('[data-stm]'); if (m) statusMenu(m); });
   $('#q').addEventListener('input', e => { st.q = e.target.value; current = rows(); });
   const kf = $('#kf'); if (kf) kf.addEventListener('change', e => { st.k = e.target.value; current = rows(); });
