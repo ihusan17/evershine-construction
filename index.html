@@ -182,6 +182,8 @@ table.items td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line
 table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
+input.numlock{background:var(--surface-2)!important;border-color:transparent!important;font-weight:700;cursor:default}
+input.numlock:focus{box-shadow:none!important;outline:none}
 /* editor: chosen customer summary */
 .ccard{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2);gap:2px!important;font-size:14.5px;line-height:1.45}
 .ccard .cc-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:2px}
@@ -849,7 +851,7 @@ const UNITS = ['Nos','Bags','CUFT','CUM','Trip','Lot','Kg','Ton','Ltr','Sqft','S
 const DEFAULTS = {
   name:'EVERSHINE CONSTRUCTION', address:'Ever Shine, Zikura Magu\nSh. Milandhoo', phone:'+960 7714133', email:'mhmd.ihsn80@gmail.com',
   prefix:'ESC', bankName:'Bank of Maldives', accNo:'773 0000382 938 (MVR)', accName:'Ali Ibrahim',
-  quoteValidDays:20, invoiceDueDays:20, signDelivery:true, signDocs:true,
+  quoteValidDays:20, invoiceDueDays:5, signDelivery:true, signDocs:true,
   quoteTerms:'This quotation remains valid for 20 days from the date of issue.\nUnless otherwise agreed, payment shall be made in full within 30 days from the date of invoice.\nTransport schedules are subject to weather and maritime conditions. We are not liable for delays caused by unforeseen sea conditions.',
   invoiceTerms:'Payment is due within 20 days from the invoice date\nAccepted payment methods: Cash & Bank Transfer\nForward payment receipt to 7714133 via viber or email once payment has been processed',
   deliveryMessage:'This delivery note serves as confirmation that the items listed above have been delivered as per the requirements provided, with the items received in good condition.',
@@ -1015,7 +1017,11 @@ let wordingFixed = false;
 function fixWording(){
   if (wordingFixed || !isOwnerRole() || !S.ready) return; wordingFixed = true;
   const q = S.settings.quoteTerms || '';
-  if (/This quotation remain valid/.test(q)) saveSettings({...S.settings, quoteTerms: q.replace(/This quotation remain valid/g, 'This quotation remains valid')}).catch(() => {});
+  const fix = {};
+  if (/This quotation remain valid/.test(q)) fix.quoteTerms = q.replace(/This quotation remain valid/g, 'This quotation remains valid');
+  // the default payment term became 5 days: move a saved 20-day default over once (a different choice is kept)
+  if (!S.settings.due5 && num(S.settings.invoiceDueDays) === 20) Object.assign(fix, {invoiceDueDays:5, invoiceTerms: syncTermDays(S.settings.invoiceTerms, 'invoice', 5)});
+  if (Object.keys(fix).length) saveSettings({...S.settings, ...fix, due5:true}).catch(() => {});
 }
 function subscribe(){
   let waiting = 3; const seen = {};
@@ -1063,7 +1069,7 @@ async function boot(){
   let got = null;
   if (c && typeof c.use === 'function'){ try { got = await c.use('db'); } catch(e){} }
   if (got){ db = got; S.mode = 'cloud'; subscribe(); }
-  else { S.mode = 'local'; loadLocal(); S.ready = true; render(true); }
+  else { S.mode = 'local'; loadLocal(); S.ready = true; fixWording(); render(true); }
   if (c && typeof c.use === 'function') c.use('downloads').then(d => { downloads = d; }).catch(() => {});
 }
 
@@ -1884,10 +1890,10 @@ function newDraft(type, kind){
   kind = type === 'delivery' ? null : (kind === 'hire' ? 'hire' : 'goods');
   return { id:uid(), type, number:nextNumber(type,t), _auto:true, date:t, customerId:'', customer:{name:'',address:'',phone:''},
     po:'', project: kind === 'hire' ? hireProject() : '', deliveryAddress:'', kind, layout: kind === 'hire' ? 'lump' : 'items', items:[blankItem()], taxRate:0,
-    terms: type==='quotation' ? syncTermDays(s.quoteTerms, 'quotation', num(s.quoteValidDays)||20) : type==='invoice' ? syncTermDays(s.invoiceTerms, 'invoice', num(s.invoiceDueDays)||20) : '',
+    terms: type==='quotation' ? syncTermDays(s.quoteTerms, 'quotation', num(s.quoteValidDays)||20) : type==='invoice' ? syncTermDays(s.invoiceTerms, 'invoice', num(s.invoiceDueDays)||5) : '',
     message: type==='delivery' ? s.deliveryMessage : '',
     status: type==='quotation' ? 'draft' : type==='delivery' ? 'pending' : 'issued',
-    payments:[], validDays:num(s.quoteValidDays)||20, dueDays:num(s.invoiceDueDays)||20, sourceId:null, createdAt:new Date().toISOString(),
+    payments:[], validDays:num(s.quoteValidDays)||20, dueDays:num(s.invoiceDueDays)||5, sourceId:null, createdAt:new Date().toISOString(),
     ...(type === 'delivery' ? {signs:{byName:s.signName || '', byDate:'', toName:'', toDate:''}} : {}) };
 }
 function convertDraft(src, type){
@@ -1918,7 +1924,7 @@ function viewEditor(main, d, isEdit){
       </section>` : ''}
       <section class="panel"><h2>Details</h2>
         <div class="fgrid">
-          <div class="fld"><label for="f-number">${T.numLabel}</label><input id="f-number" data-f="number" value="${esc(d.number)}" required></div>
+          <div class="fld"><label for="f-number">${T.numLabel}</label><input id="f-number" class="numlock" value="${esc(d.number)}" readonly tabindex="-1" title="Numbers are given automatically"><span class="hint">🔒 ${isEdit ? 'Document numbers can\'t be changed.' : 'Automatic (next after the last one). Change the next number in Settings → Numbering.'}</span></div>
           <div class="fld"><label for="f-date">${T.dateLabel.replace(':','')}</label><input id="f-date" type="date" data-f="date" value="${esc(d.date)}" required></div>
           ${d.type==='quotation' ? `<div class="fld"><label for="f-valid-s">Valid for</label>${daysPick('f-valid', 'data-f="validDays"', d.validDays)}<span class="hint" id="h-valid"></span></div>` : ''}
           ${d.type==='invoice' ? `<div class="fld"><label for="f-due-s">Payment due in</label>${daysPick('f-due', 'data-f="dueDays"', d.dueDays)}<span class="hint" id="h-due"></span></div>` : ''}
@@ -2025,7 +2031,6 @@ function viewEditor(main, d, isEdit){
     const el = e.target;
     if (el.dataset.f){
       d[el.dataset.f] = el.value;
-      if (el.dataset.f === 'number') d._auto = false;
       if ((el.dataset.f === 'validDays' && d.type === 'quotation') || (el.dataset.f === 'dueDays' && d.type === 'invoice')){
         d.terms = syncTermDays(d.terms, d.type, el.value); const ta = $('#f-terms'); if (ta){ ta.value = d.terms; fitT(); }
       }
@@ -2115,6 +2120,7 @@ function viewEditor(main, d, isEdit){
   markKind();
 
   $('#save').addEventListener('click', async () => {
+    if (!isEdit) d.number = nextNumber(d.type, d.date);   // always the next free number at the moment of saving
     d.number = (d.number||'').trim(); d.customer.name = (d.customer.name||'').trim();
     if (!d.number) return toast('Add a document number.'), $('#f-number').focus();
     if (!d.date) return toast('Pick a date.'), $('#f-date').focus();
@@ -3378,7 +3384,7 @@ function viewSettings(main, openKey){
   main.querySelectorAll('.s-cancel').forEach(b => b.addEventListener('click', () => again(b.closest('.srow').dataset.sec)));
   main.querySelectorAll('.s-save').forEach(b => b.addEventListener('click', async () => {
     b.disabled = true;
-    s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 20; s.signDelivery = !!s.signDelivery; s.signDocs = !!s.signDocs;
+    s.quoteValidDays = num(s.quoteValidDays) || 20; s.invoiceDueDays = num(s.invoiceDueDays) || 5; s.signDelivery = !!s.signDelivery; s.signDocs = !!s.signDocs;
     s.prefix = (s.prefix||'ESC').trim().replace(/[\/\s]+/g,'') || 'ESC';
     ['QTN', 'INV', 'DN'].forEach(c => { const v = Math.floor(num(s['start' + c])); s['start' + c] = v > 0 ? v : ''; });
     s.startYY = todayISO().slice(2,4);   // the next numbers apply to this year
