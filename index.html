@@ -182,6 +182,9 @@ table.items td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line
 table.items input,table.items textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 table.items textarea{resize:vertical;min-height:38px;line-height:1.35}
 table.items .n{text-align:right}
+/* editor: terms locked until Edit */
+textarea.lockta{background:var(--surface-2)!important;border-color:transparent!important;resize:none;cursor:default;color:var(--ink)}
+textarea.lockta:focus{box-shadow:none!important;outline:none}
 /* products: category tabs, chips and row actions */
 .ptabs{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 12px}
 .ptabs.mini{padding:0;margin:8px 0}
@@ -1941,10 +1944,10 @@ function viewEditor(main, d, isEdit){
           <div class="fld"><label for="g-td">Received on</label><input id="g-td" type="date" data-g="toDate" value="${esc(g.toDate)}"></div>
           <div class="fld span4 dim">${S.settings.signDelivery ? 'Your saved signature is placed on the "Delivered by" line. Change it in Settings → Signature.' : 'The "Delivered by" line is left blank to sign by hand. Turn on your saved signature in Settings → Signature.'}</div>
         </div></section>`; })() : ''}
-      <section class="panel"><h2>${isDN ? 'Delivery wording' : 'Terms & conditions'}</h2>
+      <section class="panel"><h2>${isDN ? 'Delivery wording' : 'Terms & conditions'} <button type="button" class="btn sm" id="t-edit" aria-pressed="false">✎ Edit</button></h2>
         <div class="fgrid two">
-          ${isDN ? `<div class="fld span4"><label for="f-msg">Confirmation text</label><textarea id="f-msg" data-f="message" rows="3">${esc(d.message)}</textarea></div>`
-                 : `<div class="fld span4"><label for="f-terms">One term per line</label><textarea id="f-terms" data-f="terms" rows="4">${esc(d.terms)}</textarea></div>
+          ${isDN ? `<div class="fld span4"><label for="f-msg">Confirmation text</label><textarea id="f-msg" class="lockta" data-f="message" rows="3" readonly>${esc(d.message)}</textarea><span class="hint t-lockhint">Locked to avoid mistakes. Click <b>Edit</b> to change it for this delivery note.</span></div>`
+                 : `<div class="fld span4"><label for="f-terms">One term per line</label><textarea id="f-terms" class="lockta" data-f="terms" rows="4" readonly>${esc(d.terms)}</textarea><span class="hint t-lockhint">Locked to avoid mistakes. Click <b>Edit</b> to change the terms for this ${T.label.toLowerCase()}.</span></div>
                     <div class="fld"><label for="f-disc">Discount (optional)</label><div class="dpick"><input id="f-disc" type="number" min="0" step="0.01" data-f="discount" value="${esc(d.discount || '')}" placeholder="None" style="flex:1;width:auto"><select data-f="discountType" aria-label="Discount type" style="flex:none;width:92px"><option value="pct" ${d.discountType !== 'amt' ? 'selected' : ''}>%</option><option value="amt" ${d.discountType === 'amt' ? 'selected' : ''}>MVR</option></select></div><span class="hint">Leave empty for no discount. Taken off before GST.</span></div>
                     <div class="fld"><label for="f-tax">GST / tax (%)</label><input id="f-tax" type="number" min="0" step="0.01" data-f="taxRate" value="${esc(d.taxRate||0)}"><span class="hint">Leave at 0 if you don't charge tax. The row is hidden when 0.</span></div>`}
         </div>
@@ -2004,7 +2007,7 @@ function viewEditor(main, d, isEdit){
       d[el.dataset.f] = el.value;
       if (el.dataset.f === 'number') d._auto = false;
       if ((el.dataset.f === 'validDays' && d.type === 'quotation') || (el.dataset.f === 'dueDays' && d.type === 'invoice')){
-        d.terms = syncTermDays(d.terms, d.type, el.value); const ta = $('#f-terms'); if (ta) ta.value = d.terms;
+        d.terms = syncTermDays(d.terms, d.type, el.value); const ta = $('#f-terms'); if (ta){ ta.value = d.terms; fitT(); }
       }
       if (el.dataset.f === 'date' && d._auto && !isEdit){ d.number = nextNumber(d.type, d.date); $('#f-number').value = d.number; }
       if (['taxRate','discount','discountType'].includes(el.dataset.f)) drawTotals();
@@ -2036,6 +2039,16 @@ function viewEditor(main, d, isEdit){
     custNote(); if (v === '__new') $('#f-cname').focus();
   });
   islandPicker($('#ibody'));
+  // Terms / delivery wording: locked until Edit (the number of days above still updates the wording automatically)
+  const tbox = $('#f-terms') || $('#f-msg');
+  const fitT = () => { tbox.style.height = 'auto'; tbox.style.height = (tbox.scrollHeight + 2) + 'px'; };
+  fitT(); tbox.addEventListener('input', fitT);
+  $('#t-edit').addEventListener('click', e => {
+    const on = tbox.readOnly; tbox.readOnly = !on; tbox.classList.toggle('lockta', !on);
+    e.currentTarget.textContent = on ? '🔒 Lock' : '✎ Edit'; e.currentTarget.setAttribute('aria-pressed', on);
+    tbox.parentNode.querySelector('.t-lockhint').hidden = on;
+    if (on){ tbox.focus(); tbox.setSelectionRange(tbox.value.length, tbox.value.length); } fitT();
+  });
   // Description box: pick a saved product to fill the line (not for boat trips, where the description is the cargo)
   const fillLine = (it, p) => ({...it, desc: p.name || '', unit: p.unit || it.unit || '', qty: num(it.qty) ? it.qty : '1', rate: isDN ? (it.rate || '') : String(p.rate ?? '')});
   const focusQty = i => { const qty = $('#ibody').querySelector(`[data-i="${i}"][data-k="qty"]`); if (qty){ qty.focus(); qty.select(); } };
