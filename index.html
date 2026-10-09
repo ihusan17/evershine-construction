@@ -222,6 +222,9 @@ table.list.prods tr.picked,table.list.prods tr.picked td{background:var(--brand-
 .ipop .ip-list .grp .chev{font-style:normal;color:var(--muted);margin-left:6px;font-size:12px}
 .ipop .ip-list .kids{margin:0 0 4px 12px;padding-left:6px;border-left:2px solid var(--brand-soft)}
 .ipop .ip-list .opt small{font-size:11.5px}
+.ipop.pdrop .opt.prod .pn{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.ipop.pdrop .opt.prod small{white-space:nowrap}
+.ipop.pdrop .pcat{font-size:10.5px;padding:1px 7px}
 .ipop .ip-list .new,.ipop .ip-list .add{color:var(--brand);font-weight:600}
 .ipop .ip-list .addto{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:4px 10px 8px;font-size:12.5px}
 .ipop .ip-list .addto .chip{border:1px solid var(--brand);color:var(--brand);border-radius:999px;padding:2px 9px;font-weight:600;cursor:pointer}
@@ -1099,6 +1102,46 @@ const atollItems = a => [...a.islands.map(v => ({v})), ...customPlaces().filter(
 const placeId = n => 'p-' + (n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || Date.now().toString(36));
 // Dropdown for From / Stops / To: islands grouped under their atoll (tap the atoll to open it), saved custom places,
 // and typing searches everything or saves a new custom name. In Stops every tap adds the next stop (1st, 2nd, …).
+// Dropdown of saved products under a line's Description box: typing filters it, a click (or ↑/↓ + Enter) fills the line.
+// Free typing still works; the list hides when nothing matches. opts.on(el) says whether a box gets it, opts.pick(i, product) fills line i.
+function productDrop(box, opts){
+  let pop = null, inp = null, act = 0, hits = [];
+  const close = () => { if (pop) pop.remove(); pop = null; inp = null; };
+  const place = () => { const r = inp.getBoundingClientRect(), w = Math.min(Math.max(r.width, 300), innerWidth - 16);
+    pop.style.width = w + 'px'; pop.style.left = (Math.max(8, Math.min(r.left, innerWidth - w - 8)) + scrollX) + 'px'; pop.style.top = (r.bottom + scrollY + 4) + 'px'; };
+  const draw = kb => {
+    const q = inp.value.trim().toLowerCase(), list = products();
+    hits = list.filter(p => !q || [p.name, p.unit, (catOf(p) || {}).name].some(x => (x || '').toLowerCase().includes(q))).slice(0, 80);
+    if (!hits.length || (hits.length === 1 && (hits[0].name || '').trim().toLowerCase() === q)){ pop.hidden = true; return; }
+    pop.hidden = false; act = Math.min(act, hits.length - 1);
+    pop.innerHTML = `<div class="ip-hint dim">${q ? 'Matching products' : 'Your products'} · click one to fill this line</div><div class="ip-list" role="listbox">`
+      + hits.map((p, i) => { const c = catOf(p), meta = [p.unit, opts.rates && String(p.rate ?? '') !== '' ? 'MVR ' + money(num(p.rate)) : ''].filter(Boolean).join(' · ');
+        return `<div class="opt prod${i === act ? ' act' : ''}" role="option" data-nav data-i="${i}"><span class="pn">${esc(p.name)}${c ? ` <span class="pcat" style="--c:${catColor(c)}">${esc(c.name)}</span>` : ''}</span><small class="dim">${esc(meta)}</small></div>`; }).join('') + '</div>';
+    place();
+    if (kb){ const a = pop.querySelector('.act'); if (a) a.scrollIntoView({block:'nearest'}); }
+  };
+  const pick = p => { const i = +inp.dataset.i; close(); opts.pick(i, p); };
+  const open = el => {
+    if (!products().length) return;
+    if (pop && inp === el) return; close(); inp = el; act = 0;
+    pop = document.createElement('div'); pop.className = 'ipop pdrop'; document.body.appendChild(pop);
+    pop.addEventListener('mousedown', e => e.preventDefault());   // keep the cursor in the box
+    pop.addEventListener('click', e => { const o = e.target.closest('[data-i]'); if (o && inp) pick(hits[+o.dataset.i]); });
+    draw();
+  };
+  const isDesc = el => el && el.matches && el.matches('textarea[data-k="desc"]') && opts.on(el);
+  box.addEventListener('focusin', e => { if (isDesc(e.target)) open(e.target); });
+  box.addEventListener('click', e => { if (isDesc(e.target) && !pop) open(e.target); });
+  box.addEventListener('focusout', e => { if (e.target === inp) setTimeout(() => { if (inp && document.activeElement !== inp) close(); }, 120); });
+  box.addEventListener('input', e => { if (pop && e.target === inp){ act = 0; draw(true); } });
+  box.addEventListener('keydown', e => {
+    if (!pop || e.target !== inp || pop.hidden) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); act = (act + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length; draw(true); }
+    else if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); pick(hits[act]); }
+    else if (e.key === 'Escape'){ e.preventDefault(); pop.hidden = true; }
+  });
+  addEventListener('resize', () => { if (pop && !pop.hidden) place(); });
+}
 function islandPicker(box){
   let pop = null, inp = null, act = 0, openG = null;
   const SEP = /(?:,|;|→|->|–|—|-|\n)\s*$/;
@@ -2010,6 +2053,13 @@ function viewEditor(main, d, isEdit){
   $('#pq').addEventListener('input', drawPicker);
   $('#pcat').addEventListener('click', e => { const b = e.target.closest('[data-pc]'); if (b){ pickCat = b.dataset.pc; drawPicker(); } });
   islandPicker($('#ibody'));
+  // Description box: pick a saved product to fill the line (not for boat trips, where the description is the cargo)
+  productDrop($('#ibody'), {rates: !isDN, on: () => isDN || d.kind !== 'hire', pick: (i, p) => {
+    const it = d.items[i]; if (!it || !p) return;
+    d.items[i] = {...it, desc: p.name || '', unit: p.unit || it.unit || '', qty: num(it.qty) ? it.qty : '1', rate: isDN ? (it.rate || '') : String(p.rate ?? '')};
+    drawItems();
+    const qty = $('#ibody').querySelector(`[data-i="${i}"][data-k="qty"]`); if (qty){ qty.focus(); qty.select(); }
+  }});
   $('#pgrid').addEventListener('click', e => { const b = e.target.closest('[data-pid]'); if (!b) return; const p = plist.find(x => x.id === b.dataset.pid); if (p) addProduct(p); });
   // trip date: a calendar fills the box as dd/mm/yyyy (typing a period like "13–15 Sep" still works)
   const openCal = i => { const pk = $('#ibody').querySelector(`[data-calp="${i}"]`); if (!pk) return;
