@@ -2468,7 +2468,7 @@ function drawPL(pdf){
   });
   font(8.4, false, GREY); y += 6;
   pdf.text(plState.basis === 'cash' ? 'Income = payments received in the period, without GST. Expenses by date.' : 'Income = invoices dated in the period, without GST; paid / credit as received up to today. Voided invoices are left out. Expenses by date.', L, y);
-  return pdfFooter(pdf, k, y + 4, 'report', 'Profit & Loss');
+  return y;   // internal report: no thank-you line or contact footer
 }
 // Monthly expenses: a ticked expense starts a series (rid = the first one's id). Each new month the latest of a series that is
 // still ticked and not yet added for this month is listed, so it can be added with one click (amounts can be changed first).
@@ -3112,7 +3112,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · PDF follows fold';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · P&L PDF footer removed';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
