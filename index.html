@@ -1539,9 +1539,109 @@ const DV = {
 };
 const TR_SKIP = '.sheet,.sheet-fit,script,style,textarea,input,[data-notr],#rules-text';
 const DV_RX = [[/^(\d+) days?$/, '$1 ދުވަސް'], [/^Custom…$/, 'އެހެން…'], [/^(\d+) selected$/, '$1 ހޮވިފައި']];
+// more Dhivehi: help lines, settings, reports, notifications
+Object.assign(DV, {
+  'Saved in this browser only':'މި ބްރައުޒަރުގައި ސޭވްކޮށްފައި', 'Not yet marked as delivered':'އަދި ޑެލިވަރ ކުރިކަމަށް ނުޖަހާ',
+  'Create':'އައުކޮށް ހަދާ', 'Switch to dark theme':'އަނދިރި ތީމަށް', 'Switch to light theme':'އަލި ތީމަށް', 'Account':'އެކައުންޓް', 'Light theme':'އަލި ތީމް', 'Dark theme':'އަނދިރި ތީމް', 'Follow this device':'ޑިވައިސްގެ ސެޓިންގ',
+  'Project / PO':'ޕްރޮޖެކްޓް / PO', 'Quick preview':'އަވަސް ބެލުން', 'Change status':'ހާލަތު ބަދަލުކުރޭ', 'days':'ދުވަސް', 'day':'ދުވަސް',
+  'Delivered this month':'މިމަހު ޑެލިވަރ ކުރި', 'Quantity to deliver':'ޑެލިވަރ ކުރަންޖެހޭ އަދަދު', 'across pending notes':'ބާކީ ނޯޓުތަކުގައި', 'Deliver to':'ޑެލިވަރ ކުރާނީ',
+  'Name A–Z':'ނަން A–Z', 'Owes most':'އެންމެ ގިނައިން ބާކީ', 'Invoiced most':'އެންމެ ގިނައިން އިންވޮއިސް ކުރި', 'Most recent':'އެންމެ ފަހުން',
+  'Rate (MVR)':'ރޭޓް (MVR)', 'No products yet. Add one, or import the items you used in past documents.':'އަދި މުދަލެއް ނެތް. އެއް އިތުރުކުރޭ، ނުވަތަ ކުރީގެ ޑޮކިއުމަންޓްތަކުގައި ބޭނުންކުރި އައިޓަމްތައް އިމްޕޯޓްކުރޭ.',
+  'Sales are invoices issued (incl. GST), by invoice date. Voided invoices are left out.':'ވިއްކުމަކީ ދޫކުރި އިންވޮއިސްތައް (GST އާއެކު)، އިންވޮއިސްގެ ތާރީޚުން. ބާޠިލް އިންވޮއިސްތައް ނުހިމެނޭ.',
+  'Last 12 months':'ފަހުގެ 12 މަސް', 'This year':'މިއަހަރު', 'Last year':'ފާއިތުވި އަހަރު', '12 months':'12 މަސް', 'Collected':'ލިބުނު', 'Monthly sales and expenses':'މަހުން މަހަށް ވިއްކުމާއި ޚަރަދު',
+  'Total':'ޖުމްލަ', 'Top customers by sales':'އެންމެ ގިނައިން ގަތް ކަސްޓަމަރުން', 'Expenses by category':'ބާވަތުން ޚަރަދު', 'Nothing in this period.':'މި މުއްދަތުގައި އެއްވެސް އެއްޗެއް ނެތް.',
+  "Costs of running the business. Link a cost to a job to see that job's profit.":'ވިޔަފާރި ހިންގުމުގެ ޚަރަދު. މަސައްކަތެއްގެ ފައިދާ ބަލަން ޚަރަދު އެ މަސައްކަތާ ގުޅާލާ.',
+  'All months':'ހުރިހާ މަހެއް', 'All categories':'ހުރިހާ ބާވަތެއް', 'Materials':'މެޓީރިއަލް', 'Fuel':'ތެޔޮ', 'Labour':'މަސައްކަތު ޚަރަދު', 'Boat maintenance':'ބޯޓު މަރާމާތު', 'Transport & freight':'ދަތުރާއި ފްރައިޓް',
+  'Salaries':'މުސާރަ', 'Rent':'ކުލި', 'Utilities':'ކަރަންޓާއި ފެން', 'Equipment':'ސާމާނު', 'Office':'އޮފީސް', 'Other':'އެހެނިހެން',
+  'No expenses yet. Add fuel, materials, labour and other costs to see your profit.':'އަދި ޚަރަދެއް ނެތް. ފައިދާ ބަލަން ތެޔޮ، މެޓީރިއަލް، މަސައްކަތު ޚަރަދާއި އެހެން ޚަރަދުތައް އިތުރުކުރޭ.',
+  'Search description, supplier or job':'ތަފްޞީލު، ސަޕްލަޔަރު ނުވަތަ މަސައްކަތް ހޯދާ', 'Search number, customer, project, PO, item or island':'ނަންބަރު، ކަސްޓަމަރު، ޕްރޮޖެކްޓް، PO، އައިޓަމް ނުވަތަ ރަށް ހޯދާ',
+  'These details print on every new document. Tap a section to see it, then':'ކޮންމެ އައު ޑޮކިއުމަންޓެއްގައި މި މަޢުލޫމާތު ޗާޕުވާނެ. ބަލަން ސެކްޝަނަކަށް ފިތާލާ، ދެން ބަދަލުކުރަން', 'to change it.':'އަށް ފިތާލާ.',
+  'Locked so nothing changes by mistake.':'ގޯހުން ބަދަލުނުވުމަށް ތަޅުލާފައި.', 'Company name':'ކުންފުނީގެ ނަން', 'Bank name':'ބޭންކުގެ ނަން', 'Account number':'އެކައުންޓް ނަންބަރު', 'Account name':'އެކައުންޓްގެ ނަން',
+  'Boat name (for hire documents)':'ބޯޓުގެ ނަން (ހަޔަރ ޑޮކިއުމަންޓްތަކަށް)', 'Used for the project line, e.g. VESSEL HIRE (REHENDHI)':'ޕްރޮޖެކްޓް ލައިނަށް، މިސާލު VESSEL HIRE (REHENDHI)',
+  'Number prefix':'ނަންބަރުގެ ފުރަތަމަ ބައި', 'Quotes valid for':'ކޯޓޭޝަން ޞައްޙަ މުއްދަތު', 'Invoices due in':'އިންވޮއިސް ދައްކަންޖެހޭ މުއްދަތު',
+  'Next quotation number':'ދެން އަންނަ ކޯޓޭޝަން ނަންބަރު', 'Next invoice number':'ދެން އަންނަ އިންވޮއިސް ނަންބަރު', 'Next delivery note number':'ދެން އަންނަ ޑެލިވަރީ ނޯޓު ނަންބަރު',
+  'Next numbers: leave empty to simply continue after your last document. A number you set here is used for the next new document this year (it never goes below a number already used).':'ދެން އަންނަ ނަންބަރު: ހުސްކޮށް ބާއްވައިފިނަމަ ފަހު ޑޮކިއުމަންޓަށް ފަހުން ކުރިއަށް ދާނެ. މިތަނުގައި ޖަހާ ނަންބަރު މިއަހަރުގެ ދެން އަންނަ ޑޮކިއުމަންޓަށް ބޭނުންކުރެވޭނެ (ބޭނުންކުރެވިފައިވާ ނަންބަރަކަށްވުރެ ދަށަކަށް ނުދާނެ).',
+  'Your signature':'ތިބާގެ ސޮއި', 'Draw signature':'ސޮއި ކުރަހާ', 'Upload image…':'ފޮޓޯ އަޕްލޯޑް ކުރޭ…', 'Adjust size & background':'ސައިޒާއި ފަހަތް ބަދަލުކުރޭ', 'Use default':'ޑިފޯލްޓް ބޭނުންކުރޭ',
+  'Use a clear photo or scan on white paper, or draw with your finger or mouse. Click Save to keep it.':'ހުދު ކަރުދާހެއްގައި ސާފު ފޮޓޯއެއް ނުވަތަ ސްކޭނެއް ބޭނުންކުރޭ، ނުވަތަ އިނގިލިން ނުވަތަ މައުސްއިން ކުރަހާ. ބަހައްޓަން ސޭވް އަށް ފިތާލާ.',
+  'Signature on delivery notes':'ޑެލިވަރީ ނޯޓުގައި ސޮއި', 'Place on the "Delivered by" line':'"Delivered by" ލައިނުގައި ޖަހާ', 'Leave blank to sign by hand':'އަތުން ސޮއިކުރަން ހުސްކޮށް ބާއްވާ',
+  'Signature on quotations & invoices':'ކޯޓޭޝަނާއި އިންވޮއިސްގައި ސޮއި', 'Place on the "Authorised signature" line':'"Authorised signature" ލައިނުގައި ޖަހާ', 'Your name (printed under your signature)':'ތިބާގެ ނަން (ސޮއިގެ ދަށުގައި ޗާޕުވާ)',
+  'Shown under "Authorised signature" on quotations and invoices, and filled in as "Delivered by" on new delivery notes.':'ކޯޓޭޝަނާއި އިންވޮއިސްގައި "Authorised signature" ގެ ދަށުގައި ފެންނާނެ، އަދި އައު ޑެލިވަރީ ނޯޓުތަކުގައި "Delivered by" ގައި ލިޔެވޭނެ.',
+  'Quotation terms (one per line)':'ކޯޓޭޝަންގެ ޝަރުޠުތައް (ކޮންމެ ލައިނެއްގައި އެކެއް)', 'Invoice terms (one per line)':'އިންވޮއިސްގެ ޝަރުޠުތައް (ކޮންމެ ލައިނެއްގައި އެކެއް)',
+  'Delivery note confirmation':'ޑެލިވަރީ ނޯޓުގެ ޔަޤީންކުރުން', 'Delivery note reminder':'ޑެލިވަރީ ނޯޓުގެ ހަނދާންކޮށްދިނުން', 'Footer line':'ފޫޓަރ ލައިން',
+  'Changing wording here affects new documents only. Existing documents keep the terms they were saved with.':'މިތަނުގައި ބަދަލުކުރާ ލިޔުން އަސަރުކުރާނީ އައު ޑޮކިއުމަންޓްތަކަށް. ކުރިން ހެދި ޑޮކިއުމަންޓްތަކުގައި ސޭވްކުރި ޝަރުޠުތައް ބާކީ ހުންނާނެ.',
+  'Works when the portal is connected to Firebase':'ޕޯޓަލް Firebase އާ ގުޅިފައިވާއިރު މަސައްކަތްކުރާނެ', 'The team list works when the portal is connected to Firebase.':'ޓީމް ލިސްޓު މަސައްކަތްކުރާނީ ޕޯޓަލް Firebase އާ ގުޅިފައިވާއިރު.',
+  'Built-in font · upload Faruma to use it for Dhivehi text':'ބިލްޓްއިން ފޮންޓް · ދިވެހި ލިޔުމަށް ފަރުމާ އަޕްލޯޑް ކުރޭ',
+  'Dhivehi (Thaana) text on your documents uses this font, on screen and in the PDF. Upload':'ޑޮކިއުމަންޓްތަކުގެ ދިވެހި (ތާނަ) ލިޔުމަށް، ސްކްރީނާއި PDF ގައި މި ފޮންޓް ބޭނުންކުރެވޭނެ. އަޕްލޯޑް ކުރޭ',
+  'from your computer (Windows: open':'ކޮމްޕިއުޓަރުން (Windows: ހުޅުވާ', ', copy Faruma to the desktop, then choose it here).':'، ފަރުމާ ޑެސްކްޓޮޕަށް ކޮޕީކޮށް، ދެން މިތަނުން ހޮވާ).',
+  'Upload font (.ttf)…':'ފޮންޓް އަޕްލޯޑް ކުރޭ (.ttf)…', 'Use built-in font':'ބިލްޓްއިން ފޮންޓް ބޭނުންކުރޭ', 'Using the built-in font. Click Save to keep a change.':'ބިލްޓްއިން ފޮންޓް ބޭނުންކުރެވެނީ. ބަދަލު ބަހައްޓަން ސޭވް އަށް ފިތާލާ.',
+  'Download a backup, restore one, or sign out':'ބެކަޕް ޑައުންލޯޑް ކުރޭ، ރީސްޓޯ ކުރޭ، ނުވަތަ ސައިން އައުޓް ވޭ',
+  'Download every quotation, invoice, delivery note, customer and setting as one file. Keep it as a backup, or restore it into another copy of this portal (for example your own website).':'ހުރިހާ ކޯޓޭޝަނެއް، އިންވޮއިހެއް، ޑެލިވަރީ ނޯޓެއް، ކަސްޓަމަރެއް އަދި ސެޓިންގެއް އެއް ފައިލެއްގެ ގޮތުގައި ޑައުންލޯޑް ކުރޭ. ބެކަޕެއްގެ ގޮތުގައި ބަހައްޓާ، ނުވަތަ މި ޕޯޓަލްގެ އެހެން ކޮޕީއަކަށް ރީސްޓޯ ކުރޭ.',
+  'Days':'ދުވަސް', 'Automatic':'އޮޓޮމެޓިކް',
+  'No payments recorded yet.':'އަދި ފައިސާއެއް ރެކޯޑު ކޮށްފައެއް ނެތް.', 'No costs linked yet. Add fuel, materials or labour for this job to see its profit.':'އަދި ޚަރަދެއް ގުޅާފައެއް ނެތް. ފައިދާ ބަލަން މި މަސައްކަތުގެ ތެޔޮ، މެޓީރިއަލް ނުވަތަ މަސައްކަތު ޚަރަދު އިތުރުކުރޭ.',
+  'Costs':'ޚަރަދު', 'Duplicate':'ކޮޕީ ހަދާ', 'Void invoice':'އިންވޮއިސް ބާޠިލް ކުރޭ', 'Void quotation':'ކޯޓޭޝަން ބާޠިލް ކުރޭ', 'Void delivery note':'ޑެލިވަރީ ނޯޓު ބާޠިލް ކުރޭ',
+  "Documents can't be deleted. Void it instead to keep the record.":'ޑޮކިއުމަންޓް ފޮހެލެވޭކަށް ނެތް. ރެކޯޑު ބަހައްޓަން ބާޠިލް ކުރޭ.',
+  'Email the PDF':'PDF އީމެއިލް ކުރޭ', 'Send the PDF on Telegram':'PDF ޓެލެގްރާމްގައި ފޮނުވާ', 'Send the PDF on Viber':'PDF ވައިބަރގައި ފޮނުވާ', 'Show a PAID stamp on this invoice':'މި އިންވޮއިހުގައި PAID ސްޓޭމްޕް ދައްކާ', 'Remove payment':'ފައިސާ ފޮހެލާ',
+  'Valid until':'ޞައްޙަ ތާރީޚު', 'Convert to invoice':'އިންވޮއިހަކަށް ހަދާ', 'Mark as sent':'ފޮނުވިކަމަށް ޖަހާ', 'Mark as accepted':'ގަބޫލުކުރިކަމަށް ޖަހާ', 'Mark as rejected':'ގަބޫލުނުކުރިކަމަށް ޖަހާ',
+  'Estimated profit':'ލަފާކުރާ ފައިދާ', 'Total quantity':'ޖުމްލަ އަދަދު', 'Mark as delivered':'ޑެލިވަރ ކުރިކަމަށް ޖަހާ',
+  'Fill in the details, then save. You can print or download it afterwards.':'މަޢުލޫމާތު ފުރިހަމަކޮށް ސޭވް ކުރޭ. ފަހުން ޕްރިންޓް ނުވަތަ ޑައުންލޯޑް ކުރެވޭނެ.',
+  'Itemised lines with unit, quantity and rate':'ޔުނިޓް، އަދަދާއި ރޭޓާއެކު އައިޓަމް ލައިންތައް', 'Boat hire (':'ބޯޓު ހަޔަރ (', 'Boat hire':'ބޯޓު ހަޔަރ',
+  'Trips with loading and unloading points and an amount':'ލޯޑް ކުރާ އަދި ބާލާ ތަންތަނާއި އަގާއެކު ދަތުރުތައް', 'Invoice #':'އިންވޮއިސް #', 'Quotation #':'ކޯޓޭޝަން #', 'Delivery Note #':'ޑެލިވަރީ ނޯޓު #',
+  'Locked to avoid mistakes. Click':'ގޯސްވުމުން ރައްކާވުމަށް ތަޅުލާފައި. ޝަރުޠު ބަދަލުކުރަން',
+  'Leave empty for no discount. Taken off before GST.':'ޑިސްކައުންޓް ނެތްނަމަ ހުސްކޮށް ބާއްވާ. GST ގެ ކުރިން އުނިކުރެވޭ.', "Leave at 0 if you don't charge tax. The row is hidden when 0.":'ޓެކްސް ނުނަގާނަމަ 0 ގައި ބާއްވާ. 0 ނަމަ ރޯ ނުފެންނާނެ.',
+  'Numbers are given automatically':'ނަންބަރު ދެވެނީ އޮޓޮމެޓިކުން', 'Optional, e.g. VESSEL HIRE (REHENDHI)':'އިޚްތިޔާރީ، މިސާލު VESSEL HIRE (REHENDHI)', 'Remove line':'ލައިން ފޮހެލާ',
+  'Trips / hire charges':'ދަތުރު / ހަޔަރ ޗާޖު', 'From':'ފެށޭ ތަން', '(optional)':'(އިޚްތިޔާރީ)', 'Stops':'މެދު ތަންތަން', 'To':'ނިމޭ ތަން', '⇄ Return trip':'⇄ އެނބުރި ދަތުރު',
+  'Islands in between, separated by commas or dashes':'މެދުގައި ހުރި ރަށްތައް، ކޮމާ ނުވަތަ ޑޭޝްއިން ވަކިކޮށް', 'Return trip: the boat comes back to the From island':'އެނބުރި ދަތުރު: ބޯޓު ފެށި ރަށަށް އެނބުރި އަންނާނެ', 'Pick a date':'ތާރީޚެއް ހޮވާ',
+  'Changes here apply to this document only. Edit the saved customer under Customers.':'މިތަނުގެ ބަދަލުތައް ހިނގާނީ މި ޑޮކިއުމަންޓަށް އެކަނި. ސޭވްކުރި ކަސްޓަމަރު ބަދަލުކުރަން ކަސްޓަމަރުން ޕޭޖަށް ދޭ.',
+  'No notifications yet.':'އަދި ނޮޓިފިކޭޝަނެއް ނެތް.', 'No documents yet.':'އަދި ޑޮކިއުމަންޓެއް ނެތް.', 'Create your first quotation':'ފުރަތަމަ ކޯޓޭޝަން ހަދާ', 'Create one':'އެކެއް ހަދާ',
+  'No matches. Try a different search or filter.':'އެއްވެސް އެއްޗެއް ނުފެނުނު. އެހެން ގޮތަކަށް ހޯދާ.', 'No customer has a credit.':'ކްރެޑިޓް ހުރި ކަސްޓަމަރެއް ނެތް.', 'No customer owes money.':'ފައިސާ ބާކީ ކަސްޓަމަރެއް ނެތް.',
+  'No customers match. Try a different search or filter.':'އެއްވެސް ކަސްޓަމަރެއް ނުފެނުނު. އެހެން ގޮތަކަށް ހޯދާ.', 'No customers yet.':'އަދި ކަސްޓަމަރެއް ނެތް.', 'No expenses match.':'އެއްވެސް ޚަރަދެއް ނުފެނުނު.', 'No products match.':'އެއްވެސް މުދަލެއް ނުފެނުނު.',
+  "That page doesn't exist or the document was deleted.":'އެ ޕޭޖެއް ނެތް، ނުވަތަ ޑޮކިއުމަންޓް ފޮހެލާފައި.', 'Go to the overview':'އޯވަވިއުއަށް ދާ',
+  'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
+});
+const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
+Object.keys(DV_MON).forEach(m => { DV_MON[m.slice(0, 3)] = DV_MON[m]; }); DV_MON.Sept = DV_MON.September;
+const DV_DAY = {Monday:'ހޯމަ', Tuesday:'އަންގާރަ', Wednesday:'ބުދަ', Thursday:'ބުރާސްފަތި', Friday:'ހުކުރު', Saturday:'ހޮނިހިރު', Sunday:'އާދިއްތަ'};
+const DV_TYPE = {quotation:'ކޯޓޭޝަން', invoice:'އިންވޮއިސް', 'delivery note':'ޑެލިވަރީ ނޯޓު', Quotation:'ކޯޓޭޝަން', Invoice:'އިންވޮއިސް', 'Delivery note':'ޑެލިވަރީ ނޯޓު'};
+const MON_RX = 'January|February|March|April|May|June|July|August|September|October|November|December|Sept|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+const DV_DATE = new RegExp(`\\b(\\d{1,2}) (${MON_RX})\\b`, 'g');
+const dvAmt = '([\\d,]+(?:\\.\\d+)?)';
+DV_RX.push(
+  [new RegExp(`^Overdue by (\\d+) days? · MVR ${dvAmt} due$`), '$1 ދުވަސް ލަސްވެފައި · ބާކީ MVR $2'],
+  [/^Overdue by (\d+) days?$/, '$1 ދުވަސް ލަސްވެފައި'],
+  [new RegExp(`^Payment due today · MVR ${dvAmt}$`), 'މިއަދު ދައްކަންޖެހޭ · MVR $1'],
+  [new RegExp(`^Payment due in (\\d+) days? · MVR ${dvAmt}$`), '$1 ދުވަހުން ދައްކަންޖެހޭ · MVR $2'],
+  [/^Quote expires today · no reply recorded$/, 'މިއަދު ހަމަވާނެ · ޖަވާބެއް ނުލިބޭ'],
+  [/^Quote expires in (\d+) days? · no reply recorded$/, '$1 ދުވަހުން ހަމަވާނެ · ޖަވާބެއް ނުލިބޭ'],
+  [/^(\d+) paid invoices?$/, '$1 ދައްކާފައިވާ އިންވޮއިސް'], [/^(\d+) invoices?$/, '$1 އިންވޮއިސް'], [/^(\d+) quotations?$/, '$1 ކޯޓޭޝަން'],
+  [/^(\d+) waiting for a reply$/, '$1 ޖަވާބަށް އިންތިޒާރުގައި'], [/^delivery notes? pending$/, 'ޑެލިވަރީ ނޯޓު ބާކީ'],
+  [new RegExp(`^${dvAmt} collected$`), '$1 ލިބިފައި'], [/^within (\d+) days$/, '$1 ދުވަހުގެ ތެރޭގައި'], [/^(\d+) decided$/, '$1 ނިންމާފައި'],
+  [new RegExp(`^(\\d+) shown · MVR ${dvAmt} · ${dvAmt} unpaid$`), '$1 ފެންނަނީ · MVR $2 · $3 ނުދައްކާ'],
+  [new RegExp(`^(\\d+) shown · MVR ${dvAmt}$`), '$1 ފެންނަނީ · MVR $2'], [/^(\d+) shown$/, '$1 ފެންނަނީ'],
+  [/^([\d.,]+) qty$/, '$1 އަދަދު'], [/^(\d+)% of sales$/, 'ވިއްކުމުގެ $1%'],
+  [new RegExp(`^(\\d+) saved · MVR ${dvAmt} owed\\..*$`), '$1 ކަސްޓަމަރުން · MVR $2 ބާކީ. އާ މީހަކަށް ޑޮކިއުމަންޓެއް ހަދާއިރު ކަސްޓަމަރު އަމިއްލައަށް އިތުރުވޭ.'],
+  [/^(\d+) products?\..*$/, '$1 މުދާ. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
+  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'],
+  [/^No (quotations|invoices|delivery notes) yet\.$/, (m, t) => 'އަދި ' + ({quotations:'ކޯޓޭޝަނެއް', invoices:'އިންވޮއިހެއް', 'delivery notes':'ޑެލިވަރީ ނޯޓެއް'})[t] + ' ނެތް.'], [/^Total \((\d+)\)$/, 'ޖުމްލަ ($1)'],
+  [/^New (quotation|invoice|delivery note) (\S+)$/, (m, t, n) => 'އައު ' + DV_TYPE[t] + ' ' + n],
+  [/^Payment received · (\S+)$/, 'ފައިސާ ލިބިއްޖެ · $1'], [/^(\S+) is paid in full$/, '$1 ފުރިހަމައަށް ދައްކައިފި'], [/^(\S+) is overdue$/, '$1 ލަސްވެއްޖެ'],
+  [/^(\S+) was voided$/, '$1 ބާޠިލް ކުރެވިއްޖެ'], [/^Quotation (\S+) accepted$/, 'ކޯޓޭޝަން $1 ގަބޫލުކޮށްފި'], [/^(\S+\/\S+) delivered$/, '$1 ޑެލިވަރ ކުރެވިއްޖެ'],
+  [new RegExp(`^MVR ${dvAmt} was due (.+?) · (.*)$`), 'MVR $1 ދައްކަންޖެހުނީ $2 · $3'],
+  [/^(\d+) min ago$/, '$1 މިނެޓް ކުރިން'], [/^(\d+) h ago$/, '$1 ގަޑިއިރު ކުރިން'],
+  [/^Numbers look like (\S+)$/, 'ނަންބަރު ހުންނާނީ $1 ގޮތަށް'], [/^Next: (\S+)$/, 'ދެން: $1'],
+  [/^next (\S+), (\S+), (\S+) · quotes valid (\d+) days · invoices due (\d+) days$/, 'ދެން $1، $2، $3 · ކޯޓޭޝަން $4 ދުވަސް · އިންވޮއިސް $5 ދުވަސް'],
+  [/^(\d+) quotation terms · (\d+) invoice terms · footer (.*)$/, '$1 ކޯޓޭޝަން ޝަރުޠު · $2 އިންވޮއިސް ޝަރުޠު · ފޫޓަރ $3'],
+  [/^Default signature · quotations & invoices: (\w+) · delivery notes: (\w+)$/, (m, a, b) => { const w = x => ({printed:'ޗާޕުވާ', blank:'ހުސް'})[x] || x; return 'ޑިފޯލްޓް ސޮއި · ކޯޓޭޝަނާއި އިންވޮއިސް: ' + w(a) + ' · ޑެލިވަރީ ނޯޓު: ' + w(b); }],
+  [/^Using: (.+)\. Click Save to keep a change\.$/, 'ބޭނުންކުރެވެނީ: $1. ބަދަލު ބަހައްޓަން ސޭވް އަށް ފިތާލާ.'], [/^(.+) · used for Dhivehi on screen and in PDFs$/, '$1 · ސްކްރީނާއި PDF ގައި ދިވެހިއަށް'],
+  [/^Portal version (.+)$/, 'ޕޯޓަލް ވާޝަން $1'], [/^Edit (\S+\/\S+)$/, '$1 އެޑިޓް ކުރޭ'],
+  [/^(Quotation|Invoice|Delivery note) · (Goods|Boat hire)$/, (m, t, k) => DV_TYPE[t] + ' · ' + (k === 'Goods' ? 'މުދާ' : 'ބޯޓު ހަޔަރ')],
+  [/^to change the terms for this .+\.$/, 'އަށް ފިތާލާ.'],
+  [new RegExp(`^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) (\\d{1,2}) (${MON_RX})$`), (m, d, n, mo) => DV_DAY[d] + ' ' + n + ' ' + DV_MON[mo]],
+  [new RegExp(`^(${MON_RX}) (\\d{4})$`), (m, mo, y) => DV_MON[mo] + ' ' + y]
+);
 function trText(t){ const k = t.trim(); if (!k) return null; let v = DV[k];
   if (!v) for (const [rx, to] of DV_RX) if (rx.test(k)){ v = k.replace(rx, to); break; }
-  return v ? t.replace(k, v) : null; }
+  const w = (v || k).replace(DV_DATE, (m, d, mo) => d + ' ' + DV_MON[mo]).replace(/ · by (\S+)$/, ' · $1 ގެ ފަރާތުން');   // dates and "by name" inside any line
+  return w !== k ? t.replace(k, w) : null; }
 function trAttr(el){ ['placeholder', 'title', 'aria-label'].forEach(a => { const v = el.getAttribute && el.getAttribute(a); const n = v && DV[v.trim()]; if (n) el.setAttribute(a, n); }); }
 function translate(root){
   if (LANG !== 'dv' || !root) return;
@@ -2744,7 +2844,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Dhivehi UI v4';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Dhivehi UI v5';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
