@@ -599,7 +599,7 @@ table.list.pl tr.tot td{font-weight:800;border-top:1px solid var(--line)}
 table.list.pl tr.big td{font-weight:800;font-size:16.5px;border-top:2px solid var(--brand);background:var(--surface-2)}
 table.list.pl tr.note td{font-size:12.5px;color:var(--muted)}
 table.list.pl .pct{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
-@media (max-width:560px){table.list.pl .plp{display:none}}
+@media (max-width:560px){table.list.pl .plp{display:none}#plx input{width:152px;padding-left:10px;padding-right:6px;font-size:13.5px}}
 .warnbox2{margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--warn-soft);font-size:14px}
 .costlist{list-style:none;margin:0;padding:0}
 .costlist li{display:flex;justify-content:space-between;gap:8px;padding:9px 18px;border-top:1px solid var(--line);font-size:14px;cursor:pointer}
@@ -1654,6 +1654,7 @@ Object.assign(DV, {
   'This period':'މި މުއްދަތު', 'Same time last year':'ފާއިތުވި އަހަރު މި ދުވަހަށް', 'Year before':'ކުރީ އަހަރު', 'Previous 12 months':'ކުރީގެ 12 މަސް', 'Income':'އާމްދަނީ', 'Cost of sales':'ވިއްކުމުގެ ޚަރަދު', 'Running costs':'ހިންގުމުގެ ޚަރަދު',
   'Goods & materials sales':'މުދާ އަދި ސާމާނު ވިއްކުން', 'Less discounts':'ޑިސްކައުންޓް އުނިކޮށް', 'Total income':'ޖުމްލަ އާމްދަނީ', 'Gross profit':'ޖުމްލަ ފައިދާ', 'No costs recorded':'ޚަރަދެއް ލިޔެވިފައެއް ނެތް',
   'GST collected (owed to MIRA, not income)':'ނެގި GST (MIRA އަށް ދައްކަންޖެހޭ، އާމްދަނީއެއް ނޫން)', 'Profit and loss for the period you pick. Income is counted without GST.':'ހޮވާ މުއްދަތުގެ ފައިދާއާއި ގެއްލުން. އާމްދަނީ ގުނެނީ GST ނުލާ.', 'same as before':'ކުރީގެ ހަމަ',
+  'This month':'މި މަސް', 'Last month':'ފާއިތުވި މަސް', 'Pick a month…':'މަހެއް ހޮވާ…', 'Custom dates…':'އެހެން ތާރީޚުތައް…', 'Previous month':'ކުރީ މަސް', 'Same dates last year':'ފާއިތުވި އަހަރު މި ތާރީޚުތައް', 'to':'އާ ހަމައަށް',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2228,7 +2229,7 @@ function expenseBox(x, preset){
 function viewReports(main, tab){
   const showExp = canEdit();
   main.innerHTML = `<div class="pagehead"><div><h1>Reports</h1><p>${tab === 'pl' ? 'Profit and loss for the period you pick. Income is counted without GST.' : tab === 'expenses' ? 'Costs of running the business. Link a cost to a job to see that job\'s profit.' : 'Sales are invoices issued (incl. GST), by invoice date. Voided invoices are left out.'}</p></div>
-      <div class="row">${tab === 'expenses' ? `<button class="btn primary" id="addx" data-need="edit">${icon('plus',18)}Add expense</button>` : `<select id="rp" class="btn" aria-label="Period"><option value="12m">Last 12 months</option><option value="ty">This year</option><option value="ly">Last year</option></select>`}${tab === 'pl' ? `<div class="seg" id="plb" role="tablist">${[['inv','Invoiced'],['cash','Cash received']].map(([k, l]) => `<button type="button" data-b="${k}" class="${plState.basis === k ? 'on' : ''}">${l}</button>`).join('')}</div><button class="btn" id="plpdf">Download PDF</button>` : ''}</div></div>
+      <div class="row">${tab === 'expenses' ? `<button class="btn primary" id="addx" data-need="edit">${icon('plus',18)}Add expense</button>` : tab === 'pl' ? `<select id="plp" class="btn" aria-label="Period"><option value="tm">This month</option><option value="lm">Last month</option><option value="m">Pick a month…</option><option value="12m">Last 12 months</option><option value="ty">This year</option><option value="ly">Last year</option><option value="custom">Custom dates…</option></select><span class="row" id="plx" style="gap:6px" hidden></span>` : `<select id="rp" class="btn" aria-label="Period"><option value="12m">Last 12 months</option><option value="ty">This year</option><option value="ly">Last year</option></select>`}${tab === 'pl' ? `<div class="seg" id="plb" role="tablist">${[['inv','Invoiced'],['cash','Cash received']].map(([k, l]) => `<button type="button" data-b="${k}" class="${plState.basis === k ? 'on' : ''}">${l}</button>`).join('')}</div><button class="btn" id="plpdf">Download PDF</button>` : ''}</div></div>
     ${showExp ? `<nav class="tabs"><a href="#/reports" class="${tab === 'overview' ? 'on' : ''}">Overview</a><a href="#/reports/pl" class="${tab === 'pl' ? 'on' : ''}">Profit &amp; Loss</a><a href="#/reports/expenses" class="${tab === 'expenses' ? 'on' : ''}">Expenses</a></nav>` : ''}
     ${showExp && S.expensesBlocked ? '<div class="warnbox2"><b>One step left for expenses:</b> the security rules in Firebase need updating. Owner: Settings → Team → Security rules → Copy rules, then paste and Publish in Firebase.</div>' : ''}
     <div id="rbody"></div>`;
@@ -2304,20 +2305,35 @@ function viewReports(main, tab){
    "Cash received": payments received in the period, split into income and GST in the same proportion as their invoice.
    Expenses are always counted by their date. */
 const COS_CATS = ['Materials','Fuel','Labour','Transport & freight'];
-const plState = {basis:'inv'};
+const plState = {basis:'inv', period:'ty', month:'', from:'', to:''};
+const monthEnd = k => { const [y, m] = k.split('-').map(Number); return `${k}-${pad2(new Date(y, m, 0).getDate())}`; };
+const prevMonth = k => { const [y, m] = k.split('-').map(Number), d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
+const yearBack = iso => (+iso.slice(0,4) - 1) + iso.slice(4);
+const cap = iso => iso > todayISO() ? todayISO() : iso;
+// the period picked on the Profit & Loss tab, and the period it is compared with
+function plRange(){
+  const t = todayISO(), tm = t.slice(0,7), p = plState.period;
+  if (p === 'tm'){ const pm = prevMonth(tm), d = t.slice(8); return {from:tm + '-01', to:t, pfrom:pm + '-01', pto:[pm + '-' + d, monthEnd(pm)].sort()[0], prevLabel:'Previous month'}; }
+  if (p === 'lm' || p === 'm'){ const k = p === 'lm' ? prevMonth(tm) : (plState.month || tm), pm = prevMonth(k);
+    return {from:k + '-01', to:cap(monthEnd(k)), pfrom:pm + '-01', pto:monthEnd(pm), prevLabel:'Previous month'}; }
+  if (p === 'custom'){ let f = plState.from || tm + '-01', e = plState.to || t; if (f > e) [f, e] = [e, f];
+    return {from:f, to:e, pfrom:yearBack(f), pto:yearBack(e), prevLabel:'Same dates last year'}; }
+  const m = periodMonths(p);
+  return {from:m[0] + '-01', to:cap(monthEnd(m[m.length - 1])), pfrom:yearBack(m[0] + '-01'), pto:yearBack(cap(monthEnd(m[m.length - 1]))), prevLabel:p === 'ty' ? 'Same time last year' : p === 'ly' ? 'Year before' : 'Previous 12 months'};
+}
 const shiftYear = k => (+k.slice(0,4) - 1) + k.slice(4);
-function plData(months, basis){
-  const set = new Set(months), P = {goods:0, hire:0, disc:0, gst:0, cos:{}, run:{}, src:{goods:[], hire:[], disc:[], gst:[]}, xs:{}};
+function plData(from, to, basis){
+  const inR = iso => !!iso && iso >= from && iso <= to, P = {goods:0, hire:0, disc:0, gst:0, cos:{}, run:{}, src:{goods:[], hire:[], disc:[], gst:[]}, xs:{}};
   Object.values(S.docs).filter(d => d.type === 'invoice' && !isVoid(d)).forEach(d => {
     const tot = total(d); let f = 0;
-    if (basis === 'cash'){ const got = (d.payments || []).filter(p => set.has(ym(p.date || d.date))).reduce((s,p) => s + num(p.amount), 0); f = tot > 0 ? Math.min(got, tot) / tot : 0; }
-    else if (set.has(ym(d.date))) f = 1;
+    if (basis === 'cash'){ const got = (d.payments || []).filter(p => inR(p.date || d.date)).reduce((s,p) => s + num(p.amount), 0); f = tot > 0 ? Math.min(got, tot) / tot : 0; }
+    else if (inR(d.date)) f = 1;
     if (!f) return;
     const k = d.kind === 'hire' ? 'hire' : 'goods', g = subtotal(d) * f, ds = discAmt(d) * f, gs = taxAmt(d) * f;
     P[k] += g; P.disc += ds; P.gst += gs;
     P.src[k].push({d, v:g}); if (ds) P.src.disc.push({d, v:-ds}); if (gs) P.src.gst.push({d, v:gs});
   });
-  expList().filter(x => set.has(ym(x.date))).forEach(x => { const c = x.category || 'Other', b = COS_CATS.includes(c) ? P.cos : P.run;
+  expList().filter(x => inR(x.date)).forEach(x => { const c = x.category || 'Other', b = COS_CATS.includes(c) ? P.cos : P.run;
     b[c] = (b[c] || 0) + num(x.amount); (P.xs[c] = P.xs[c] || []).push(x); });
   const sum = o => Object.values(o).reduce((a, v) => a + v, 0);
   P.income = P.goods + P.hire - P.disc; P.cosT = sum(P.cos); P.runT = sum(P.run); P.gross = P.income - P.cosT; P.net = P.gross - P.runT; P.costs = P.cosT + P.runT;
@@ -2337,16 +2353,11 @@ function plRows(A, B){
   rows.push({big:1, label:'Net profit', v:A.net, p:B.net}, {k:'gst', note:1, label:'GST collected (owed to MIRA, not income)', v:A.gst, p:B.gst});
   return rows;
 }
-function plPeriod(p){
-  const m = periodMonths(p), last = m[m.length - 1], [y, mo] = last.split('-').map(Number);
-  const end = new Date(y, mo, 0).toISOString().slice(0,10) > todayISO() ? todayISO() : `${last}-${pad2(new Date(y, mo, 0).getDate())}`;
-  return {months:m, prev:m.map(shiftYear), from:m[0] + '-01', to:end, prevLabel:p === 'ty' ? 'Same time last year' : p === 'ly' ? 'Year before' : 'Previous 12 months'};
-}
 const chg = (a, b, good) => { if (!b) return ''; const v = Math.round((a - b) / Math.abs(b) * 100); if (!v) return 'same as before';
   return `<span class="${(v > 0) === good ? 'up' : 'dn'}">${v > 0 ? '▲' : '▼'} ${Math.abs(v)}%</span> vs before`; };
 function plTab(main){
   const draw = () => {
-    const per = plPeriod(repState.period), A = plData(per.months, plState.basis), B = plData(per.prev, plState.basis), rows = plRows(A, B);
+    const per = plRange(), A = plData(per.from, per.to, plState.basis), B = plData(per.pfrom, per.pto, plState.basis), rows = plRows(A, B);
     const margin = A.income ? Math.round(A.net / A.income * 100) : 0, pm = B.income ? Math.round(B.net / B.income * 100) : null;
     $('#rbody').innerHTML = `
       <div class="stats">${stat('receipt', money0(A.income), 'MVR', 'Income (excl. GST)', chg(A.income, B.income, true))}${stat('wallet', money0(A.costs), 'MVR', 'Costs', chg(A.costs, B.costs, false), 'warn')}
@@ -2360,8 +2371,15 @@ function plTab(main){
       <p class="dim" style="font-size:13px;margin:12px 2px 0">Tap a line to see the invoices or expenses behind it. ${plState.basis === 'cash' ? 'Cash received: income is the payments received in this period (without GST).' : 'Invoiced: income is the invoices dated in this period, paid or not.'} Expenses count by their date; link them in Reports → Expenses.</p>`;
     $('#rbody').querySelectorAll('tr[data-i]').forEach(tr => tr.addEventListener('click', () => plDrill(rows[+tr.dataset.i], A)));
   };
-  $('#rp').value = repState.period;
-  $('#rp').addEventListener('change', e => { repState.period = e.target.value; draw(); });
+  // period: whole months, a picked month, or any date range
+  const extra = () => { const p = plState.period, t = todayISO();
+    $('#plx').innerHTML = p === 'm' ? `<input type="month" id="plm" class="btn" value="${plState.month || t.slice(0,7)}" max="${t.slice(0,7)}" aria-label="Month">`
+      : p === 'custom' ? `<input type="date" id="plf" class="btn" value="${plState.from || t.slice(0,7) + '-01'}" aria-label="From"><span class="dim">to</span><input type="date" id="plt" class="btn" value="${plState.to || t}" aria-label="To">` : '';
+    $('#plx').hidden = !$('#plx').innerHTML; };
+  $('#plp').value = plState.period; extra();
+  $('#plp').addEventListener('change', e => { plState.period = e.target.value; extra(); draw(); });
+  $('#plx').addEventListener('change', e => { const v = e.target.value; if (!v) return;
+    if (e.target.id === 'plm') plState.month = v; if (e.target.id === 'plf') plState.from = v; if (e.target.id === 'plt') plState.to = v; draw(); });
   $('#plb').addEventListener('click', e => { const b = e.target.closest('[data-b]'); if (!b) return; plState.basis = b.dataset.b; $('#plb').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); draw(); });
   $('#plpdf').addEventListener('click', async e => { const btn = e.currentTarget, l = btn.innerHTML; btn.disabled = true; btn.textContent = 'Preparing PDF…';
     try { const f = await buildPL(); await saveFile(f.name, f.blob); } catch(err){ console.error(err); toast('The PDF could not be created. Try Print, and choose "Save as PDF".'); }
@@ -2383,7 +2401,7 @@ async function buildPL(){
 }
 function drawPL(pdf){
   const k = pdfKit(pdf), {BLUE, INK, GREY, LINE, ZEBRA, WHITE, L, R, CW, BOTTOM, font, txt} = k;
-  const per = plPeriod(repState.period), A = plData(per.months, plState.basis), B = plData(per.prev, plState.basis), rows = plRows(A, B);
+  const per = plRange(), A = plData(per.from, per.to, plState.basis), B = plData(per.pfrom, per.pto, plState.basis), rows = plRows(A, B);
   let y = pdfHeader(pdf, k, 'Profit & Loss', [['Period:', `${fmtDate(per.from)} – ${fmtDate(per.to)}`], ['Basis:', plState.basis === 'cash' ? 'Cash received' : 'Invoiced'], ['Date:', fmtDate(todayISO())]]);
   y += 2;
   const C1 = R - 42, C2 = R - 2.4;
@@ -3017,7 +3035,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Profit & Loss';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · P&L dates';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
