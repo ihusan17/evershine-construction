@@ -160,6 +160,9 @@ table.list .num{text-align:right;font-variant-numeric:tabular-nums;white-space:n
 .filters input{flex:1;min-width:180px}
 .filters select{flex:none;width:auto}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+.cust .tag{margin-left:8px;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;vertical-align:1px;background:var(--surface-2);color:var(--muted)}
+.cust .tag.ck-gov{background:rgba(59,120,190,.14);color:#3b78be}.cust .tag.ck-biz{background:rgba(45,140,85,.14);color:#2d8c55}
+#ckchips{border-right:1px solid var(--line);padding-right:8px}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:4px 12px;font-size:14px;cursor:pointer;font-weight:500}
 .chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 
@@ -639,6 +642,8 @@ body[data-role=viewer] .stbtn{cursor:default} body[data-role=viewer] .stbtn svg{
   table.list.custs .c-bill{grid-area:bill;font-size:12.5px;color:var(--muted)}
   table.list.custs .c-docs{grid-area:docs;font-size:12.5px;color:var(--muted)}
   table.list.custs .c-docs::after{content:attr(data-n)}
+  table.list.custs .m-only{display:inline}
+  table.list.custs .d-only{display:none}
   table.list.custs .c-owed::before,table.list.custs .c-bill::before{content:attr(data-l);font-size:11px;font-weight:600;color:var(--muted)}
   table.list.prods tr{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"name name rate" "cat unit act"}
   table.list.prods.sel tr{grid-template-columns:30px auto minmax(0,1fr) auto;grid-template-areas:"sel name name rate" "sel cat unit act"}
@@ -1133,6 +1138,15 @@ async function newCategory(){
   const c = {id: uid(), name}; await saveSettings({...S.settings, productCats: prodCats().concat(c)}); return c;
 }
 const custList = () => Object.values(S.customers).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+// customer type: Government / Private business / Individual (saved as c.kind; guessed from the name until it is set)
+const CUST_KINDS = [['gov','Government'], ['biz','Private business'], ['person','Individual']];
+const GOV_RX = /\b(corporation limited|fenaka|stelco|mwsc|council|ministry|authority|hospital|school|government|govt|police|mndf|court|commission|university|college|state trading|sto)\b/i;
+const BIZ_RX = /\b(pvt|private|ltd|limited|llc|inc|plc|co|company|enterprises?|investments?|trading|resorts?|hotels?|construction|holdings|group|services|shop|store|marine|travels?|agency)\b/i;
+const custKindGuess = n => GOV_RX.test(n || '') ? 'gov' : BIZ_RX.test(n || '') ? 'biz' : 'person';
+const custKind = c => (c && c.kind) || custKindGuess(c && c.name);
+const kindLabel = k => (CUST_KINDS.find(x => x[0] === k) || ['', ''])[1];
+const kindChips = (list, on) => [['all','All']].concat(CUST_KINDS).map(([k, l]) => { const n = k === 'all' ? list.length : list.filter(c => custKind(c) === k).length;
+  return `<button type="button" class="chip ${on === k ? 'on' : ''}" data-k="${k}">${l}${n ? `<span class="n">${n}</span>` : ''}</button>`; }).join('');
 
 function nextNumber(type, date){
   const T = TYPES[type], yy = (date || todayISO()).slice(2,4);
@@ -1608,6 +1622,7 @@ Object.assign(DV, {
   'Saved':'ސޭވްކޮށްފި', 'Customer saved':'ކަސްޓަމަރު ސޭވްކޮށްފި', 'Customer deleted':'ކަސްޓަމަރު ފޮހެލައިފި', 'Product saved':'މުދާ ސޭވްކޮށްފި', 'Product deleted':'މުދާ ފޮހެލައިފި', 'Expense deleted':'ޚަރަދު ފޮހެލައިފި', 'Payment removed':'ފައިސާ ފޮހެލައިފި',
   'Categories saved':'ބާވަތްތައް ސޭވްކޮށްފި', 'Marked as delivered':'ޑެލިވަރ ކުރިކަމަށް ޖަހައިފި', 'Marked as not delivered':'ޑެލިވަރ ނުކުރާކަމަށް ޖަހައިފި', 'Add a name.':'ނަމެއް ލިޔޭ.', 'Add at least one line.':'މަދުވެގެން އެއް ލައިން ލިޔޭ.', 'Enter an amount above zero.':'ސުމެއްގެ މަތީ ޢަދަދެއް ލިޔޭ.', 'Pick a date.':'ތާރީޚެއް ހޮވާ.',
   'The change could not be saved. Check your connection and try again.':'ބަދަލު ސޭވް ނުވި. ކަނެކްޝަން ބަލައިލާފައި އަލުން ފަށާ.', 'PDF is ready. Tap Email again.':'PDF ތައްޔާރު. އަލުން އީމެއިލް އަށް ފިތާލާ.',
+  'Government':'ސަރުކާރު', 'Private business':'ޕްރައިވެޓް ވިޔަފާރި', 'Individual':'ފަރުދު', 'Type':'ބާވަތް',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2380,6 +2395,7 @@ function viewEditor(main, d, isEdit){
       <section class="panel"><h2>Customer</h2>
         <div class="fgrid two">
           <div class="fld span4"><label for="f-cust">Choose customer</label>
+            <div class="chips" id="f-ck" style="margin-bottom:8px">${kindChips(custs, 'all')}</div>
             <select id="f-cust"><option value="">Select a saved customer…</option>${custs.map(c => `<option value="${esc(c.id)}" ${c.id===d.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}<option value="__new" ${!d.customerId && d.customer?.name ? 'selected':''}>New customer…</option></select></div>
           <div class="fld span4 ccard" id="c-card" hidden></div>
           <div class="fld span4" id="c-fields" hidden><div class="fgrid two" style="padding:0">
@@ -2502,6 +2518,13 @@ function viewEditor(main, d, isEdit){
   });
   $('#c-card').addEventListener('click', e => { if (!e.target.closest('#c-edit')) return; cEdit = true; showCust(); $('#f-cname').focus(); });
   $('#c-done').addEventListener('click', () => { cEdit = false; custNote(); });
+  // type chips above the list: show only government / private business / individuals
+  let ck = 'all';
+  $('#f-ck').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; ck = b.dataset.k;
+    $('#f-ck').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b));
+    const sel = $('#f-cust'), cur = sel.value, list = custs.filter(c => ck === 'all' || custKind(c) === ck || c.id === cur);
+    sel.innerHTML = `<option value="">Select a saved customer…</option>${list.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}<option value="__new">New customer…</option>`;
+    sel.value = cur; sel.focus(); try { sel.showPicker(); } catch(err){} });
   $('#f-cust').addEventListener('change', e => { cEdit = false; cNew = e.target.value === '__new';
     const v = e.target.value;
     if (v && v !== '__new'){ const c = S.customers[v]; d.customerId = v; d.customer = {name:c.name||'', address:c.address||'', phone:c.phone||''}; }
@@ -2578,7 +2601,7 @@ function viewEditor(main, d, isEdit){
     try {
       if (!d.customerId){
         const cid = uid();
-        await put('customers', cid, {name:d.customer.name, address:d.customer.address||'', phone:d.customer.phone||'', email:'', createdAt:new Date().toISOString()});
+        await put('customers', cid, {name:d.customer.name, address:d.customer.address||'', phone:d.customer.phone||'', email:'', kind:ck !== 'all' ? ck : custKindGuess(d.customer.name), createdAt:new Date().toISOString()});
         d.customerId = cid;
       }
       const body = clone(d); delete body._auto;
@@ -2860,7 +2883,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Dhivehi UI v6';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Customer types';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
@@ -3265,7 +3288,7 @@ async function sharePDF(key, build, btn, app = 'telegram'){
 }
 
 /* ---------- customers ---------- */
-const custState = {q:'', f:'all', sort:'name'};
+const custState = {q:'', f:'all', k:'all', sort:'name'};
 function viewCustomers(main){
   const st = custState, all = custList();
   const stats = id => { const ds = Object.values(S.docs).filter(d => d.customerId === id); const inv = ds.filter(d => d.type === 'invoice' && !isVoid(d));
@@ -3278,6 +3301,7 @@ function viewCustomers(main){
     <section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="cq" type="search" placeholder="Search name, phone, email or address" value="${esc(st.q)}" aria-label="Search customers"></label>
         <select id="csort" aria-label="Sort"><option value="name">Name A–Z</option><option value="owed">Owes most</option><option value="billed">Invoiced most</option><option value="recent">Most recent</option></select>
+        <div class="chips" id="ckchips">${kindChips(all, st.k)}</div>
         <div class="chips" id="cchips">${FL.map(([k,l,fn,tone]) => { const n = all.filter(fn).length; return `<button class="chip ${st.f===k?'on':''}" data-f="${k}">${l}${n ? `<span class="n ${tone}">${n}</span>` : ''}</button>`; }).join('')}</div></div>
       <div class="tablewrap"><table class="list custs"><thead><tr><th>Name</th><th>Contact</th><th class="num">Documents</th><th class="num">Invoiced (MVR)</th><th class="num">Owed (MVR)</th></tr></thead><tbody id="crows"></tbody></table></div>
     </section>`;
@@ -3285,10 +3309,10 @@ function viewCustomers(main){
   const draw = () => {
     const q = st.q.trim().toLowerCase(), fn = (FL.find(f => f[0] === st.f) || FL[0])[2];
     const qd = q.replace(/\D/g, '');
-    const list = all.filter(c => fn(c) && (!q || [c.name, c.email, c.address].join(' ').toLowerCase().includes(q) || (qd.length >= 3 && (c.phone||'').replace(/\D/g,'').includes(qd)) || (c.phone||'').toLowerCase().includes(q)));
+    const list = all.filter(c => fn(c) && (st.k === 'all' || custKind(c) === st.k) && (!q || [c.name, c.email, c.address].join(' ').toLowerCase().includes(q) || (qd.length >= 3 && (c.phone||'').replace(/\D/g,'').includes(qd)) || (c.phone||'').toLowerCase().includes(q)));
     const by = {owed:(a,b) => X[b.id].due - X[a.id].due, billed:(a,b) => X[b.id].billed - X[a.id].billed, recent:(a,b) => X[b.id].last.localeCompare(X[a.id].last)}[st.sort];
     if (by) list.sort((a,b) => by(a,b) || (a.name||'').localeCompare(b.name||''));
-    $('#crows').innerHTML = list.length ? list.map(c => { const x = X[c.id]; return `<tr data-c="${esc(c.id)}"><td class="c-name"><div class="cust">${esc(c.name)}</div><div class="dim">${esc((c.address||'').split('\n')[0])}</div></td><td class="dim c-contact">${esc([c.phone, c.email].filter(Boolean).join(' · '))}</td><td class="num c-docs" data-n="${x.n === 1 ? ' document' : ' documents'}">${x.n}</td><td class="num c-bill" data-l="Invoiced ">${money(x.billed)}</td><td class="num c-owed ${x.due > 0 ? '' : 'zero'}" data-l="Owes " style="${x.due>0?'color:var(--bad);font-weight:600':''}">${money(x.due)}</td></tr>`; }).join('')
+    $('#crows').innerHTML = list.length ? list.map(c => { const x = X[c.id]; return `<tr data-c="${esc(c.id)}"><td class="c-name"><div class="cust">${esc(c.name)}<span class="tag ck-${custKind(c)} d-only">${kindLabel(custKind(c))}</span></div><div class="dim"><span class="cust m-only"><span class="tag ck-${custKind(c)}" style="margin:0 6px 0 0">${kindLabel(custKind(c))}</span></span>${esc((c.address||'').split('\n')[0])}</div></td><td class="dim c-contact">${esc([c.phone, c.email].filter(Boolean).join(' · '))}</td><td class="num c-docs" data-n="${x.n === 1 ? ' document' : ' documents'}">${x.n}</td><td class="num c-bill" data-l="Invoiced ">${money(x.billed)}</td><td class="num c-owed ${x.due > 0 ? '' : 'zero'}" data-l="Owes " style="${x.due>0?'color:var(--bad);font-weight:600':''}">${money(x.due)}</td></tr>`; }).join('')
       : `<tr><td colspan="5" class="empty">${all.length ? 'No customers match. Try a different search or filter.' : 'No customers yet.'}</td></tr>`;
     $('#crows').querySelectorAll('[data-c]').forEach(r => r.addEventListener('click', () => customerBox(S.customers[r.dataset.c])));
     const owed = list.reduce((s,c) => s + X[c.id].due, 0);
@@ -3297,6 +3321,7 @@ function viewCustomers(main){
   $('#cq').addEventListener('input', e => { st.q = e.target.value; draw(); });
   $('#csort').addEventListener('change', e => { st.sort = e.target.value; draw(); });
   $('#cchips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; main.querySelectorAll('#cchips .chip').forEach(c => c.classList.toggle('on', c === b)); draw(); });
+  $('#ckchips').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; st.k = b.dataset.k; main.querySelectorAll('#ckchips .chip').forEach(c => c.classList.toggle('on', c === b)); draw(); });
   $('#balrep').addEventListener('click', balancesBox);
   $('#addc').addEventListener('click', () => customerBox(null));
   draw();
@@ -3307,6 +3332,7 @@ function customerBox(c){
   const ds = isNew ? [] : Object.values(S.docs).filter(d => d.customerId === c.id).sort((a,b) => (b.date||'').localeCompare(a.date||''));
   const w = modal(isNew ? 'Add customer' : c.name, `${canEdit() ? '' : '<p class="dim" style="margin:0">View only</p>'}
     <div class="fld"><label for="c-n">Name</label><input id="c-n" value="${esc(c.name)}"></div>
+    <div class="fld"><label for="c-k">Type</label><select id="c-k">${CUST_KINDS.map(([k, l]) => `<option value="${k}" ${custKind(c) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
     ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
@@ -3316,7 +3342,7 @@ function customerBox(c){
       if (!canEdit()){ toast('Your role can only view customers.'); return false; }
       const name = w.querySelector('#c-n').value.trim(); if (!name){ toast('Add a name.'); return false; }
       const id = c.id || uid();
-      await put('customers', id, {...c, name, address:w.querySelector('#c-a').value.trim(), phone:w.querySelector('#c-p').value.trim(), email:w.querySelector('#c-e').value.trim(), createdAt:c.createdAt || new Date().toISOString()});
+      await put('customers', id, {...c, name, kind:w.querySelector('#c-k').value, address:w.querySelector('#c-a').value.trim(), phone:w.querySelector('#c-p').value.trim(), email:w.querySelector('#c-e').value.trim(), createdAt:c.createdAt || new Date().toISOString()});
       toast('Customer saved');
     });
   const pvIds = ds.slice(0,12).map(d => d.id);
@@ -3331,7 +3357,7 @@ function customerBox(c){
     {to: c.email || '', subject: `Statement of account – ${S.settings.name || ''}`, body: `Dear ${c.name || 'Sir/Madam'},\n\nPlease find attached your statement of account.\n\n${statementText(c)}\n\nThank you.`}, se));
   const pv = e => { const b = e.target.closest('[data-pv]'); if (!b || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')) return; e.preventDefault(); e.stopPropagation(); previewDoc(b.dataset.pv, pvIds); };
   w.addEventListener('click', pv, true); w.addEventListener('keydown', pv, true);
-  if (!canEdit()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('[data-ok]').style.display = 'none'; }
+  if (!canEdit()){ w.querySelectorAll('input,textarea').forEach(x => x.readOnly = true); w.querySelector('#c-k').disabled = true; w.querySelector('[data-ok]').style.display = 'none'; }
   w.querySelectorAll('[data-new]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault(); w.remove(); const d = newDraft(a.dataset.new); d.customerId = c.id; d.customer = {name:c.name, address:c.address||'', phone:c.phone||''};
     history.pushState(null, '', '#/new/' + a.dataset.new); lastKey = 'new/' + a.dataset.new; renderSide(); viewEditor($('#main'), d, false); window.scrollTo(0,0);
