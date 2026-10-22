@@ -1671,6 +1671,7 @@ Object.assign(DV, {
   'To stop one repeating, open its last expense and untick "Repeats every month".':'ތަކުރާރުވުން ހުއްޓުވަން، އެންމެ ފަހުގެ ޚަރަދު ހުޅުވައި "Repeats every month" ގެ ޓިކް ނަގާލާ.',
   'By category: goods & boat hire':'ބާވަތުން: މުދާ އަދި ބޯޓު ހަޔަރ',
   'Paid to (employee name)':'ދެއްކީ (މުވައްޒަފުގެ ނަން)', 'Employee name':'މުވައްޒަފުގެ ނަން', 'Name not given':'ނަމެއް ނުލިޔޭ',
+  'No description':'ތަފްޞީލެއް ނެތް',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2384,15 +2385,16 @@ function plRows(A, B){
     if (A.disc || B.disc) rows.push({k:'disc', label:'Less discounts', v:-A.disc, p:-B.disc});
   }
   rows.push({sec:'Cost of sales'});
-  const cc = cats(A.cos, B.cos, COS_CATS); cc.forEach(c => rows.push({x:c, label:c, v:A.cos[c] || 0, p:B.cos[c] || 0}));
+  // a category with more than one expense gets a line per item: salaries per person ("Paid to"), others per description
+  const subs = c => { const n = (A.xs[c] || []).length; if (!(c === 'Salaries' ? n : n > 1)) return;
+    const by = P => { const o = {}; (P.xs[c] || []).forEach(x => { const l = expItem(x), k = l.toLowerCase(); o[k] = o[k] || {l, v:0}; o[k].v += num(x.amount); if (o[k].l === o[k].l.toLowerCase()) o[k].l = l; }); return o; };
+    const a = by(A), b = by(B);
+    Object.keys({...a, ...b}).sort((m, q) => ((a[q] || {}).v || 0) - ((a[m] || {}).v || 0) || m.localeCompare(q))
+      .forEach(k => rows.push({x:c, who:k, sub:1, label:(a[k] || b[k]).l, v:(a[k] || {}).v || 0, p:(b[k] || {}).v || 0})); };
+  const cc = cats(A.cos, B.cos, COS_CATS); cc.forEach(c => { rows.push({x:c, label:c, v:A.cos[c] || 0, p:B.cos[c] || 0}); subs(c); });
   if (!cc.length) rows.push({none:1, label:'No costs recorded'});
   rows.push({tot:1, label:'Gross profit', v:A.gross, p:B.gross, pct:A.income ? Math.round(A.gross / A.income * 100) : null}, {sec:'Running costs'});
-  const rc = cats(A.run, B.run, EXP_CATS); rc.forEach(c => { rows.push({x:c, label:c, v:A.run[c] || 0, p:B.run[c] || 0});
-    if (c === 'Salaries'){   // one line per person ("Paid to" on the expense)
-      const by = (P, o = {}) => ((P.xs.Salaries) || []).forEach(x => { const n = payee(x); o[n] = (o[n] || 0) + num(x.amount); }) || o;
-      const a = by(A), b = by(B);
-      Object.keys({...a, ...b}).sort((m, n) => (a[n] || 0) - (a[m] || 0) || m.localeCompare(n)).forEach(n => rows.push({x:'Salaries', who:n, sub:1, label:n, v:a[n] || 0, p:b[n] || 0}));
-    } });
+  const rc = cats(A.run, B.run, EXP_CATS); rc.forEach(c => { rows.push({x:c, label:c, v:A.run[c] || 0, p:B.run[c] || 0}); subs(c); });
   if (!rc.length) rows.push({none:1, label:'No costs recorded'});
   rows.push({big:1, label:'Net profit', v:A.net, p:B.net}, {k:'gst', note:1, label:'GST collected (owed to MIRA, not income)', v:A.gst, p:B.gst});
   return rows;
@@ -2432,9 +2434,9 @@ function plTab(main){
     btn.disabled = false; btn.innerHTML = l; });
   draw();
 }
-const payee = x => (x.vendor || '').trim() || 'Name not given';
+const expItem = x => x.category === 'Salaries' ? (x.vendor || '').trim() || 'Name not given' : (x.desc || '').trim() || (x.vendor || '').trim() || 'No description';
 function plDrill(r, A){
-  const items = r.x ? (A.xs[r.x] || []).filter(x => !r.who || payee(x) === r.who).map(x => ({label:x.desc || x.category, sub:[fmtDate(x.date), x.vendor].filter(Boolean).join(' · '), v:num(x.amount), go:x.docId ? 'doc/' + x.docId : ''}))
+  const items = r.x ? (A.xs[r.x] || []).filter(x => !r.who || expItem(x).toLowerCase() === r.who).map(x => ({label:x.desc || x.category, sub:[fmtDate(x.date), x.vendor].filter(Boolean).join(' · '), v:num(x.amount), go:x.docId ? 'doc/' + x.docId : ''}))
     : (A.src[r.k] || []).map(s => ({label:s.d.number, sub:[s.d.customer?.name, fmtDate(s.d.date)].filter(Boolean).join(' · '), v:s.v, go:'doc/' + s.d.id}));
   items.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
   const w = modal(r.label, items.length ? `<div class="tablewrap" style="max-height:min(60vh,520px);overflow:auto"><table class="list"><tbody>${items.map(it => `<tr ${it.go ? `data-go="${esc(it.go)}"` : 'style="cursor:default"'}><td><b>${esc(it.label)}</b><div class="dim">${esc(it.sub)}</div></td><td class="num">${money(it.v)}</td></tr>`).join('')}
@@ -3112,7 +3114,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · P&L PDF footer removed';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · P&L expense lines';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
