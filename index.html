@@ -1054,9 +1054,15 @@ async function del(col, id){
   else saveLocal();
   onData();
 }
+// The Dhivehi font is large, so it lives in its own record (settings/dvfont): settings/company stays far below Firestore's 1 MB limit.
+let fontRec = null, fontSaved = null;   // fontRec: what settings/dvfont holds; fontSaved: the font text last written there
 async function saveSettings(s){
   S.settings = {...DEFAULTS, ...s};
-  if (db){ try { await db.doc('settings/company').set(clone(S.settings)); } catch(e){ dbErr(e); throw e; } }
+  if (db){ try {
+    const {dvFont = '', dvFontName = '', ...rest} = clone(S.settings);
+    if (dvFont !== fontSaved){ await db.doc('settings/dvfont').set({data:dvFont, name:dvFontName}); fontSaved = dvFont; fontRec = {data:dvFont, name:dvFontName}; }
+    await db.doc('settings/company').set(rest);
+  } catch(e){ dbErr(e); throw e; } }
   else saveLocal();
   onData();
 }
@@ -1082,9 +1088,18 @@ function subscribe(){
   db.collection('customers').limit(1000).onSnapshot(snap => {
     const m = {}; snap.docs.forEach(x => m[x.id] = {...x.data(), id:x.id}); S.customers = m; ready('c'); onData();
   }, fail('c'));
+  let company = null;
+  const merge = () => { if (!company) return;
+    S.settings = {...DEFAULTS, ...company};
+    if (fontRec) Object.assign(S.settings, {dvFont:fontRec.data || '', dvFontName:fontRec.name || ''}); };
   db.doc('settings/company').onSnapshot(snap => {
-    S.settings = {...DEFAULTS, ...(snap.exists ? snap.data() : {})}; ready('s'); onData();
+    company = snap.exists ? snap.data() : {}; merge(); ready('s'); onData();
+    // one-time move: a font still stored inside settings/company goes to its own record
+    if (company.dvFont !== undefined && isOwnerRole()) saveSettings(S.settings).catch(() => {});
   }, fail('s'));
+  db.doc('settings/dvfont').onSnapshot(snap => {
+    fontRec = snap.exists ? snap.data() : null; fontSaved = fontRec ? fontRec.data || '' : null; merge(); onData();
+  }, () => {});
   // expenses: owner and staff only; a viewer (or rules not yet updated) simply sees none
   if (canEdit()) db.collection('expenses').limit(2000).onSnapshot(snap => {
     const m = {}; snap.docs.forEach(x => m[x.id] = {...x.data(), id:x.id}); S.expenses = m; S.expensesBlocked = false; onData();
@@ -2882,7 +2897,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Share button';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Font record';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
