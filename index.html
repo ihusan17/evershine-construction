@@ -596,6 +596,8 @@ table.list.pl tbody tr{cursor:default}table.list.pl tr[data-i]{cursor:pointer}
 table.list.pl tr.sec td{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--brand);padding-top:16px;border-bottom:0}
 table.list.pl tr.ln td:first-child,table.list.pl tr.none td{padding-left:30px}table.list.pl tr.none td{color:var(--muted);font-size:13px}
 table.list.pl tr.tot td{font-weight:800;border-top:1px solid var(--line)}
+table.list.pl tr.fold{cursor:pointer}table.list.pl tr.fold td{padding:6px 18px 6px 30px;border-bottom:0}
+.linkbtn{border:0;background:none;padding:4px 0;font:inherit;font-size:13.5px;font-weight:600;color:var(--brand);cursor:pointer}
 table.list.pl tr.sub td{font-size:13px;color:var(--muted);padding-top:6px;padding-bottom:6px}table.list.pl tr.sub td:first-child{padding-left:46px}table.list.pl tr.sub td:first-child::before{content:"↳ "}
 table.list.pl tr.big td{font-weight:800;font-size:16.5px;border-top:2px solid var(--brand);background:var(--surface-2)}
 table.list.pl tr.note td{font-size:12.5px;color:var(--muted)}
@@ -1667,6 +1669,7 @@ Object.assign(DV, {
   'Repeats every month':'ކޮންމެ މަހަކު އަންނަ', 'Rent, electricity, salaries… Each new month it is listed under Expenses, ready to add with one click.':'ކުލި، ކަރަންޓް، މުސާރަ… ކޮންމެ އައު މަހަކު ޚަރަދުގެ ދަށުގައި ފެންނާނެ، އެއް ފިތުމުން އިތުރުކުރެވޭނެ.',
   'Review & add':'ބަލައި އިތުރުކުރޭ', 'Add ticked':'ހޮވި ތަކެތި އިތުރުކުރޭ', 'Tick at least one expense.':'މަދުވެގެން އެއް ޚަރަދު ހޮވާ.', '↻ Monthly':'↻ މަހުން މަހަށް',
   'To stop one repeating, open its last expense and untick "Repeats every month".':'ތަކުރާރުވުން ހުއްޓުވަން، އެންމެ ފަހުގެ ޚަރަދު ހުޅުވައި "Repeats every month" ގެ ޓިކް ނަގާލާ.',
+  'By category: goods & boat hire':'ބާވަތުން: މުދާ އަދި ބޯޓު ހަޔަރ',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -1691,7 +1694,7 @@ DV_RX.push(
   [/^([\d.,]+) qty$/, '$1 އަދަދު'], [/^(\d+)% of sales$/, 'ވިއްކުމުގެ $1%'],
   [new RegExp(`^(\\d+) saved · MVR ${dvAmt} owed\\..*$`), '$1 ކަސްޓަމަރުން · MVR $2 ބާކީ. އާ މީހަކަށް ޑޮކިއުމަންޓެއް ހަދާއިރު ކަސްޓަމަރު އަމިއްލައަށް އިތުރުވޭ.'],
   [/^(\d+) products?\. .*$/, '$1 މުދާ. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
-  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'], [/^Profit & Loss · (.+)$/, 'ފައިދާއާއި ގެއްލުން · $1'], [/^Boat hire \((.+)\)$/, 'ބޯޓު ހަޔަރ ($1)'], [/^before (\d+)%$/, 'ކުރިން $1%'], [/^(\d+) monthly expenses?$/, '$1 މަހުން މަހަށް ޚަރަދު'], [/^not added for this month yet \((.*)\)$/, 'މިމަހަށް އަދި ނުލިޔޭ ($1)'], [/^Monthly expenses · (.+)$/, 'މަހުން މަހަށް ޚަރަދު · $1'],
+  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'], [/^Profit & Loss · (.+)$/, 'ފައިދާއާއި ގެއްލުން · $1'], [/^Boat hire \((.+)\)$/, 'ބޯޓު ހަޔަރ ($1)'], [/^before (\d+)%$/, 'ކުރިން $1%'], [/^([▸▾]) By category: goods & boat hire$/, '$1 ބާވަތުން: މުދާ އަދި ބޯޓު ހަޔަރ'], [/^(\d+) monthly expenses?$/, '$1 މަހުން މަހަށް ޚަރަދު'], [/^not added for this month yet \((.*)\)$/, 'މިމަހަށް އަދި ނުލިޔޭ ($1)'], [/^Monthly expenses · (.+)$/, 'މަހުން މަހަށް ޚަރަދު · $1'],
   [/^(\d+) monthly expenses? added$/, '$1 މަހުން މަހަށް ޚަރަދު އިތުރުކޮށްފި'], [/^Tick the ones to add for (.+)\. Change.*$/, '$1 އަށް އިތުރުކުރަން ބޭނުންވާ ތަކެތި ހޮވާ. މި މަހު ތަފާތުނަމަ ޢަދަދު ނުވަތަ ތާރީޚު ބަދަލުކުރޭ.'], [/^Paid ([\d,]+) · Credit$/, 'ލިބިފައި $1 · ކްރެޑިޓް'], [/^Tap a line to see the invoices or expenses behind it\. (Cash|Invoiced).*$/, (m, b) => 'ލައިނަކަށް ފިތާލުމުން އޭގެ ފަހަތުގައިވާ އިންވޮއިސް ނުވަތަ ޚަރަދު ފެންނާނެ. ' + (b === 'Cash' ? 'ލިބުނު ފައިސާ: މި މުއްދަތުގައި ލިބުނު ފައިސާ (GST ނުލާ).' : 'އިންވޮއިސް ކުރި: މި މުއްދަތުގެ ތާރީޚުގައިވާ އިންވޮއިސްތައް، ދެއްކި ނަމަވެސް ނުދެއްކި ނަމަވެސް.') + ' ޚަރަދު ގުނެނީ އޭގެ ތާރީޚުން.'], [/^vs before$/, 'ކުރިންނާ އަޅާބަލާއިރު'],
   [/^(\d+) documents?$/, '$1 ޑޮކިއުމަންޓް'], [new RegExp(`^Balance is MVR ${dvAmt}$`), 'ބާކީ MVR $1'], [/^to change it for this .+\.$/, 'އަށް ފިތާލާ.'],
   [/^(\d+) products?(?: in (\d+) categor(?:y|ies))?\. In the quotation.*$/, (m, n, c) => n + ' މުދާ' + (c ? ' · ' + c + ' ބާވަތް' : '') + '. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
@@ -2369,10 +2372,14 @@ function plRows(A, B){
   const cats = (a, b, order) => [...new Set([...order.filter(c => c in a || c in b), ...Object.keys(a), ...Object.keys(b)])];
   const vessel = (S.settings.vesselName || '').trim();
   const split = k => plState.basis === 'cash' ? [] : [{k:k + '_paid', sub:1, label:'Paid', v:A[k + '_paid'], p:B[k + '_paid']}, {k:k + '_credit', sub:1, label:'Credit (not yet paid)', v:A[k + '_credit'], p:B[k + '_credit']}];
-  const rows = [{sec:'Income'}, {k:'goods', label:'Goods & materials sales', v:A.goods, p:B.goods}, ...split('goods'), {k:'hire', label:'Boat hire' + (vessel ? ` (${vessel})` : ''), v:A.hire, p:B.hire}, ...split('hire')];
-  if (A.disc || B.disc) rows.push({k:'disc', label:'Less discounts', v:-A.disc, p:-B.disc});
-  rows.push({tot:1, label:'Total income', v:A.income, p:B.income});
+  // Income: the total with paid / credit first; goods and boat hire stay folded away until "By category" is opened
+  const rows = [{sec:'Income'}, {tot:1, label:'Total income', v:A.income, p:B.income}];
   if (plState.basis !== 'cash') rows.push({k:'paid', sub:1, label:'Paid sales (received)', v:A.paid, p:B.paid}, {k:'credit', sub:1, label:'Credit sales (not yet paid)', v:A.credit, p:B.credit});
+  rows.push({fold:1, label:'By category: goods & boat hire'});
+  if (plState.incOpen){
+    rows.push({k:'goods', label:'Goods & materials sales', v:A.goods, p:B.goods}, ...split('goods'), {k:'hire', label:'Boat hire' + (vessel ? ` (${vessel})` : ''), v:A.hire, p:B.hire}, ...split('hire'));
+    if (A.disc || B.disc) rows.push({k:'disc', label:'Less discounts', v:-A.disc, p:-B.disc});
+  }
   rows.push({sec:'Cost of sales'});
   const cc = cats(A.cos, B.cos, COS_CATS); cc.forEach(c => rows.push({x:c, label:c, v:A.cos[c] || 0, p:B.cos[c] || 0}));
   if (!cc.length) rows.push({none:1, label:'No costs recorded'});
@@ -2395,10 +2402,12 @@ function plTab(main){
         <div class="tablewrap"><table class="list pl"><thead><tr><th></th><th class="num">This period</th><th class="num plp">${per.prevLabel}</th></tr></thead><tbody>
         ${rows.map((r, i) => r.sec ? `<tr class="sec"><td colspan="3">${r.sec}</td></tr>`
           : r.none ? `<tr class="none"><td colspan="3">${r.label}</td></tr>`
+          : r.fold ? `<tr class="fold" data-fold><td colspan="3"><button type="button" class="linkbtn" aria-expanded="${!!plState.incOpen}">${plState.incOpen ? '▾' : '▸'} ${r.label}</button></td></tr>`
           : `<tr class="${r.tot ? 'tot' : r.big ? 'big' : r.note ? 'note' : r.sub ? 'ln sub' : 'ln'}" ${r.k || r.x ? `data-i="${i}"` : ''}><td>${esc(r.label)}${r.pct != null && r.pct !== undefined ? ` <span class="pct">${r.pct}%</span>` : ''}</td><td class="num ${r.v < 0 && !r.note ? 'neg' : ''}">${money(r.v)}</td><td class="num plp dim">${money(r.p)}</td></tr>`).join('')}
         </tbody></table></div></section>
       <p class="dim" style="font-size:13px;margin:12px 2px 0">Tap a line to see the invoices or expenses behind it. ${plState.basis === 'cash' ? 'Cash received: income is the payments received in this period (without GST).' : 'Invoiced: income is the invoices dated in this period; paid and credit sales show how much of it has been received so far.'} Expenses count by their date; link them in Reports → Expenses.</p>`;
     $('#rbody').querySelectorAll('tr[data-i]').forEach(tr => tr.addEventListener('click', () => plDrill(rows[+tr.dataset.i], A)));
+    $('#rbody').querySelector('[data-fold]').addEventListener('click', () => { plState.incOpen = !plState.incOpen; draw(); });
   };
   // period: whole months, a picked month, or any date range
   const extra = () => { const p = plState.period, t = todayISO();
@@ -2430,7 +2439,8 @@ async function buildPL(){
 }
 function drawPL(pdf){
   const k = pdfKit(pdf), {BLUE, INK, GREY, LINE, ZEBRA, WHITE, L, R, CW, BOTTOM, font, txt} = k;
-  const per = plRange(), A = plData(per.from, per.to, plState.basis), B = plData(per.pfrom, per.pto, plState.basis), rows = plRows(A, B);
+  const per = plRange(), A = plData(per.from, per.to, plState.basis), B = plData(per.pfrom, per.pto, plState.basis);
+  const open = plState.incOpen; plState.incOpen = true; const rows = plRows(A, B).filter(r => !r.fold); plState.incOpen = open;   // the PDF always shows the categories
   let y = pdfHeader(pdf, k, 'Profit & Loss', [['Period:', `${fmtDate(per.from)} – ${fmtDate(per.to)}`], ['Basis:', plState.basis === 'cash' ? 'Cash received' : 'Invoiced'], ['Date:', fmtDate(todayISO())]]);
   y += 2;
   const C1 = R - 42, C2 = R - 2.4;
@@ -3093,7 +3103,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Monthly expenses';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Income folded';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
