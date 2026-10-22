@@ -223,10 +223,8 @@ html.lang-dv body{font-family:"Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)
 html.lang-dv input,html.lang-dv textarea,html.lang-dv select{font-family:inherit}
 html.lang-dv .num,html.lang-dv .n,html.lang-dv input[type=number],html.lang-dv input[inputmode=decimal]{direction:ltr}
 /* English text left inside the Dhivehi screens (dates, names, sentences) keeps its own left-to-right order but stays right-aligned */
-html.lang-dv body{text-align:right}
+html.lang-dv body{text-align:left}
 html.lang-dv body :where(div,p,span,small,b,td,th,a,button,label,h1,h2,h3,li,summary){unicode-bidi:plaintext}
-html.lang-dv th{text-align:right}
-html.lang-dv .menu .pop{right:auto;left:0}
 /* customer balances report */
 .balsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .balsum div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:grid;gap:2px}
@@ -1541,7 +1539,7 @@ function translate(root){
 }
 function applyLang(){
   const dv = LANG === 'dv', h = document.documentElement;
-  h.lang = dv ? 'dv' : 'en'; h.dir = dv ? 'rtl' : 'ltr'; h.classList.toggle('lang-dv', dv);
+  h.lang = dv ? 'dv' : 'en'; h.dir = 'ltr'; h.classList.toggle('lang-dv', dv);
   if (dv){ translate(document.body);
     if (!window.__trObs){ window.__trObs = new MutationObserver(ms => ms.forEach(m => { if (m.type === 'characterData') translate(m.target); else { m.addedNodes.forEach(translate); if (m.type === 'attributes') trAttr(m.target); } }));
       window.__trObs.observe(document.body, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['placeholder','title','aria-label']}); } }
@@ -2732,7 +2730,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Dhivehi UI';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Dhivehi UI v2';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
