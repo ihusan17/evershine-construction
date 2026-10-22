@@ -16,9 +16,9 @@
   --brand:#2f6199; --brand-2:#244d7c; --brand-ink:#ffffff; --brand-soft:#e8eff8; --sand:#efe8d8;
   --shell:#eef0f4; --shadow:0 1px 2px rgba(16,24,40,.03);
   --ok:#2e7a4d; --ok-soft:#e1f0e6; --warn:#94600f; --warn-soft:#f6ecd8; --bad:#b1372c; --bad-soft:#f7e2df; --neutral-soft:#e9ebe7;
-  --ui:"Plus Jakarta Sans","Faruma","Noto Sans Thaana","Segoe UI",system-ui,sans-serif;
+  --ui:"Plus Jakarta Sans","EvFaruma","Faruma","Noto Sans Thaana","Segoe UI",system-ui,sans-serif;
   --cond:"Plus Jakarta Sans","Segoe UI",system-ui,sans-serif;
-  --serif:Cambria,"Source Serif 4","Faruma","Noto Sans Thaana",Georgia,serif;
+  --serif:Cambria,"Source Serif 4","EvFaruma","Faruma","Noto Sans Thaana",Georgia,serif;
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   color-scheme:light;
 }
@@ -217,8 +217,8 @@ table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-so
 .pbulk[hidden]{display:none!important}
 /* Dhivehi interface (right to left); documents stay English, left to right */
 html.lang-dv .sheet,html.lang-dv .sheet-fit,html.lang-dv .pv .sheet{direction:ltr;text-align:left}
-html.lang-dv body{font-family:"Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
-[data-lang-set="dv"],.dvf{font-family:"Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
+html.lang-dv body{font-family:"EvFaruma","Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
+[data-lang-set="dv"],.dvf{font-family:"EvFaruma","Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
 .thm .dvhint{display:block;font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
 html.lang-dv input,html.lang-dv textarea,html.lang-dv select{font-family:inherit}
 html.lang-dv .num,html.lang-dv .n,html.lang-dv input[type=number],html.lang-dv input[inputmode=decimal]{direction:ltr}
@@ -440,7 +440,7 @@ table.items .amt{padding-top:13px;text-align:right;font-variant-numeric:tabular-
 .sheet .hire .when b{font-size:13px;font-weight:600;margin-top:3px}
 .sheet .stamp{position:absolute;width:190px;right:6px;top:62px;pointer-events:none}
 .sheet .void{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:700 110px/1 var(--serif);color:rgba(178,55,44,.14);transform:rotate(-24deg);letter-spacing:.08em}
-.sheet [lang="dv"],.sheet .dv{font-family:"Faruma","Noto Sans Thaana",var(--serif)}
+.sheet [lang="dv"],.sheet .dv{font-family:"EvFaruma","Faruma","Noto Sans Thaana",var(--serif)}
 
 @media (max-width:1100px){
   .board{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -1350,12 +1350,18 @@ function route(){
   const p = h.split('/').map(decodeURIComponent);
   return {a:p[0], b:p[1], c:p[2], key:h};
 }
-// the uploaded Dhivehi font is also used on screen (as "Faruma"), so it looks the same as the PDF
+// the uploaded Dhivehi font is also used on screen (as "EvFaruma"), so it looks the same as the PDF
 let dvFontOn = null;
 function applyDvFont(){
   const f = S.settings.dvFont || ''; if (f === dvFontOn) return; dvFontOn = f;
-  let st = document.getElementById('dvfont'); if (!st){ st = document.createElement('style'); st.id = 'dvfont'; document.head.appendChild(st); }
-  st.textContent = f ? `@font-face{font-family:"Faruma";src:url(data:font/ttf;base64,${f}) format("truetype");size-adjust:112%;unicode-range:U+0780-07BF,U+FDF2,U+060C,U+061B,U+061F}` : '';
+  // FontFace with the raw bytes: works on iPhone Safari too (a data: url with a format hint can be skipped there)
+  if (window.__dvFace){ try { document.fonts.delete(window.__dvFace); } catch(e){} window.__dvFace = null; }
+  if (!f) return;
+  try {
+    const bin = atob(f), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const face = new FontFace('EvFaruma', u.buffer, {unicodeRange:'U+0780-07BF,U+FDF2,U+060C,U+061B,U+061F', sizeAdjust:'112%'});
+    document.fonts.add(face); window.__dvFace = face; face.load().catch(() => {});
+  } catch(e){}
 }
 function onData(){
   renderSide(); fixWording(); applyDvFont(); noteLive();
@@ -2730,7 +2736,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Dhivehi UI v2';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Dhivehi UI v3';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
