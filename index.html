@@ -215,6 +215,16 @@ table.list.docs:not(.sel) .c-sel,table.list.prods:not(.sel) .p-sel{display:none!
 table.list.docs .c-sel input{width:17px;height:17px;cursor:pointer;accent-color:var(--brand);margin:0;vertical-align:middle}
 table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-soft)}
 .pbulk[hidden]{display:none!important}
+/* Dhivehi interface (right to left); documents stay English, left to right */
+html.lang-dv .sheet,html.lang-dv .sheet-fit,html.lang-dv .pv .sheet{direction:ltr;text-align:left}
+html.lang-dv body{font-family:"Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
+html.lang-dv input,html.lang-dv textarea,html.lang-dv select{font-family:inherit}
+html.lang-dv .num,html.lang-dv .n,html.lang-dv input[type=number],html.lang-dv input[inputmode=decimal]{direction:ltr}
+/* English text left inside the Dhivehi screens (dates, names, sentences) keeps its own left-to-right order but stays right-aligned */
+html.lang-dv body{text-align:right}
+html.lang-dv body :where(div,p,span,small,b,td,th,a,button,label,h1,h2,h3,li,summary){unicode-bidi:plaintext}
+html.lang-dv th{text-align:right}
+html.lang-dv .menu .pop{right:auto;left:0}
 /* customer balances report */
 .balsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .balsum div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:grid;gap:2px}
@@ -1462,11 +1472,80 @@ function renderSide(){
       <details class="menu acct"><summary class="avatar" title="Account" aria-label="Account">${esc((who || S.settings.name || 'E').trim().charAt(0).toUpperCase())}</summary>
         <div class="pop"><div class="who">${who ? `<b>${esc(who)}</b>` : `<b>${esc(S.settings.name || 'Evershine')}</b>`}${S.role && S.mode === 'cloud' ? `<span class="rolechip">${esc(ROLES[S.role][0])}</span><br>` : ''}<i class="${S.mode}"></i>${modeText}</div>
           <div class="thm"><span>Theme</span><div class="seg" role="radiogroup" aria-label="Theme">${[['light','sun','Light'],['dark','moon','Dark'],['auto','monitor','Auto']].map(([k,ic,l]) => `<button type="button" role="radio" aria-checked="${themePref()===k}" class="${themePref()===k?'on':''}" data-theme-set="${k}" title="${k==='auto' ? 'Follow this device' : l + ' theme'}">${icon(ic,15)}${l}</button>`).join('')}</div></div>
+          <div class="thm"><span>Language</span><div class="seg" role="radiogroup" aria-label="Language">${[['en','English'],['dv','ދިވެހި']].map(([k,l]) => `<button type="button" role="radio" aria-checked="${LANG===k}" class="${LANG===k?'on':''}" data-lang-set="${k}" data-notr>${l}</button>`).join('')}</div></div>
           ${isOwnerRole() ? `<a href="#/settings">${icon('gear')}Settings</a>` : ''}${who ? `<button type="button" id="signout">${icon('out')}Sign out</button>` : ''}</div></details>
     </div>`;
   const t = $('#top');
   if (t.dataset.v !== top){ t.dataset.v = top; t.innerHTML = top; }
 }
+
+/* ---------- language: English or Dhivehi for the portal itself ----------
+   Menus, buttons, labels and statuses switch to Dhivehi (right to left). Documents (the sheet, print and PDF),
+   names and anything typed stay as they are; documents are always in English. Chosen per browser. */
+const LANG_KEY = 'evershine-lang';
+let LANG = (() => { try { return localStorage.getItem(LANG_KEY) === 'dv' ? 'dv' : 'en'; } catch(e){ return 'en'; } })();
+const DV = {
+  'Overview':'ޚުލާޞާ', 'Home':'ހޯމް', 'Quotes':'ކޯޓޭޝަން', 'Quotations':'ކޯޓޭޝަންތައް', 'Invoices':'އިންވޮއިސްތައް', 'Delivery':'ޑެލިވަރީ',
+  'Delivery notes':'ޑެލިވަރީ ނޯޓުތައް', 'Customers':'ކަސްޓަމަރުން', 'Clients':'ކަސްޓަމަރުން', 'Products':'މުދާ', 'Items':'މުދާ', 'Reports':'ރިޕޯޓު',
+  'Settings':'ސެޓިންގްސް', 'MENU':'މެނޫ', 'Expenses':'ޚަރަދު', 'Sales':'ވިއްކުން', 'Profit':'ފައިދާ',
+  'New quotation':'އައު ކޯޓޭޝަން', 'New invoice':'އައު އިންވޮއިސް', 'New delivery note':'އައު ޑެލިވަރީ ނޯޓު',
+  'Save':'ސޭވް', 'Save changes':'ބަދަލުތައް ސޭވް ކުރޭ', 'Save invoice':'އިންވޮއިސް ސޭވް ކުރޭ', 'Save quotation':'ކޯޓޭޝަން ސޭވް ކުރޭ', 'Save delivery note':'ޑެލިވަރީ ނޯޓު ސޭވް ކުރޭ',
+  'Cancel':'ކެންސަލް', 'Close':'ބަންދުކުރޭ', 'Edit':'އެޑިޓް', '✎ Edit':'✎ އެޑިޓް', '✎ Edit details':'✎ މަޢުލޫމާތު އެޑިޓް', '🔒 Lock':'🔒 ލޮކް', 'Delete':'ފޮހެލާ',
+  'Print':'ޕްރިންޓް', 'Download PDF':'PDF ޑައުންލޯޑް', 'Email':'އީމެއިލް', 'Telegram':'ޓެލެގްރާމް', 'Viber':'ވައިބަރ', 'Export CSV':'CSV އެކްސްޕޯޓް',
+  'Add':'އިތުރުކުރޭ', 'Add line':'ލައިނެއް އިތުރުކުރޭ', 'Add trip':'ދަތުރެއް އިތުރުކުރޭ', 'Add customer':'ކަސްޓަމަރެއް އިތުރުކުރޭ', '+ Add product':'+ މުދަލެއް އިތުރުކުރޭ',
+  'Clear':'ސާފުކުރޭ', 'Done':'ނިމުނީ', '✓ Done':'✓ ނިމުނީ', '☑ Select':'☑ ހޮވާ', 'Remove':'ނައްތާލާ', 'Reset':'ރީސެޓް',
+  'Record payment':'ފައިސާ ލިބުނުކަން ލިޔޭ', 'Create delivery note':'ޑެލިވަރީ ނޯޓެއް ހަދާ', 'Create invoice':'އިންވޮއިހެއް ހަދާ',
+  'Notifications':'ނޯޓިފިކޭޝަން', 'Mark all read':'ހުރިހާ ކިޔައިފިން', 'Sign out':'ސައިން އައުޓް', 'Theme':'ތީމް', 'Language':'ބަސް',
+  'Light':'ލައިޓް', 'Dark':'ޑާކް', 'Auto':'އޮޓޯ', 'Details':'ތަފްޞީލު', 'Customer':'ކަސްޓަމަރު', 'Choose customer':'ކަސްޓަމަރު ހޮވާ',
+  'Select a saved customer…':'ކަސްޓަމަރެއް ހޮވާ…', 'New customer…':'އައު ކަސްޓަމަރެއް…', 'Name':'ނަން', 'Phone':'ފޯނު', 'Address':'އެޑްރެސް',
+  'Date':'ތާރީޚު', 'Invoice Date':'އިންވޮއިސްގެ ތާރީޚު', 'Payment due in':'ފައިސާ ދައްކަންޖެހޭ މުއްދަތު', 'Valid for':'ޞައްޙަ މުއްދަތު',
+  'P.O number':'P.O ނަންބަރު', 'Project':'ޕްރޮޖެކްޓް', 'Description':'ތަފްޞީލު', 'Description / cargo':'ތަފްޞީލު / ބަރު', 'Unit':'ޔުނިޓް', 'Qty':'އަދަދު',
+  'Rate':'ރޭޓް', 'Amount':'އަދަދު', 'Amount (MVR)':'ޢަދަދު (MVR)', 'Sub total':'ސަބް ޓޯޓަލް', 'Grand total (MVR)':'ޖުމްލަ (MVR)',
+  'Terms & conditions':'ޝަރުޠުތައް', 'Delivery wording':'ޑެލިވަރީ ލިޔުން', 'One term per line':'ކޮންމެ ޝަރުޠެއް ވަކި ލައިނެއްގައި',
+  'Discount (optional)':'ޑިސްކައުންޓް (އިޚްތިޔާރީ)', 'GST / tax (%)':'ޖީއެސްޓީ / ޓެކްސް (%)', 'Balance':'ބާކީ', 'Due date':'ދައްކަންޖެހޭ ތާރީޚު',
+  'Payments':'ފައިސާ ދެއްކުން', 'Number':'ނަންބަރު', 'Status':'ހާލަތު', 'Contact':'ގުޅޭނެ', 'Documents':'ލިޔެކިޔުން', 'Invoiced (MVR)':'އިންވޮއިސް (MVR)',
+  'Owed (MVR)':'ބާކީ (MVR)', 'Product':'މުދާ', 'Category':'ބާވަތް', 'Used in':'ބޭނުންކުރި', 'Needs attention':'ސަމާލުކަން ދޭންޖެހޭ', 'Recently updated':'ފަހުން ބަދަލުކުރި',
+  'Draft':'ޑްރާފްޓް', 'Sent':'ފޮނުވިފައި', 'Accepted':'ގަބޫލުކޮށްފި', 'Rejected':'ގަބޫލުނުކުރި', 'Expired':'މުއްދަތު ހަމަވެފައި', 'Unpaid':'ނުދައްކާ',
+  'Part paid':'ބައެއް ދައްކާފައި', 'Paid':'ދައްކާފައި', 'Overdue':'ލަސްވެފައި', 'Void':'ބާޠިލް', 'To deliver':'ޑެލިވަރ ކުރަންޖެހޭ', 'Delivered':'ޑެލިވަރ ކުރެވިފައި', 'All':'ހުރިހާ',
+  'Awaiting payment':'ފައިސާއަށް މަޑުކުރަނީ', 'Open quotations':'ހުޅުވިފައިވާ ކޯޓޭޝަން', 'Overdue amount':'ލަސްވެފައިވާ އަދަދު', 'Unpaid totals':'ނުދައްކާ ޖުމްލަ',
+  'Collected this month':'މި މަހު ލިބުނު', 'Average paid time':'ފައިސާ ލިބެން ނަގާ ދުވަސް', 'Expiring soon':'އަވަހަށް މުއްދަތު ހަމަވާ', 'Win rate':'ގަބޫލުކުރާ ނިސްބަތް',
+  'Billed this month':'މި މަހު ބިލު ކުރި', 'Company profile':'ކުންފުނީގެ މަޢުލޫމާތު', 'Bank details':'ބޭންކުގެ މަޢުލޫމާތު', 'Numbering & timing':'ނަންބަރު އަދި މުއްދަތު',
+  'Signature':'ސޮއި', 'Default wording':'ޑިފޯލްޓް ލިޔުން', 'Team':'ޓީމް', 'Backup & move':'ބެކަޕް', 'Dhivehi font':'ދިވެހި ފޮންޓް',
+  'Balances report':'ބާކީ ރިޕޯޓު', 'Customer balances':'ކަސްޓަމަރުންގެ ބާކީ', 'Owes money':'ފައިސާ ދައްކަންޖެހޭ', 'Owes us':'ދައްކަންޖެހޭ', 'Credits':'ކްރެޑިޓް',
+  'All balances':'ހުރިހާ ބާކީ', 'Has documents':'ލިޔެކިޔުން ހުރި', 'No documents':'ލިޔެކިޔުން ނެތް', 'Goods & materials':'މުދާ އަދި ސާމާނު',
+  'Search products':'މުދާ ހޯދާ', 'Search name, phone, email or address':'ނަން، ފޯނު، އީމެއިލް ނުވަތަ އެޑްރެސް ހޯދާ', 'Item or service':'މުދާ ނުވަތަ ޚިދުމަތް',
+  'Cargo or job':'ބަރު ނުވަތަ މަސައްކަތް', 'Loading point':'ބަރު އަރުވާ ތަން', 'Unloading point':'ބަރު ފައިބާ ތަން', 'Tap to pick islands':'ރަށްތައް ހޮވާ', 'Pick date':'ތާރީޚު ހޮވާ',
+  'Import from past documents':'ކުރީގެ ލިޔެކިޔުމުން ނަގާ', 'Set status ▾':'ހާލަތު ބަދަލުކުރޭ ▾', 'Set category ▾':'ބާވަތް ބަދަލުކުރޭ ▾', '+ Category':'+ ބާވަތެއް',
+  'Mark as paid (full balance)':'ދައްކައިފިކަމަށް ލިޔޭ (މުޅި ބާކީ)', 'Job costs':'މަސައްކަތުގެ ޚަރަދު', '+ Add cost':'+ ޚަރަދެއް', 'Add cost':'ޚަރަދެއް އިތުރުކުރޭ',
+  'Add expense':'ޚަރަދެއް އިތުރުކުރޭ', 'Paid in full':'ފުރިހަމައަށް ދައްކާފައި', 'Paid by':'ދެއްކި މީހާ', 'Method':'ގޮތް', 'Reference':'ރެފަރެންސް', 'Month':'މަސް',
+  'Statement PDF':'ސްޓޭޓްމަންޓް PDF', 'Email statement':'ސްޓޭޓްމަންޓް އީމެއިލް', 'Linked documents':'ގުޅިފައިވާ ލިޔެކިޔުން', 'Delivery address':'ޑެލިވަރީ އެޑްރެސް',
+  'Confirmation text':'ކަށަވަރުކުރާ ލިޔުން', 'Download backup':'ބެކަޕް ޑައުންލޯޑް', 'Restore from backup…':'ބެކަޕުން އަނބުރާ ގެނައުން…', 'Delete all documents…':'ހުރިހާ ލިޔެކިޔުން ފޮހެލާ…',
+  'PAID stamp':'PAID ސްޓޭމްޕް', 'Menu':'މެނޫ', 'All invoices':'ހުރިހާ އިންވޮއިސް', 'All quotations':'ހުރިހާ ކޯޓޭޝަން', 'All delivery notes':'ހުރިހާ ޑެލިވަރީ ނޯޓު',
+  'All types':'ހުރިހާ ބާވަތެއް', 'Boat hire':'ދޯނި ކުއްޔަށް', 'Invoice':'އިންވޮއިސް', 'Quotation':'ކޯޓޭޝަން', 'Delivery note':'ޑެލިވަރީ ނޯޓު', 'Job':'މަސައްކަތް', 'Sign in':'ސައިން އިން', 'Password':'ޕާސްވޯޑް', 'Forgot password?':'ޕާސްވޯޑް ހަނދާން ނެތީ؟', 'None':'ނެތް', 'Optional':'އިޚްތިޔާރީ',
+};
+const TR_SKIP = '.sheet,.sheet-fit,script,style,textarea,input,[data-notr],#rules-text';
+const DV_RX = [[/^(\d+) days?$/, '$1 ދުވަސް'], [/^Custom…$/, 'އެހެން…'], [/^(\d+) selected$/, '$1 ހޮވިފައި']];
+function trText(t){ const k = t.trim(); if (!k) return null; let v = DV[k];
+  if (!v) for (const [rx, to] of DV_RX) if (rx.test(k)){ v = k.replace(rx, to); break; }
+  return v ? t.replace(k, v) : null; }
+function trAttr(el){ ['placeholder', 'title', 'aria-label'].forEach(a => { const v = el.getAttribute && el.getAttribute(a); const n = v && DV[v.trim()]; if (n) el.setAttribute(a, n); }); }
+function translate(root){
+  if (LANG !== 'dv' || !root) return;
+  if (root.nodeType === 3){ const p = root.parentElement; if (p && !p.closest(TR_SKIP)){ const n = trText(root.nodeValue); if (n !== null) root.nodeValue = n; } return; }
+  if (root.nodeType !== 1 || root.closest(TR_SKIP)) return;
+  trAttr(root); root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el => { if (!el.closest('.sheet')) trAttr(el); });
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode: n => n.parentElement && n.parentElement.closest(TR_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
+  for (let n; (n = w.nextNode());){ const t = trText(n.nodeValue); if (t !== null) n.nodeValue = t; }
+}
+function applyLang(){
+  const dv = LANG === 'dv', h = document.documentElement;
+  h.lang = dv ? 'dv' : 'en'; h.dir = dv ? 'rtl' : 'ltr'; h.classList.toggle('lang-dv', dv);
+  if (dv){ translate(document.body);
+    if (!window.__trObs){ window.__trObs = new MutationObserver(ms => ms.forEach(m => { if (m.type === 'characterData') translate(m.target); else { m.addedNodes.forEach(translate); if (m.type === 'attributes') trAttr(m.target); } }));
+      window.__trObs.observe(document.body, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['placeholder','title','aria-label']}); } }
+}
+function setLang(v){ try { localStorage.setItem(LANG_KEY, v); } catch(e){} location.reload(); }
+document.addEventListener('click', e => { const b = e.target.closest('[data-lang-set]'); if (b && b.dataset.langSet !== LANG) setLang(b.dataset.langSet); });
 
 /* ---------- notifications ----------
    Built from the documents themselves (no extra storage): new documents, payments, paid in full, overdue, accepted, delivered.
@@ -3690,6 +3769,7 @@ function toast(msg){
   t.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => t.remove(), 3400);
 }
 
+applyLang();
 boot();
 </script>
 
