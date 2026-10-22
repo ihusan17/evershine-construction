@@ -601,6 +601,11 @@ table.list.pl tr.big td{font-weight:800;font-size:16.5px;border-top:2px solid va
 table.list.pl tr.note td{font-size:12.5px;color:var(--muted)}
 table.list.pl .pct{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
 @media (max-width:560px){table.list.pl .plp{display:none}#plx input{width:152px;padding-left:10px;padding-right:6px;font-size:13.5px}}
+.mdue{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--brand-soft);font-size:14px}
+.mdue>span{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.mdue svg{color:var(--brand)}
+.tag.rep{font-size:11px;padding:0 6px;color:var(--brand);border-color:var(--brand-soft);background:var(--brand-soft)}
+.tickrow{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;font-size:14px}.tickrow input{margin-top:3px;width:18px;height:18px}
+table.mrows input:not([type=checkbox]){width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;background:var(--surface);color:var(--ink)}table.mrows input[type=checkbox]{width:18px;height:18px}table.mrows td{vertical-align:middle}
 .warnbox2{margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--warn-soft);font-size:14px}
 .costlist{list-style:none;margin:0;padding:0}
 .costlist li{display:flex;justify-content:space-between;gap:8px;padding:9px 18px;border-top:1px solid var(--line);font-size:14px;cursor:pointer}
@@ -1659,6 +1664,9 @@ Object.assign(DV, {
   'Paid sales (received)':'ފައިސާ ލިބިފައިވާ ވިއްކުން', 'Credit sales (not yet paid)':'ކްރެޑިޓަށް ވިއްކުން (އަދި ނުދައްކާ)',
   'Credit (not yet paid)':'ކްރެޑިޓް (އަދި ނުދައްކާ)',
   'Copy ready. Change anything, then Save expense.':'ކޮޕީ ތައްޔާރު. ބޭނުންނަމަ ބަދަލުކޮށް، ޚަރަދު ސޭވް ކުރޭ.', 'Add expense':'ޚަރަދެއް އިތުރުކުރޭ', 'Expense added':'ޚަރަދު އިތުރުކޮށްފި', 'Expense saved':'ޚަރަދު ސޭވްކޮށްފި',
+  'Repeats every month':'ކޮންމެ މަހަކު އަންނަ', 'Rent, electricity, salaries… Each new month it is listed under Expenses, ready to add with one click.':'ކުލި، ކަރަންޓް، މުސާރަ… ކޮންމެ އައު މަހަކު ޚަރަދުގެ ދަށުގައި ފެންނާނެ، އެއް ފިތުމުން އިތުރުކުރެވޭނެ.',
+  'Review & add':'ބަލައި އިތުރުކުރޭ', 'Add ticked':'ހޮވި ތަކެތި އިތުރުކުރޭ', 'Tick at least one expense.':'މަދުވެގެން އެއް ޚަރަދު ހޮވާ.', '↻ Monthly':'↻ މަހުން މަހަށް',
+  'To stop one repeating, open its last expense and untick "Repeats every month".':'ތަކުރާރުވުން ހުއްޓުވަން، އެންމެ ފަހުގެ ޚަރަދު ހުޅުވައި "Repeats every month" ގެ ޓިކް ނަގާލާ.',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -1683,7 +1691,8 @@ DV_RX.push(
   [/^([\d.,]+) qty$/, '$1 އަދަދު'], [/^(\d+)% of sales$/, 'ވިއްކުމުގެ $1%'],
   [new RegExp(`^(\\d+) saved · MVR ${dvAmt} owed\\..*$`), '$1 ކަސްޓަމަރުން · MVR $2 ބާކީ. އާ މީހަކަށް ޑޮކިއުމަންޓެއް ހަދާއިރު ކަސްޓަމަރު އަމިއްލައަށް އިތުރުވޭ.'],
   [/^(\d+) products?\. .*$/, '$1 މުދާ. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
-  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'], [/^Profit & Loss · (.+)$/, 'ފައިދާއާއި ގެއްލުން · $1'], [/^Boat hire \((.+)\)$/, 'ބޯޓު ހަޔަރ ($1)'], [/^before (\d+)%$/, 'ކުރިން $1%'], [/^Paid ([\d,]+) · Credit$/, 'ލިބިފައި $1 · ކްރެޑިޓް'], [/^Tap a line to see the invoices or expenses behind it\. (Cash|Invoiced).*$/, (m, b) => 'ލައިނަކަށް ފިތާލުމުން އޭގެ ފަހަތުގައިވާ އިންވޮއިސް ނުވަތަ ޚަރަދު ފެންނާނެ. ' + (b === 'Cash' ? 'ލިބުނު ފައިސާ: މި މުއްދަތުގައި ލިބުނު ފައިސާ (GST ނުލާ).' : 'އިންވޮއިސް ކުރި: މި މުއްދަތުގެ ތާރީޚުގައިވާ އިންވޮއިސްތައް، ދެއްކި ނަމަވެސް ނުދެއްކި ނަމަވެސް.') + ' ޚަރަދު ގުނެނީ އޭގެ ތާރީޚުން.'], [/^vs before$/, 'ކުރިންނާ އަޅާބަލާއިރު'],
+  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'], [/^Profit & Loss · (.+)$/, 'ފައިދާއާއި ގެއްލުން · $1'], [/^Boat hire \((.+)\)$/, 'ބޯޓު ހަޔަރ ($1)'], [/^before (\d+)%$/, 'ކުރިން $1%'], [/^(\d+) monthly expenses?$/, '$1 މަހުން މަހަށް ޚަރަދު'], [/^not added for this month yet \((.*)\)$/, 'މިމަހަށް އަދި ނުލިޔޭ ($1)'], [/^Monthly expenses · (.+)$/, 'މަހުން މަހަށް ޚަރަދު · $1'],
+  [/^(\d+) monthly expenses? added$/, '$1 މަހުން މަހަށް ޚަރަދު އިތުރުކޮށްފި'], [/^Tick the ones to add for (.+)\. Change.*$/, '$1 އަށް އިތުރުކުރަން ބޭނުންވާ ތަކެތި ހޮވާ. މި މަހު ތަފާތުނަމަ ޢަދަދު ނުވަތަ ތާރީޚު ބަދަލުކުރޭ.'], [/^Paid ([\d,]+) · Credit$/, 'ލިބިފައި $1 · ކްރެޑިޓް'], [/^Tap a line to see the invoices or expenses behind it\. (Cash|Invoiced).*$/, (m, b) => 'ލައިނަކަށް ފިތާލުމުން އޭގެ ފަހަތުގައިވާ އިންވޮއިސް ނުވަތަ ޚަރަދު ފެންނާނެ. ' + (b === 'Cash' ? 'ލިބުނު ފައިސާ: މި މުއްދަތުގައި ލިބުނު ފައިސާ (GST ނުލާ).' : 'އިންވޮއިސް ކުރި: މި މުއްދަތުގެ ތާރީޚުގައިވާ އިންވޮއިސްތައް، ދެއްކި ނަމަވެސް ނުދެއްކި ނަމަވެސް.') + ' ޚަރަދު ގުނެނީ އޭގެ ތާރީޚުން.'], [/^vs before$/, 'ކުރިންނާ އަޅާބަލާއިރު'],
   [/^(\d+) documents?$/, '$1 ޑޮކިއުމަންޓް'], [new RegExp(`^Balance is MVR ${dvAmt}$`), 'ބާކީ MVR $1'], [/^to change it for this .+\.$/, 'އަށް ފިތާލާ.'],
   [/^(\d+) products?(?: in (\d+) categor(?:y|ies))?\. In the quotation.*$/, (m, n, c) => n + ' މުދާ' + (c ? ' · ' + c + ' ބާވަތް' : '') + '. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
   [/^No (quotations|invoices|delivery notes) yet\.$/, (m, t) => 'އަދި ' + ({quotations:'ކޯޓޭޝަނެއް', invoices:'އިންވޮއިހެއް', 'delivery notes':'ޑެލިވަރީ ނޯޓެއް'})[t] + ' ނެތް.'], [/^Total \((\d+)\)$/, 'ޖުމްލަ ($1)'],
@@ -2215,6 +2224,7 @@ function expenseBox(x, preset){
       <div class="fld"><label for="x-m">Paid by</label><select id="x-m">${['Cash','Bank transfer','Card','Cheque','Other'].map(m => `<option ${m === x.method ? 'selected' : ''}>${m}</option>`).join('')}</select></div></div>
     <div class="fld"><label for="x-s">Description</label><input id="x-s" value="${esc(x.desc)}" placeholder="e.g. Diesel for REHENDHI, 200 L"></div>
     <div class="fld"><label for="x-v">Paid to (optional)</label><input id="x-v" value="${esc(x.vendor)}" placeholder="Supplier or person"></div>
+    <label class="tickrow"><input type="checkbox" id="x-r" ${x.monthly ? 'checked' : ''}> <span><b>Repeats every month</b><br><span class="dim">Rent, electricity, salaries… Each new month it is listed under Expenses, ready to add with one click.</span></span></label>
     <div class="fld"><label for="x-j">For job (optional)</label><select id="x-j"><option value="">Not linked to a job</option>${jobs.map(d => `<option value="${esc(d.id)}" ${d.id === x.docId ? 'selected' : ''}>${esc(d.number)} · ${esc(d.customer?.name || '')}</option>`).join('')}</select><span class="hint">Link it to a quotation or invoice to see that job's profit.</span></div>
     ${!isNew ? `<div class="row"><button type="button" class="btn sm" data-dupx>⧉ Duplicate</button>${isOwnerRole() ? '<button type="button" class="btn sm danger" data-delx>Delete expense</button>' : ''}</div>` : ''}`,
     'Save expense', async w => {
@@ -2222,7 +2232,7 @@ function expenseBox(x, preset){
       if (!(amount > 0)){ toast('Enter an amount above zero.'); return false; }
       const id = x.id || uid();
       await put('expenses', id, {date: w.querySelector('#x-d').value || todayISO(), amount, category: w.querySelector('#x-c').value, method: w.querySelector('#x-m').value,
-        desc: w.querySelector('#x-s').value.trim(), vendor: w.querySelector('#x-v').value.trim(), docId: w.querySelector('#x-j').value, note: x.note || '',
+        desc: w.querySelector('#x-s').value.trim(), vendor: w.querySelector('#x-v').value.trim(), docId: w.querySelector('#x-j').value, note: x.note || '', monthly: w.querySelector('#x-r').checked, rid: x.rid || '',
         createdAt: x.createdAt || new Date().toISOString(), createdBy: x.createdBy || S.user || '', updatedAt: new Date().toISOString()});
       toast(isNew ? 'Expense added' : 'Expense saved');
       if (location.hash.startsWith('#/doc/')) render(true, true);
@@ -2230,7 +2240,7 @@ function expenseBox(x, preset){
   // Duplicate: a new expense with the same details (as shown in the box), dated today
   const dp = w.querySelector('[data-dupx]');
   if (dp) dp.addEventListener('click', () => { const v = id => w.querySelector(id).value;
-    const copy = {amount:v('#x-a'), category:v('#x-c'), method:v('#x-m'), desc:v('#x-s'), vendor:v('#x-v'), docId:v('#x-j'), date:todayISO()};
+    const copy = {amount:v('#x-a'), category:v('#x-c'), method:v('#x-m'), desc:v('#x-s'), vendor:v('#x-v'), docId:v('#x-j'), date:todayISO(), monthly:w.querySelector('#x-r').checked, rid:x.monthly ? x.rid || x.id : ''};
     w.remove(); expenseBox(null, copy); toast('Copy ready. Change anything, then Save expense.'); });
   const dx = w.querySelector('[data-delx]');
   if (dx) dx.addEventListener('click', () => { w.remove(); confirmBox('Delete this expense?', `MVR ${money(x.amount)} · ${x.desc || x.category} on ${fmtDate(x.date)}`, 'Delete', async () => { await del('expenses', x.id); toast('Expense deleted'); if (location.hash.startsWith('#/doc/')) render(true, true); }); });
@@ -2441,10 +2451,38 @@ function drawPL(pdf){
   pdf.text(plState.basis === 'cash' ? 'Income = payments received in the period, without GST. Expenses by date.' : 'Income = invoices dated in the period, without GST; paid / credit as received up to today. Voided invoices are left out. Expenses by date.', L, y);
   return pdfFooter(pdf, k, y + 4, 'report', 'Profit & Loss');
 }
+// Monthly expenses: a ticked expense starts a series (rid = the first one's id). Each new month the latest of a series that is
+// still ticked and not yet added for this month is listed, so it can be added with one click (amounts can be changed first).
+function monthlyDue(){
+  const cur = todayISO().slice(0,7), last = {};
+  expList().forEach(x => { if (!x.monthly && !x.rid) return; const k = x.rid || x.id; if (!last[k] || (x.date || '') > (last[k].date || '')) last[k] = x; });
+  return Object.values(last).filter(x => x.monthly && ym(x.date) < cur).sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+}
+function monthlyBox(){
+  const due = monthlyDue(), cur = todayISO().slice(0,7), mName = new Date(cur + '-01T00:00:00').toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+  const dateIn = x => { const d = (x.date || '').slice(8) || '01', end = monthEnd(cur).slice(8), v = `${cur}-${d > end ? end : d}`; return v > todayISO() ? todayISO() : v; };   // same day as last time, not in the future
+  const w = modal('Monthly expenses · ' + mName, `<p class="dim" style="margin:0">Tick the ones to add for ${esc(mName)}. Change an amount or date if it is different this month.</p>
+    <div class="tablewrap" style="max-height:min(56vh,480px);overflow:auto"><table class="list mrows"><tbody>${due.map(x => `<tr data-m="${esc(x.id)}" style="cursor:default">
+      <td style="width:28px"><input type="checkbox" checked aria-label="Add ${esc(x.desc || x.category)}"></td>
+      <td><b>${esc(x.desc || x.category)}</b><div class="dim">${esc([x.category, x.vendor].filter(Boolean).join(' · '))} · last ${fmtDate(x.date)}</div></td>
+      <td style="width:150px"><input type="date" class="m-d" value="${dateIn(x)}" aria-label="Date"></td>
+      <td style="width:120px"><input class="m-a num" inputmode="decimal" value="${esc(x.amount)}" aria-label="Amount"></td></tr>`).join('')}</tbody></table></div>
+    <p class="dim" style="margin:0;font-size:12.5px">To stop one repeating, open its last expense and untick "Repeats every month".</p>`,
+    'Add ticked', async w => {
+      const rows = [...w.querySelectorAll('tr[data-m]')].filter(tr => tr.querySelector('input[type=checkbox]').checked);
+      if (!rows.length){ toast('Tick at least one expense.'); return false; }
+      for (const tr of rows){ const x = S.expenses[tr.dataset.m], amount = r2(num(tr.querySelector('.m-a').value)); if (!(amount > 0)) continue;
+        await put('expenses', uid(), {date:tr.querySelector('.m-d').value || todayISO(), amount, category:x.category, method:x.method || 'Cash', desc:x.desc || '', vendor:x.vendor || '', docId:'', note:'',
+          monthly:true, rid:x.rid || x.id, createdAt:new Date().toISOString(), createdBy:S.user || '', updatedAt:new Date().toISOString()}); }
+      toast(`${rows.length} monthly expense${rows.length === 1 ? '' : 's'} added`);
+    });
+  w.querySelector('.modal').style.width = 'min(720px, 100%)';
+}
 function expensesTab(main){
   const st = repState;
   const all = expList(), months = [...new Set(all.map(x => ym(x.date)))].sort().reverse();
-  $('#rbody').innerHTML = `<section class="panel">
+  const due = monthlyDue();
+  $('#rbody').innerHTML = `${due.length ? `<div class="mdue"><span>${icon('calendar',18)}<b>${due.length} monthly expense${due.length === 1 ? '' : 's'}</b> not added for this month yet (${esc(due.slice(0,3).map(x => x.desc || x.category).join(', '))}${due.length > 3 ? '…' : ''})</span><button type="button" class="btn sm primary" id="mdue">Review &amp; add</button></div>` : ''}<section class="panel">
       <div class="filters"><label class="search">${icon('search',18)}<input id="xq" type="search" placeholder="Search description, supplier or job" value="${esc(st.q)}" aria-label="Search expenses"></label>
         <select id="xm" aria-label="Month"><option value="all">All months</option>${months.map(k => `<option value="${k}" ${st.month === k ? 'selected' : ''}>${new Date(k + '-01T00:00:00').toLocaleDateString('en-GB', {month:'long', year:'numeric'})}</option>`).join('')}</select>
         <select id="xc" aria-label="Category"><option value="all">All categories</option>${EXP_CATS.map(c => `<option ${st.cat === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
@@ -2455,7 +2493,7 @@ function expensesTab(main){
       && (!q || [x.desc, x.vendor, x.category, (S.docs[x.docId] || {}).number, (S.docs[x.docId] || {}).customer?.name].join(' ').toLowerCase().includes(q)));
     const sum = list.reduce((a,x) => a + num(x.amount), 0);
     $('#xrows').innerHTML = list.length ? list.map(x => { const j = S.docs[x.docId];
-      return `<tr data-x="${esc(x.id)}"><td class="e-date">${fmtDate(x.date)}${x.vendor ? `<span class="m-only"> · ${esc(x.vendor)}</span>` : ''}</td><td class="e-what"><div>${esc(x.desc || x.category)}</div><div class="dim">${esc(x.vendor || '')}</div></td><td class="e-cat"><span class="tag" style="margin:0">${esc(x.category || '')}</span></td><td class="e-job dim">${j ? esc(j.number) : ''}</td><td class="num e-amt">${money(x.amount)}</td></tr>`; }).join('')
+      return `<tr data-x="${esc(x.id)}"><td class="e-date">${fmtDate(x.date)}${x.vendor ? `<span class="m-only"> · ${esc(x.vendor)}</span>` : ''}</td><td class="e-what"><div>${esc(x.desc || x.category)}${x.monthly ? ' <span class="tag rep" title="Repeats every month">↻ Monthly</span>' : ''}</div><div class="dim">${esc(x.vendor || '')}</div></td><td class="e-cat"><span class="tag" style="margin:0">${esc(x.category || '')}</span></td><td class="e-job dim">${j ? esc(j.number) : ''}</td><td class="num e-amt">${money(x.amount)}</td></tr>`; }).join('')
       + `<tr style="cursor:default;font-weight:700"><td colspan="4">Total (${list.length})</td><td class="num">${money(sum)}</td></tr>`
       : `<tr><td colspan="5" class="empty">${all.length ? 'No expenses match.' : 'No expenses yet. Add fuel, materials, labour and other costs to see your profit.'}</td></tr>`;
     $('#xrows').querySelectorAll('[data-x]').forEach(r => r.addEventListener('click', () => expenseBox(S.expenses[r.dataset.x])));
@@ -2464,6 +2502,7 @@ function expensesTab(main){
   $('#xm').addEventListener('change', e => { st.month = e.target.value; draw(); });
   $('#xc').addEventListener('change', e => { st.cat = e.target.value; draw(); });
   const ax = $('#addx'); if (ax) ax.addEventListener('click', () => expenseBox(null));
+  const md = $('#mdue'); if (md) md.addEventListener('click', monthlyBox);
   draw();
 }
 
@@ -3054,7 +3093,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Duplicate expense';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Monthly expenses';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
