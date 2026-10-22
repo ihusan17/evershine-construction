@@ -218,6 +218,8 @@ table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-so
 /* Dhivehi interface (right to left); documents stay English, left to right */
 html.lang-dv .sheet,html.lang-dv .sheet-fit,html.lang-dv .pv .sheet{direction:ltr;text-align:left}
 html.lang-dv body{font-family:"Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
+[data-lang-set="dv"],.dvf{font-family:"Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
+.thm .dvhint{display:block;font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
 html.lang-dv input,html.lang-dv textarea,html.lang-dv select{font-family:inherit}
 html.lang-dv .num,html.lang-dv .n,html.lang-dv input[type=number],html.lang-dv input[inputmode=decimal]{direction:ltr}
 /* English text left inside the Dhivehi screens (dates, names, sentences) keeps its own left-to-right order but stays right-aligned */
@@ -1113,7 +1115,7 @@ async function boot(){
   let got = null;
   if (c && typeof c.use === 'function'){ try { got = await c.use('db'); } catch(e){} }
   if (got){ db = got; S.mode = 'cloud'; subscribe(); }
-  else { S.mode = 'local'; loadLocal(); S.ready = true; fixWording(); noteLive(); render(true); }
+  else { S.mode = 'local'; loadLocal(); S.ready = true; fixWording(); applyDvFont(); noteLive(); render(true); }
   if (c && typeof c.use === 'function') c.use('downloads').then(d => { downloads = d; }).catch(() => {});
 }
 
@@ -1355,7 +1357,7 @@ let dvFontOn = null;
 function applyDvFont(){
   const f = S.settings.dvFont || ''; if (f === dvFontOn) return; dvFontOn = f;
   let st = document.getElementById('dvfont'); if (!st){ st = document.createElement('style'); st.id = 'dvfont'; document.head.appendChild(st); }
-  st.textContent = f ? `@font-face{font-family:"Faruma";src:url(data:font/ttf;base64,${f}) format("truetype");unicode-range:U+0780-07BF,U+FDF2,U+060C,U+061B,U+061F}` : '';
+  st.textContent = f ? `@font-face{font-family:"Faruma";src:url(data:font/ttf;base64,${f}) format("truetype");size-adjust:112%;unicode-range:U+0780-07BF,U+FDF2,U+060C,U+061B,U+061F}` : '';
 }
 function onData(){
   renderSide(); fixWording(); applyDvFont(); noteLive();
@@ -1472,7 +1474,7 @@ function renderSide(){
       <details class="menu acct"><summary class="avatar" title="Account" aria-label="Account">${esc((who || S.settings.name || 'E').trim().charAt(0).toUpperCase())}</summary>
         <div class="pop"><div class="who">${who ? `<b>${esc(who)}</b>` : `<b>${esc(S.settings.name || 'Evershine')}</b>`}${S.role && S.mode === 'cloud' ? `<span class="rolechip">${esc(ROLES[S.role][0])}</span><br>` : ''}<i class="${S.mode}"></i>${modeText}</div>
           <div class="thm"><span>Theme</span><div class="seg" role="radiogroup" aria-label="Theme">${[['light','sun','Light'],['dark','moon','Dark'],['auto','monitor','Auto']].map(([k,ic,l]) => `<button type="button" role="radio" aria-checked="${themePref()===k}" class="${themePref()===k?'on':''}" data-theme-set="${k}" title="${k==='auto' ? 'Follow this device' : l + ' theme'}">${icon(ic,15)}${l}</button>`).join('')}</div></div>
-          <div class="thm"><span>Language</span><div class="seg" role="radiogroup" aria-label="Language">${[['en','English'],['dv','ދިވެހި']].map(([k,l]) => `<button type="button" role="radio" aria-checked="${LANG===k}" class="${LANG===k?'on':''}" data-lang-set="${k}" data-notr>${l}</button>`).join('')}</div></div>
+          <div class="thm"><span>Language</span><div class="seg" role="radiogroup" aria-label="Language">${[['en','English'],['dv','ދިވެހި']].map(([k,l]) => `<button type="button" role="radio" aria-checked="${LANG===k}" class="${LANG===k?'on':''}" data-lang-set="${k}" data-notr>${l}</button>`).join('')}</div>${LANG==='dv' && !S.settings.dvFont ? `<small class="dvhint" data-notr>Faruma not uploaded: Settings → Dhivehi font → Upload Faruma (.ttf)</small>` : ''}</div>
           ${isOwnerRole() ? `<a href="#/settings">${icon('gear')}Settings</a>` : ''}${who ? `<button type="button" id="signout">${icon('out')}Sign out</button>` : ''}</div></details>
     </div>`;
   const t = $('#top');
@@ -2730,7 +2732,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-07 · Dhivehi v4';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Dhivehi UI';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
