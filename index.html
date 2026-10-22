@@ -1657,6 +1657,7 @@ Object.assign(DV, {
   'GST collected (owed to MIRA, not income)':'ނެގި GST (MIRA އަށް ދައްކަންޖެހޭ، އާމްދަނީއެއް ނޫން)', 'Profit and loss for the period you pick. Income is counted without GST.':'ހޮވާ މުއްދަތުގެ ފައިދާއާއި ގެއްލުން. އާމްދަނީ ގުނެނީ GST ނުލާ.', 'same as before':'ކުރީގެ ހަމަ',
   'This month':'މި މަސް', 'Last month':'ފާއިތުވި މަސް', 'Pick a month…':'މަހެއް ހޮވާ…', 'Custom dates…':'އެހެން ތާރީޚުތައް…', 'Previous month':'ކުރީ މަސް', 'Same dates last year':'ފާއިތުވި އަހަރު މި ތާރީޚުތައް', 'to':'އާ ހަމައަށް',
   'Paid sales (received)':'ފައިސާ ލިބިފައިވާ ވިއްކުން', 'Credit sales (not yet paid)':'ކްރެޑިޓަށް ވިއްކުން (އަދި ނުދައްކާ)',
+  'Credit (not yet paid)':'ކްރެޑިޓް (އަދި ނުދައްކާ)',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2325,7 +2326,7 @@ function plRange(){
 }
 const shiftYear = k => (+k.slice(0,4) - 1) + k.slice(4);
 function plData(from, to, basis){
-  const inR = iso => !!iso && iso >= from && iso <= to, P = {goods:0, hire:0, disc:0, gst:0, paid:0, credit:0, cos:{}, run:{}, src:{goods:[], hire:[], disc:[], gst:[], paid:[], credit:[]}, xs:{}};
+  const inR = iso => !!iso && iso >= from && iso <= to, P = {goods:0, hire:0, disc:0, gst:0, paid:0, credit:0, cos:{}, run:{}, src:{goods:[], hire:[], disc:[], gst:[], paid:[], credit:[], goods_paid:[], goods_credit:[], hire_paid:[], hire_credit:[]}, goods_paid:0, goods_credit:0, hire_paid:0, hire_credit:0, xs:{}};
   Object.values(S.docs).filter(d => d.type === 'invoice' && !isVoid(d)).forEach(d => {
     const tot = total(d); let f = 0;
     if (basis === 'cash'){ const got = (d.payments || []).filter(p => inR(p.date || d.date)).reduce((s,p) => s + num(p.amount), 0); f = tot > 0 ? Math.min(got, tot) / tot : 0; }
@@ -2338,6 +2339,9 @@ function plData(from, to, basis){
     const net = g - ds, pf = basis === 'cash' || tot <= 0 ? 1 : Math.min(paidOf(d), tot) / tot;
     if (net * pf) { P.paid += net * pf; P.src.paid.push({d, v:net * pf}); }
     if (net * (1 - pf) > 0.004) { P.credit += net * (1 - pf); P.src.credit.push({d, v:net * (1 - pf)}); }
+    // the same split under each category (before discount, so the two lines add up to the category)
+    if (g * pf) { P[k + '_paid'] += g * pf; P.src[k + '_paid'].push({d, v:g * pf}); }
+    if (g * (1 - pf) > 0.004) { P[k + '_credit'] += g * (1 - pf); P.src[k + '_credit'].push({d, v:g * (1 - pf)}); }
   });
   expList().filter(x => inR(x.date)).forEach(x => { const c = x.category || 'Other', b = COS_CATS.includes(c) ? P.cos : P.run;
     b[c] = (b[c] || 0) + num(x.amount); (P.xs[c] = P.xs[c] || []).push(x); });
@@ -2348,7 +2352,8 @@ function plData(from, to, basis){
 function plRows(A, B){
   const cats = (a, b, order) => [...new Set([...order.filter(c => c in a || c in b), ...Object.keys(a), ...Object.keys(b)])];
   const vessel = (S.settings.vesselName || '').trim();
-  const rows = [{sec:'Income'}, {k:'goods', label:'Goods & materials sales', v:A.goods, p:B.goods}, {k:'hire', label:'Boat hire' + (vessel ? ` (${vessel})` : ''), v:A.hire, p:B.hire}];
+  const split = k => plState.basis === 'cash' ? [] : [{k:k + '_paid', sub:1, label:'Paid', v:A[k + '_paid'], p:B[k + '_paid']}, {k:k + '_credit', sub:1, label:'Credit (not yet paid)', v:A[k + '_credit'], p:B[k + '_credit']}];
+  const rows = [{sec:'Income'}, {k:'goods', label:'Goods & materials sales', v:A.goods, p:B.goods}, ...split('goods'), {k:'hire', label:'Boat hire' + (vessel ? ` (${vessel})` : ''), v:A.hire, p:B.hire}, ...split('hire')];
   if (A.disc || B.disc) rows.push({k:'disc', label:'Less discounts', v:-A.disc, p:-B.disc});
   rows.push({tot:1, label:'Total income', v:A.income, p:B.income});
   if (plState.basis !== 'cash') rows.push({k:'paid', sub:1, label:'Paid sales (received)', v:A.paid, p:B.paid}, {k:'credit', sub:1, label:'Credit sales (not yet paid)', v:A.credit, p:B.credit});
@@ -3043,7 +3048,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Paid & credit sales';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Paid & credit by category';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
