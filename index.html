@@ -1658,6 +1658,7 @@ Object.assign(DV, {
   'This month':'މި މަސް', 'Last month':'ފާއިތުވި މަސް', 'Pick a month…':'މަހެއް ހޮވާ…', 'Custom dates…':'އެހެން ތާރީޚުތައް…', 'Previous month':'ކުރީ މަސް', 'Same dates last year':'ފާއިތުވި އަހަރު މި ތާރީޚުތައް', 'to':'އާ ހަމައަށް',
   'Paid sales (received)':'ފައިސާ ލިބިފައިވާ ވިއްކުން', 'Credit sales (not yet paid)':'ކްރެޑިޓަށް ވިއްކުން (އަދި ނުދައްކާ)',
   'Credit (not yet paid)':'ކްރެޑިޓް (އަދި ނުދައްކާ)',
+  'Copy ready. Change anything, then Save expense.':'ކޮޕީ ތައްޔާރު. ބޭނުންނަމަ ބަދަލުކޮށް، ޚަރަދު ސޭވް ކުރޭ.', 'Add expense':'ޚަރަދެއް އިތުރުކުރޭ', 'Expense added':'ޚަރަދު އިތުރުކޮށްފި', 'Expense saved':'ޚަރަދު ސޭވްކޮށްފި',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2215,7 +2216,7 @@ function expenseBox(x, preset){
     <div class="fld"><label for="x-s">Description</label><input id="x-s" value="${esc(x.desc)}" placeholder="e.g. Diesel for REHENDHI, 200 L"></div>
     <div class="fld"><label for="x-v">Paid to (optional)</label><input id="x-v" value="${esc(x.vendor)}" placeholder="Supplier or person"></div>
     <div class="fld"><label for="x-j">For job (optional)</label><select id="x-j"><option value="">Not linked to a job</option>${jobs.map(d => `<option value="${esc(d.id)}" ${d.id === x.docId ? 'selected' : ''}>${esc(d.number)} · ${esc(d.customer?.name || '')}</option>`).join('')}</select><span class="hint">Link it to a quotation or invoice to see that job's profit.</span></div>
-    ${!isNew && isOwnerRole() ? '<div class="row"><button type="button" class="btn sm danger" data-delx>Delete expense</button></div>' : ''}`,
+    ${!isNew ? `<div class="row"><button type="button" class="btn sm" data-dupx>⧉ Duplicate</button>${isOwnerRole() ? '<button type="button" class="btn sm danger" data-delx>Delete expense</button>' : ''}</div>` : ''}`,
     'Save expense', async w => {
       const amount = r2(num(w.querySelector('#x-a').value));
       if (!(amount > 0)){ toast('Enter an amount above zero.'); return false; }
@@ -2226,6 +2227,11 @@ function expenseBox(x, preset){
       toast(isNew ? 'Expense added' : 'Expense saved');
       if (location.hash.startsWith('#/doc/')) render(true, true);
     });
+  // Duplicate: a new expense with the same details (as shown in the box), dated today
+  const dp = w.querySelector('[data-dupx]');
+  if (dp) dp.addEventListener('click', () => { const v = id => w.querySelector(id).value;
+    const copy = {amount:v('#x-a'), category:v('#x-c'), method:v('#x-m'), desc:v('#x-s'), vendor:v('#x-v'), docId:v('#x-j'), date:todayISO()};
+    w.remove(); expenseBox(null, copy); toast('Copy ready. Change anything, then Save expense.'); });
   const dx = w.querySelector('[data-delx]');
   if (dx) dx.addEventListener('click', () => { w.remove(); confirmBox('Delete this expense?', `MVR ${money(x.amount)} · ${x.desc || x.category} on ${fmtDate(x.date)}`, 'Delete', async () => { await del('expenses', x.id); toast('Expense deleted'); if (location.hash.startsWith('#/doc/')) render(true, true); }); });
 }
@@ -3048,7 +3054,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Paid & credit by category';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Duplicate expense';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
