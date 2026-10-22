@@ -1670,6 +1670,7 @@ Object.assign(DV, {
   'Review & add':'ބަލައި އިތުރުކުރޭ', 'Add ticked':'ހޮވި ތަކެތި އިތުރުކުރޭ', 'Tick at least one expense.':'މަދުވެގެން އެއް ޚަރަދު ހޮވާ.', '↻ Monthly':'↻ މަހުން މަހަށް',
   'To stop one repeating, open its last expense and untick "Repeats every month".':'ތަކުރާރުވުން ހުއްޓުވަން، އެންމެ ފަހުގެ ޚަރަދު ހުޅުވައި "Repeats every month" ގެ ޓިކް ނަގާލާ.',
   'By category: goods & boat hire':'ބާވަތުން: މުދާ އަދި ބޯޓު ހަޔަރ',
+  'Paid to (employee name)':'ދެއްކީ (މުވައްޒަފުގެ ނަން)', 'Employee name':'މުވައްޒަފުގެ ނަން', 'Name not given':'ނަމެއް ނުލިޔޭ',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2226,7 +2227,7 @@ function expenseBox(x, preset){
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="x-c">Category</label><select id="x-c">${EXP_CATS.concat(EXP_CATS.includes(x.category) ? [] : [x.category]).map(c => `<option ${c === x.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
       <div class="fld"><label for="x-m">Paid by</label><select id="x-m">${['Cash','Bank transfer','Card','Cheque','Other'].map(m => `<option ${m === x.method ? 'selected' : ''}>${m}</option>`).join('')}</select></div></div>
     <div class="fld"><label for="x-s">Description</label><input id="x-s" value="${esc(x.desc)}" placeholder="e.g. Diesel for REHENDHI, 200 L"></div>
-    <div class="fld"><label for="x-v">Paid to (optional)</label><input id="x-v" value="${esc(x.vendor)}" placeholder="Supplier or person"></div>
+    <div class="fld"><label for="x-v" id="x-vl">${x.category === 'Salaries' ? 'Paid to (employee name)' : 'Paid to (optional)'}</label><input id="x-v" value="${esc(x.vendor)}" placeholder="Supplier or person"></div>
     <label class="tickrow"><input type="checkbox" id="x-r" ${x.monthly ? 'checked' : ''}> <span><b>Repeats every month</b><br><span class="dim">Rent, electricity, salaries… Each new month it is listed under Expenses, ready to add with one click.</span></span></label>
     <div class="fld"><label for="x-j">For job (optional)</label><select id="x-j"><option value="">Not linked to a job</option>${jobs.map(d => `<option value="${esc(d.id)}" ${d.id === x.docId ? 'selected' : ''}>${esc(d.number)} · ${esc(d.customer?.name || '')}</option>`).join('')}</select><span class="hint">Link it to a quotation or invoice to see that job's profit.</span></div>
     ${!isNew ? `<div class="row"><button type="button" class="btn sm" data-dupx>⧉ Duplicate</button>${isOwnerRole() ? '<button type="button" class="btn sm danger" data-delx>Delete expense</button>' : ''}</div>` : ''}`,
@@ -2240,6 +2241,8 @@ function expenseBox(x, preset){
       toast(isNew ? 'Expense added' : 'Expense saved');
       if (location.hash.startsWith('#/doc/')) render(true, true);
     });
+  w.querySelector('#x-c').addEventListener('change', e => { const sal = e.target.value === 'Salaries';
+    w.querySelector('#x-vl').textContent = sal ? 'Paid to (employee name)' : 'Paid to (optional)'; w.querySelector('#x-v').placeholder = sal ? 'Employee name' : 'Supplier or person'; });
   // Duplicate: a new expense with the same details (as shown in the box), dated today
   const dp = w.querySelector('[data-dupx]');
   if (dp) dp.addEventListener('click', () => { const v = id => w.querySelector(id).value;
@@ -2384,7 +2387,12 @@ function plRows(A, B){
   const cc = cats(A.cos, B.cos, COS_CATS); cc.forEach(c => rows.push({x:c, label:c, v:A.cos[c] || 0, p:B.cos[c] || 0}));
   if (!cc.length) rows.push({none:1, label:'No costs recorded'});
   rows.push({tot:1, label:'Gross profit', v:A.gross, p:B.gross, pct:A.income ? Math.round(A.gross / A.income * 100) : null}, {sec:'Running costs'});
-  const rc = cats(A.run, B.run, EXP_CATS); rc.forEach(c => rows.push({x:c, label:c, v:A.run[c] || 0, p:B.run[c] || 0}));
+  const rc = cats(A.run, B.run, EXP_CATS); rc.forEach(c => { rows.push({x:c, label:c, v:A.run[c] || 0, p:B.run[c] || 0});
+    if (c === 'Salaries'){   // one line per person ("Paid to" on the expense)
+      const by = (P, o = {}) => ((P.xs.Salaries) || []).forEach(x => { const n = payee(x); o[n] = (o[n] || 0) + num(x.amount); }) || o;
+      const a = by(A), b = by(B);
+      Object.keys({...a, ...b}).sort((m, n) => (a[n] || 0) - (a[m] || 0) || m.localeCompare(n)).forEach(n => rows.push({x:'Salaries', who:n, sub:1, label:n, v:a[n] || 0, p:b[n] || 0}));
+    } });
   if (!rc.length) rows.push({none:1, label:'No costs recorded'});
   rows.push({big:1, label:'Net profit', v:A.net, p:B.net}, {k:'gst', note:1, label:'GST collected (owed to MIRA, not income)', v:A.gst, p:B.gst});
   return rows;
@@ -2424,8 +2432,9 @@ function plTab(main){
     btn.disabled = false; btn.innerHTML = l; });
   draw();
 }
+const payee = x => (x.vendor || '').trim() || 'Name not given';
 function plDrill(r, A){
-  const items = r.x ? (A.xs[r.x] || []).map(x => ({label:x.desc || x.category, sub:[fmtDate(x.date), x.vendor].filter(Boolean).join(' · '), v:num(x.amount), go:x.docId ? 'doc/' + x.docId : ''}))
+  const items = r.x ? (A.xs[r.x] || []).filter(x => !r.who || payee(x) === r.who).map(x => ({label:x.desc || x.category, sub:[fmtDate(x.date), x.vendor].filter(Boolean).join(' · '), v:num(x.amount), go:x.docId ? 'doc/' + x.docId : ''}))
     : (A.src[r.k] || []).map(s => ({label:s.d.number, sub:[s.d.customer?.name, fmtDate(s.d.date)].filter(Boolean).join(' · '), v:s.v, go:'doc/' + s.d.id}));
   items.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
   const w = modal(r.label, items.length ? `<div class="tablewrap" style="max-height:min(60vh,520px);overflow:auto"><table class="list"><tbody>${items.map(it => `<tr ${it.go ? `data-go="${esc(it.go)}"` : 'style="cursor:default"'}><td><b>${esc(it.label)}</b><div class="dim">${esc(it.sub)}</div></td><td class="num">${money(it.v)}</td></tr>`).join('')}
@@ -3103,7 +3112,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Income folded';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Salaries by person';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
