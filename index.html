@@ -2449,7 +2449,7 @@ async function buildPL(){
 function drawPL(pdf){
   const k = pdfKit(pdf), {BLUE, INK, GREY, LINE, ZEBRA, WHITE, L, R, CW, BOTTOM, font, txt} = k;
   const per = plRange(), A = plData(per.from, per.to, plState.basis), B = plData(per.pfrom, per.pto, plState.basis);
-  const open = plState.incOpen; plState.incOpen = true; const rows = plRows(A, B).filter(r => !r.fold); plState.incOpen = open;   // the PDF always shows the categories
+  const rows = plRows(A, B).filter(r => !r.fold);   // like the screen: the categories only when "By category" is open
   let y = pdfHeader(pdf, k, 'Profit & Loss', [['Period:', `${fmtDate(per.from)} – ${fmtDate(per.to)}`], ['Basis:', plState.basis === 'cash' ? 'Cash received' : 'Invoiced'], ['Date:', fmtDate(todayISO())]]);
   y += 2;
   const C1 = R - 42, C2 = R - 2.4;
@@ -3112,7 +3112,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Salaries by person';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · PDF follows fold';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
