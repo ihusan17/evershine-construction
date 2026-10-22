@@ -217,7 +217,7 @@ table.list.docs tr.picked td,table.list.docs tr.picked{background:var(--brand-so
 .pbulk[hidden]{display:none!important}
 /* Dhivehi interface (right to left); documents stay English, left to right */
 html.lang-dv .sheet,html.lang-dv .sheet-fit,html.lang-dv .pv .sheet{direction:ltr;text-align:left}
-html.lang-dv body{font-family:"EvFaruma","Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
+html.lang-dv body{font-family:"Plus Jakarta Sans","EvFaruma","Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
 [data-lang-set="dv"],.dvf{font-family:"EvFaruma","Faruma","MV Faseyha","Noto Sans Thaana",var(--ui)}
 .thm .dvhint{display:block;font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
 html.lang-dv input,html.lang-dv textarea,html.lang-dv select{font-family:inherit}
@@ -1596,6 +1596,18 @@ Object.assign(DV, {
   'No matches. Try a different search or filter.':'އެއްވެސް އެއްޗެއް ނުފެނުނު. އެހެން ގޮތަކަށް ހޯދާ.', 'No customer has a credit.':'ކްރެޑިޓް ހުރި ކަސްޓަމަރެއް ނެތް.', 'No customer owes money.':'ފައިސާ ބާކީ ކަސްޓަމަރެއް ނެތް.',
   'No customers match. Try a different search or filter.':'އެއްވެސް ކަސްޓަމަރެއް ނުފެނުނު. އެހެން ގޮތަކަށް ހޯދާ.', 'No customers yet.':'އަދި ކަސްޓަމަރެއް ނެތް.', 'No expenses match.':'އެއްވެސް ޚަރަދެއް ނުފެނުނު.', 'No products match.':'އެއްވެސް މުދަލެއް ނުފެނުނު.',
   "That page doesn't exist or the document was deleted.":'އެ ޕޭޖެއް ނެތް، ނުވަތަ ޑޮކިއުމަންޓް ފޮހެލާފައި.', 'Go to the overview':'އޯވަވިއުއަށް ދާ',
+  'No category':'ބާވަތެއް ނެތް', 'Not used yet':'އަދި ބޭނުންނުކުރޭ', 'More':'އިތުރު', 'Name / description':'ނަން / ތަފްޞީލު', '+ New':'+ އައު', 'Cost price (optional, only you see it)':'ގަތް އަގު (އިޚްތިޔާރީ، ފެންނާނީ ތިބާއަށް)',
+  '⧉ Duplicate':'⧉ ކޮޕީ ހަދާ', 'Delete product':'މުދާ ފޮހެލާ', 'Save product':'މުދާ ސޭވް ކުރޭ', 'Nos, Bags, CUM…':'Nos، Bags، CUM…', 'What it costs you per unit':'ކޮންމެ ޔުނިޓަކަށް ތިބާއަށް ކުރާ ޚަރަދު',
+  'Invoices, payments and balance':'އިންވޮއިސް، ފައިސާ އަދި ބާކީ', 'Delete customer':'ކަސްޓަމަރު ފޮހެލާ', 'Save customer':'ކަސްޓަމަރު ސޭވް ކުރޭ',
+  'Preparing PDF…':'PDF ތައްޔާރުކުރަނީ…', "Sharing didn't work here. Use Download PDF and send it in Telegram.":'މިތަނުން ޝެއާ ނުވި. PDF ޑައުންލޯޑްކޮށް ޓެލެގްރާމްގައި ފޮނުވާ.', "Sharing didn't work here. Use Download PDF and send it in Viber.":'މިތަނުން ޝެއާ ނުވި. PDF ޑައުންލޯޑްކޮށް ވައިބަރގައި ފޮނުވާ.',
+  'The PDF could not be created. Try Print, and choose "Save as PDF".':'PDF ނުހެދުނު. ޕްރިންޓް ކޮށް "Save as PDF" ހޮވާ.', 'Date received':'ލިބުނު ތާރީޚު', 'Bank transfer':'ބޭންކް ޓްރާންސްފަރ', 'Cash':'ނަގުދު', 'Cheque':'ޗެކް', 'Card':'ކާޑު',
+  'Optional, e.g. transfer reference':'އިޚްތިޔާރީ، މިސާލު ޓްރާންސްފަރ ރެފަރެންސް', 'Signatures':'ސޮއިތައް', 'Delivered by (name)':'ޑެލިވަރ ކުރީ (ނަން)', 'Delivered on':'ޑެލިވަރ ކުރި ތާރީޚު', 'Received by (name)':'ބަލައިގަތީ (ނަން)', 'Received on':'ބަލައިގަތް ތާރީޚު',
+  'Your saved signature is placed on the "Delivered by" line. Change it in Settings → Signature.':'ސޭވްކުރި ސޮއި "Delivered by" ލައިނުގައި ޖެހޭނެ. ބަދަލުކުރަން ސެޓިންގްސް → ސޮއި.', 'Site or location':'ސައިޓް ނުވަތަ ތަން', 'Leave blank to write by hand':'އަތުން ލިޔަން ހުސްކޮށް ބާއްވާ',
+  'Paid to (optional)':'ފައިސާ ދެއްކީ (އިޚްތިޔާރީ)', 'For job (optional)':'މަސައްކަތް (އިޚްތިޔާރީ)', 'Not linked to a job':'މަސައްކަތަކާ ނުގުޅާ', "Link it to a quotation or invoice to see that job's profit.":'މަސައްކަތުގެ ފައިދާ ބަލަން ކޯޓޭޝަނަކާ ނުވަތަ އިންވޮއިހަކާ ގުޅާލާ.',
+  'Save expense':'ޚަރަދު ސޭވް ކުރޭ', 'e.g. Diesel for REHENDHI, 200 L':'މިސާލު REHENDHI އަށް ޑީސަލް، 200 L', 'Supplier or person':'ސަޕްލަޔަރު ނުވަތަ މީހާ', 'Expense':'ޚަރަދު', 'Delete expense':'ޚަރަދު ފޮހެލާ',
+  'Saved':'ސޭވްކޮށްފި', 'Customer saved':'ކަސްޓަމަރު ސޭވްކޮށްފި', 'Customer deleted':'ކަސްޓަމަރު ފޮހެލައިފި', 'Product saved':'މުދާ ސޭވްކޮށްފި', 'Product deleted':'މުދާ ފޮހެލައިފި', 'Expense deleted':'ޚަރަދު ފޮހެލައިފި', 'Payment removed':'ފައިސާ ފޮހެލައިފި',
+  'Categories saved':'ބާވަތްތައް ސޭވްކޮށްފި', 'Marked as delivered':'ޑެލިވަރ ކުރިކަމަށް ޖަހައިފި', 'Marked as not delivered':'ޑެލިވަރ ނުކުރާކަމަށް ޖަހައިފި', 'Add a name.':'ނަމެއް ލިޔޭ.', 'Add at least one line.':'މަދުވެގެން އެއް ލައިން ލިޔޭ.', 'Enter an amount above zero.':'ސުމެއްގެ މަތީ ޢަދަދެއް ލިޔޭ.', 'Pick a date.':'ތާރީޚެއް ހޮވާ.',
+  'The change could not be saved. Check your connection and try again.':'ބަދަލު ސޭވް ނުވި. ކަނެކްޝަން ބަލައިލާފައި އަލުން ފަށާ.', 'PDF is ready. Tap Email again.':'PDF ތައްޔާރު. އަލުން އީމެއިލް އަށް ފިތާލާ.',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -1619,8 +1631,10 @@ DV_RX.push(
   [new RegExp(`^(\\d+) shown · MVR ${dvAmt}$`), '$1 ފެންނަނީ · MVR $2'], [/^(\d+) shown$/, '$1 ފެންނަނީ'],
   [/^([\d.,]+) qty$/, '$1 އަދަދު'], [/^(\d+)% of sales$/, 'ވިއްކުމުގެ $1%'],
   [new RegExp(`^(\\d+) saved · MVR ${dvAmt} owed\\..*$`), '$1 ކަސްޓަމަރުން · MVR $2 ބާކީ. އާ މީހަކަށް ޑޮކިއުމަންޓެއް ހަދާއިރު ކަސްޓަމަރު އަމިއްލައަށް އިތުރުވޭ.'],
-  [/^(\d+) products?\..*$/, '$1 މުދާ. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
+  [/^(\d+) products?\. .*$/, '$1 މުދާ. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
   [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'],
+  [/^(\d+) documents?$/, '$1 ޑޮކިއުމަންޓް'], [new RegExp(`^Balance is MVR ${dvAmt}$`), 'ބާކީ MVR $1'], [/^to change it for this .+\.$/, 'އަށް ފިތާލާ.'],
+  [/^(\d+) products?(?: in (\d+) categor(?:y|ies))?\. In the quotation.*$/, (m, n, c) => n + ' މުދާ' + (c ? ' · ' + c + ' ބާވަތް' : '') + '. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
   [/^No (quotations|invoices|delivery notes) yet\.$/, (m, t) => 'އަދި ' + ({quotations:'ކޯޓޭޝަނެއް', invoices:'އިންވޮއިހެއް', 'delivery notes':'ޑެލިވަރީ ނޯޓެއް'})[t] + ' ނެތް.'], [/^Total \((\d+)\)$/, 'ޖުމްލަ ($1)'],
   [/^New (quotation|invoice|delivery note) (\S+)$/, (m, t, n) => 'އައު ' + DV_TYPE[t] + ' ' + n],
   [/^Payment received · (\S+)$/, 'ފައިސާ ލިބިއްޖެ · $1'], [/^(\S+) is paid in full$/, '$1 ފުރިހަމައަށް ދައްކައިފި'], [/^(\S+) is overdue$/, '$1 ލަސްވެއްޖެ'],
@@ -1643,13 +1657,15 @@ function trText(t){ const k = t.trim(); if (!k) return null; let v = DV[k];
   const w = (v || k).replace(DV_DATE, (m, d, mo) => d + ' ' + DV_MON[mo]).replace(/ · by (\S+)$/, ' · $1 ގެ ފަރާތުން');   // dates and "by name" inside any line
   return w !== k ? t.replace(k, w) : null; }
 function trAttr(el){ ['placeholder', 'title', 'aria-label'].forEach(a => { const v = el.getAttribute && el.getAttribute(a); const n = v && DV[v.trim()]; if (n) el.setAttribute(a, n); }); }
+// an <option> without a value uses its text as the value: keep the English value so saving and filters still work
+function trSet(n, t){ const o = n.parentElement; if (o && o.tagName === 'OPTION' && !o.hasAttribute('value')) o.setAttribute('value', o.textContent); n.nodeValue = t; }
 function translate(root){
   if (LANG !== 'dv' || !root) return;
-  if (root.nodeType === 3){ const p = root.parentElement; if (p && !p.closest(TR_SKIP)){ const n = trText(root.nodeValue); if (n !== null) root.nodeValue = n; } return; }
+  if (root.nodeType === 3){ const p = root.parentElement; if (p && !p.closest(TR_SKIP)){ const n = trText(root.nodeValue); if (n !== null) trSet(root, n); } return; }
   if (root.nodeType !== 1 || root.closest(TR_SKIP)) return;
   trAttr(root); root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el => { if (!el.closest('.sheet')) trAttr(el); });
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode: n => n.parentElement && n.parentElement.closest(TR_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
-  for (let n; (n = w.nextNode());){ const t = trText(n.nodeValue); if (t !== null) n.nodeValue = t; }
+  for (let n; (n = w.nextNode());){ const t = trText(n.nodeValue); if (t !== null) trSet(n, t); }
 }
 function applyLang(){
   const dv = LANG === 'dv', h = document.documentElement;
@@ -2844,7 +2860,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Dhivehi UI v5';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Dhivehi UI v6';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
