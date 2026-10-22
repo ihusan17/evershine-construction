@@ -596,6 +596,7 @@ table.list.pl tbody tr{cursor:default}table.list.pl tr[data-i]{cursor:pointer}
 table.list.pl tr.sec td{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--brand);padding-top:16px;border-bottom:0}
 table.list.pl tr.ln td:first-child,table.list.pl tr.none td{padding-left:30px}table.list.pl tr.none td{color:var(--muted);font-size:13px}
 table.list.pl tr.tot td{font-weight:800;border-top:1px solid var(--line)}
+table.list.pl tr.sub td{font-size:13px;color:var(--muted);padding-top:6px;padding-bottom:6px}table.list.pl tr.sub td:first-child{padding-left:46px}table.list.pl tr.sub td:first-child::before{content:"↳ "}
 table.list.pl tr.big td{font-weight:800;font-size:16.5px;border-top:2px solid var(--brand);background:var(--surface-2)}
 table.list.pl tr.note td{font-size:12.5px;color:var(--muted)}
 table.list.pl .pct{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
@@ -1655,6 +1656,7 @@ Object.assign(DV, {
   'Goods & materials sales':'މުދާ އަދި ސާމާނު ވިއްކުން', 'Less discounts':'ޑިސްކައުންޓް އުނިކޮށް', 'Total income':'ޖުމްލަ އާމްދަނީ', 'Gross profit':'ޖުމްލަ ފައިދާ', 'No costs recorded':'ޚަރަދެއް ލިޔެވިފައެއް ނެތް',
   'GST collected (owed to MIRA, not income)':'ނެގި GST (MIRA އަށް ދައްކަންޖެހޭ، އާމްދަނީއެއް ނޫން)', 'Profit and loss for the period you pick. Income is counted without GST.':'ހޮވާ މުއްދަތުގެ ފައިދާއާއި ގެއްލުން. އާމްދަނީ ގުނެނީ GST ނުލާ.', 'same as before':'ކުރީގެ ހަމަ',
   'This month':'މި މަސް', 'Last month':'ފާއިތުވި މަސް', 'Pick a month…':'މަހެއް ހޮވާ…', 'Custom dates…':'އެހެން ތާރީޚުތައް…', 'Previous month':'ކުރީ މަސް', 'Same dates last year':'ފާއިތުވި އަހަރު މި ތާރީޚުތައް', 'to':'އާ ހަމައަށް',
+  'Paid sales (received)':'ފައިސާ ލިބިފައިވާ ވިއްކުން', 'Credit sales (not yet paid)':'ކްރެޑިޓަށް ވިއްކުން (އަދި ނުދައްކާ)',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -1679,7 +1681,7 @@ DV_RX.push(
   [/^([\d.,]+) qty$/, '$1 އަދަދު'], [/^(\d+)% of sales$/, 'ވިއްކުމުގެ $1%'],
   [new RegExp(`^(\\d+) saved · MVR ${dvAmt} owed\\..*$`), '$1 ކަސްޓަމަރުން · MVR $2 ބާކީ. އާ މީހަކަށް ޑޮކިއުމަންޓެއް ހަދާއިރު ކަސްޓަމަރު އަމިއްލައަށް އިތުރުވޭ.'],
   [/^(\d+) products?\. .*$/, '$1 މުދާ. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
-  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'], [/^Profit & Loss · (.+)$/, 'ފައިދާއާއި ގެއްލުން · $1'], [/^Boat hire \((.+)\)$/, 'ބޯޓު ހަޔަރ ($1)'], [/^before (\d+)%$/, 'ކުރިން $1%'], [/^Tap a line to see the invoices or expenses behind it\. (Cash|Invoiced).*$/, (m, b) => 'ލައިނަކަށް ފިތާލުމުން އޭގެ ފަހަތުގައިވާ އިންވޮއިސް ނުވަތަ ޚަރަދު ފެންނާނެ. ' + (b === 'Cash' ? 'ލިބުނު ފައިސާ: މި މުއްދަތުގައި ލިބުނު ފައިސާ (GST ނުލާ).' : 'އިންވޮއިސް ކުރި: މި މުއްދަތުގެ ތާރީޚުގައިވާ އިންވޮއިސްތައް، ދެއްކި ނަމަވެސް ނުދެއްކި ނަމަވެސް.') + ' ޚަރަދު ގުނެނީ އޭގެ ތާރީޚުން.'], [/^vs before$/, 'ކުރިންނާ އަޅާބަލާއިރު'],
+  [/^Due (.+)$/, 'ދައްކަންޖެހޭ $1'], [/^Profit & Loss · (.+)$/, 'ފައިދާއާއި ގެއްލުން · $1'], [/^Boat hire \((.+)\)$/, 'ބޯޓު ހަޔަރ ($1)'], [/^before (\d+)%$/, 'ކުރިން $1%'], [/^Paid ([\d,]+) · Credit$/, 'ލިބިފައި $1 · ކްރެޑިޓް'], [/^Tap a line to see the invoices or expenses behind it\. (Cash|Invoiced).*$/, (m, b) => 'ލައިނަކަށް ފިތާލުމުން އޭގެ ފަހަތުގައިވާ އިންވޮއިސް ނުވަތަ ޚަރަދު ފެންނާނެ. ' + (b === 'Cash' ? 'ލިބުނު ފައިސާ: މި މުއްދަތުގައި ލިބުނު ފައިސާ (GST ނުލާ).' : 'އިންވޮއިސް ކުރި: މި މުއްދަތުގެ ތާރީޚުގައިވާ އިންވޮއިސްތައް، ދެއްކި ނަމަވެސް ނުދެއްކި ނަމަވެސް.') + ' ޚަރަދު ގުނެނީ އޭގެ ތާރީޚުން.'], [/^vs before$/, 'ކުރިންނާ އަޅާބަލާއިރު'],
   [/^(\d+) documents?$/, '$1 ޑޮކިއުމަންޓް'], [new RegExp(`^Balance is MVR ${dvAmt}$`), 'ބާކީ MVR $1'], [/^to change it for this .+\.$/, 'އަށް ފިތާލާ.'],
   [/^(\d+) products?(?: in (\d+) categor(?:y|ies))?\. In the quotation.*$/, (m, n, c) => n + ' މުދާ' + (c ? ' · ' + c + ' ބާވަތް' : '') + '. ކޯޓޭޝަން، އިންވޮއިސް ނުވަތަ ޑެލިވަރީ ނޯޓު ހަދާއިރު މުދަލަށް ފިތާލުމުން ލައިނެއްގެ ގޮތުގައި އިތުރުވާނެ.'],
   [/^No (quotations|invoices|delivery notes) yet\.$/, (m, t) => 'އަދި ' + ({quotations:'ކޯޓޭޝަނެއް', invoices:'އިންވޮއިހެއް', 'delivery notes':'ޑެލިވަރީ ނޯޓެއް'})[t] + ' ނެތް.'], [/^Total \((\d+)\)$/, 'ޖުމްލަ ($1)'],
@@ -2323,7 +2325,7 @@ function plRange(){
 }
 const shiftYear = k => (+k.slice(0,4) - 1) + k.slice(4);
 function plData(from, to, basis){
-  const inR = iso => !!iso && iso >= from && iso <= to, P = {goods:0, hire:0, disc:0, gst:0, cos:{}, run:{}, src:{goods:[], hire:[], disc:[], gst:[]}, xs:{}};
+  const inR = iso => !!iso && iso >= from && iso <= to, P = {goods:0, hire:0, disc:0, gst:0, paid:0, credit:0, cos:{}, run:{}, src:{goods:[], hire:[], disc:[], gst:[], paid:[], credit:[]}, xs:{}};
   Object.values(S.docs).filter(d => d.type === 'invoice' && !isVoid(d)).forEach(d => {
     const tot = total(d); let f = 0;
     if (basis === 'cash'){ const got = (d.payments || []).filter(p => inR(p.date || d.date)).reduce((s,p) => s + num(p.amount), 0); f = tot > 0 ? Math.min(got, tot) / tot : 0; }
@@ -2332,6 +2334,10 @@ function plData(from, to, basis){
     const k = d.kind === 'hire' ? 'hire' : 'goods', g = subtotal(d) * f, ds = discAmt(d) * f, gs = taxAmt(d) * f;
     P[k] += g; P.disc += ds; P.gst += gs;
     P.src[k].push({d, v:g}); if (ds) P.src.disc.push({d, v:-ds}); if (gs) P.src.gst.push({d, v:gs});
+    // paid vs credit sales (without GST): what has been received on this invoice so far
+    const net = g - ds, pf = basis === 'cash' || tot <= 0 ? 1 : Math.min(paidOf(d), tot) / tot;
+    if (net * pf) { P.paid += net * pf; P.src.paid.push({d, v:net * pf}); }
+    if (net * (1 - pf) > 0.004) { P.credit += net * (1 - pf); P.src.credit.push({d, v:net * (1 - pf)}); }
   });
   expList().filter(x => inR(x.date)).forEach(x => { const c = x.category || 'Other', b = COS_CATS.includes(c) ? P.cos : P.run;
     b[c] = (b[c] || 0) + num(x.amount); (P.xs[c] = P.xs[c] || []).push(x); });
@@ -2344,7 +2350,9 @@ function plRows(A, B){
   const vessel = (S.settings.vesselName || '').trim();
   const rows = [{sec:'Income'}, {k:'goods', label:'Goods & materials sales', v:A.goods, p:B.goods}, {k:'hire', label:'Boat hire' + (vessel ? ` (${vessel})` : ''), v:A.hire, p:B.hire}];
   if (A.disc || B.disc) rows.push({k:'disc', label:'Less discounts', v:-A.disc, p:-B.disc});
-  rows.push({tot:1, label:'Total income', v:A.income, p:B.income}, {sec:'Cost of sales'});
+  rows.push({tot:1, label:'Total income', v:A.income, p:B.income});
+  if (plState.basis !== 'cash') rows.push({k:'paid', sub:1, label:'Paid sales (received)', v:A.paid, p:B.paid}, {k:'credit', sub:1, label:'Credit sales (not yet paid)', v:A.credit, p:B.credit});
+  rows.push({sec:'Cost of sales'});
   const cc = cats(A.cos, B.cos, COS_CATS); cc.forEach(c => rows.push({x:c, label:c, v:A.cos[c] || 0, p:B.cos[c] || 0}));
   if (!cc.length) rows.push({none:1, label:'No costs recorded'});
   rows.push({tot:1, label:'Gross profit', v:A.gross, p:B.gross, pct:A.income ? Math.round(A.gross / A.income * 100) : null}, {sec:'Running costs'});
@@ -2360,15 +2368,15 @@ function plTab(main){
     const per = plRange(), A = plData(per.from, per.to, plState.basis), B = plData(per.pfrom, per.pto, plState.basis), rows = plRows(A, B);
     const margin = A.income ? Math.round(A.net / A.income * 100) : 0, pm = B.income ? Math.round(B.net / B.income * 100) : null;
     $('#rbody').innerHTML = `
-      <div class="stats">${stat('receipt', money0(A.income), 'MVR', 'Income (excl. GST)', chg(A.income, B.income, true))}${stat('wallet', money0(A.costs), 'MVR', 'Costs', chg(A.costs, B.costs, false), 'warn')}
+      <div class="stats">${stat('receipt', money0(A.income), 'MVR', 'Income (excl. GST)', plState.basis === 'cash' ? chg(A.income, B.income, true) : `Paid ${money0(A.paid)} · Credit <span class="${A.credit > 0.5 ? 'dn' : ''}">${money0(A.credit)}</span>`)}${stat('wallet', money0(A.costs), 'MVR', 'Costs', chg(A.costs, B.costs, false), 'warn')}
         ${stat('chart', money0(A.net), 'MVR', 'Net profit', chg(A.net, B.net, true), A.net < 0 ? 'bad' : 'ok')}${stat('calendar', A.income ? margin + '%' : '–', '', 'Profit margin', pm == null ? '' : `before ${pm}%`)}</div>
       <section class="panel"><h2>Profit &amp; Loss · ${fmtDate(per.from)} – ${fmtDate(per.to)}</h2>
         <div class="tablewrap"><table class="list pl"><thead><tr><th></th><th class="num">This period</th><th class="num plp">${per.prevLabel}</th></tr></thead><tbody>
         ${rows.map((r, i) => r.sec ? `<tr class="sec"><td colspan="3">${r.sec}</td></tr>`
           : r.none ? `<tr class="none"><td colspan="3">${r.label}</td></tr>`
-          : `<tr class="${r.tot ? 'tot' : r.big ? 'big' : r.note ? 'note' : 'ln'}" ${r.k || r.x ? `data-i="${i}"` : ''}><td>${esc(r.label)}${r.pct != null && r.pct !== undefined ? ` <span class="pct">${r.pct}%</span>` : ''}</td><td class="num ${r.v < 0 && !r.note ? 'neg' : ''}">${money(r.v)}</td><td class="num plp dim">${money(r.p)}</td></tr>`).join('')}
+          : `<tr class="${r.tot ? 'tot' : r.big ? 'big' : r.note ? 'note' : r.sub ? 'ln sub' : 'ln'}" ${r.k || r.x ? `data-i="${i}"` : ''}><td>${esc(r.label)}${r.pct != null && r.pct !== undefined ? ` <span class="pct">${r.pct}%</span>` : ''}</td><td class="num ${r.v < 0 && !r.note ? 'neg' : ''}">${money(r.v)}</td><td class="num plp dim">${money(r.p)}</td></tr>`).join('')}
         </tbody></table></div></section>
-      <p class="dim" style="font-size:13px;margin:12px 2px 0">Tap a line to see the invoices or expenses behind it. ${plState.basis === 'cash' ? 'Cash received: income is the payments received in this period (without GST).' : 'Invoiced: income is the invoices dated in this period, paid or not.'} Expenses count by their date; link them in Reports → Expenses.</p>`;
+      <p class="dim" style="font-size:13px;margin:12px 2px 0">Tap a line to see the invoices or expenses behind it. ${plState.basis === 'cash' ? 'Cash received: income is the payments received in this period (without GST).' : 'Invoiced: income is the invoices dated in this period; paid and credit sales show how much of it has been received so far.'} Expenses count by their date; link them in Reports → Expenses.</p>`;
     $('#rbody').querySelectorAll('tr[data-i]').forEach(tr => tr.addEventListener('click', () => plDrill(rows[+tr.dataset.i], A)));
   };
   // period: whole months, a picked month, or any date range
@@ -2412,14 +2420,14 @@ function drawPL(pdf){
     if (r.none){ font(9, false, GREY); pdf.text(r.label, L + 7, y + 4.6); y += h; return; }
     if (r.big){ pdf.setFillColor(...ZEBRA); pdf.rect(L, y, CW, h, 'F'); pdf.setDrawColor(...BLUE); pdf.setLineWidth(0.5); pdf.line(L, y, R, y); }
     else if (r.tot){ pdf.setDrawColor(...LINE); pdf.setLineWidth(0.25); pdf.line(L, y, R, y); }
-    const bold = r.tot || r.big, sz = r.big ? 10.5 : r.note ? 8.4 : 9.2, by = y + (r.big ? 6 : 4.6);
-    font(sz, bold, r.note ? GREY : INK); txt(r.label + (r.pct != null && r.pct !== undefined ? `  (${r.pct}%)` : ''), L + (bold || r.note ? 2.4 : 7), by);
-    font(sz, bold, r.v < 0 && !r.note ? [138,42,32] : r.note ? GREY : INK); txt(money(r.v), C1, by, {align:'right'});
+    const bold = r.tot || r.big, sz = r.big ? 10.5 : r.note || r.sub ? 8.4 : 9.2, by = y + (r.big ? 6 : 4.6);
+    font(sz, bold, r.note || r.sub ? GREY : INK); txt((r.sub ? '- ' : '') + r.label + (r.pct != null && r.pct !== undefined ? `  (${r.pct}%)` : ''), L + (bold || r.note ? 2.4 : r.sub ? 11 : 7), by);
+    font(sz, bold, r.v < 0 && !r.note ? [138,42,32] : r.note || r.sub ? GREY : INK); txt(money(r.v), C1, by, {align:'right'});
     font(sz, bold, GREY); txt(money(r.p), C2, by, {align:'right'});
     y += h;
   });
   font(8.4, false, GREY); y += 6;
-  pdf.text(plState.basis === 'cash' ? 'Income = payments received in the period, without GST. Expenses by date.' : 'Income = invoices dated in the period (paid or not), without GST. Voided invoices are left out. Expenses by date.', L, y);
+  pdf.text(plState.basis === 'cash' ? 'Income = payments received in the period, without GST. Expenses by date.' : 'Income = invoices dated in the period, without GST; paid / credit as received up to today. Voided invoices are left out. Expenses by date.', L, y);
   return pdfFooter(pdf, k, y + 4, 'report', 'Profit & Loss');
 }
 function expensesTab(main){
@@ -3035,7 +3043,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · P&L dates';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Paid & credit sales';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
