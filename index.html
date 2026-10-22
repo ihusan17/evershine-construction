@@ -1440,6 +1440,7 @@ const ICONS = {
   mail:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
   chart:'<path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/>',
   send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  share:'<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/>',
   viber:'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.2 8.6c.2 3.4 2.8 6 6.2 6.2l1-1.3-1.9-1.1-.9.7a3.9 3.9 0 0 1-1.9-1.9l.7-.9-1.1-1.9Z"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
@@ -1623,6 +1624,7 @@ Object.assign(DV, {
   'Categories saved':'ބާވަތްތައް ސޭވްކޮށްފި', 'Marked as delivered':'ޑެލިވަރ ކުރިކަމަށް ޖަހައިފި', 'Marked as not delivered':'ޑެލިވަރ ނުކުރާކަމަށް ޖަހައިފި', 'Add a name.':'ނަމެއް ލިޔޭ.', 'Add at least one line.':'މަދުވެގެން އެއް ލައިން ލިޔޭ.', 'Enter an amount above zero.':'ސުމެއްގެ މަތީ ޢަދަދެއް ލިޔޭ.', 'Pick a date.':'ތާރީޚެއް ހޮވާ.',
   'The change could not be saved. Check your connection and try again.':'ބަދަލު ސޭވް ނުވި. ކަނެކްޝަން ބަލައިލާފައި އަލުން ފަށާ.', 'PDF is ready. Tap Email again.':'PDF ތައްޔާރު. އަލުން އީމެއިލް އަށް ފިތާލާ.',
   'Government':'ސަރުކާރު', 'Private business':'ޕްރައިވެޓް ވިޔަފާރި', 'Individual':'ފަރުދު', 'Type':'ބާވަތް',
+  'Share':'ޝެއާ', 'Share the PDF (Viber, Telegram, WhatsApp…)':'PDF ޝެއާ ކުރޭ (ވައިބަރ، ޓެލެގްރާމް، ވަޓްސްއެޕް…)', 'PDF is ready. Tap Share again.':'PDF ތައްޔާރު. އަލުން ޝެއާ އަށް ފިތާލާ.', "Sharing didn't work here. Use Download PDF and send it.":'މިތަނުން ޝެއާ ނުވި. PDF ޑައުންލޯޑްކޮށް ފޮނުވާ.',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -2117,7 +2119,7 @@ function balancesBox(){
   const w = modal('Customer balances', `<div class="balsum" id="bal-sum"></div>
     <div class="seg" id="bal-seg" role="tablist" style="margin:12px 0 8px">${[['all','All balances'],['owe','Owes us'],['credit','Credits']].map(([k, l]) => `<button type="button" data-w="${k}" class="${k === 'all' ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="tablewrap" style="max-height:min(52vh,460px);overflow:auto"><table class="list bals"><thead><tr><th>Customer</th><th class="num">Unpaid</th><th class="num">Overdue</th><th class="num">Balance (MVR)</th></tr></thead><tbody id="bal-rows"></tbody></table></div>
-    <div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="btn" id="bal-csv">Export CSV</button><button type="button" class="btn tg" id="bal-share">${icon('send',17)}Telegram</button><button type="button" class="btn vb" id="bal-vb">${icon('viber',17)}Viber</button></div>`,
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="btn" id="bal-csv">Export CSV</button><button type="button" class="btn" id="bal-share">${icon('share',17)}Share</button></div>`,
     'Download PDF', async () => { const f = await buildBalances(which); await saveFile(f.name, f.blob); return false; });
   w.querySelector('.modal').style.width = 'min(780px, 100%)';
   const draw = () => {
@@ -2134,8 +2136,7 @@ function balancesBox(){
       .concat(rows.map(r => [r.c.name, r.c.phone, r.open, r.oldest, r.overdue, Math.abs(r.due), r.due < 0 ? 'Credit' : 'Owes'].map(q).join(','))).join('\r\n'));
   });
   const sh = w.querySelector('#bal-share');
-  sh.addEventListener('click', () => sharePDF('bal|' + which + '|' + Date.now(), () => buildBalances(which), sh, 'telegram'));
-  const sv = w.querySelector('#bal-vb'); sv.addEventListener('click', () => sharePDF('bal|' + which + '|' + Date.now(), () => buildBalances(which), sv, 'viber'));
+  sh.addEventListener('click', () => sharePDF('bal|' + which + '|' + Date.now(), () => buildBalances(which), sh));
   draw();
 }
 async function buildStatement(c){
@@ -2303,7 +2304,7 @@ function previewDoc(id, ids){
     <div class="pvhead"><div class="pvtitle"></div>
       <div class="row pvnav"><button type="button" class="ibtn" data-step="-1" title="Previous (←)" aria-label="Previous document">‹</button><span class="dim pvcount"></span><button type="button" class="ibtn" data-step="1" title="Next (→)" aria-label="Next document">›</button><button type="button" class="ibtn" data-close title="Close (Esc)" aria-label="Close">×</button></div></div>
     <div class="pvbody"><div class="sheet-fit"></div></div>
-    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit data-need="edit">Edit</a><button type="button" class="btn" data-em>${icon('mail',17)}Email</button><button type="button" class="btn tg" data-tg>${icon('send',17)}Telegram</button><button type="button" class="btn vb" data-vb>${icon('viber',17)}Viber</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
+    <div class="pvfoot row"><a class="btn" data-open>Open</a><a class="btn" data-edit data-need="edit">Edit</a><button type="button" class="btn" data-em>${icon('mail',17)}Email</button><button type="button" class="btn" data-tg>${icon('share',17)}Share</button><button type="button" class="btn primary" data-pdf>Download PDF</button></div></div>`;
   document.body.appendChild(w);
   const show = () => {
     const d = S.docs[ids[i]]; if (!d) return close();
@@ -2324,8 +2325,7 @@ function previewDoc(id, ids){
     if (e.target.closest('[data-open],[data-edit]')){ document.querySelectorAll('.scrim').forEach(x => x !== w && x.remove()); return close(); }
     const d = S.docs[ids[i]];
     if (e.target.closest('[data-pdf]')) makePDF(d, e.target.closest('[data-pdf]'));
-    else if (e.target.closest('[data-tg]')) shareTelegram(d, e.target.closest('[data-tg]'), 'telegram');
-    else if (e.target.closest('[data-vb]')) shareTelegram(d, e.target.closest('[data-vb]'), 'viber');
+    else if (e.target.closest('[data-tg]')) shareTelegram(d, e.target.closest('[data-tg]'));
     else if (e.target.closest('[data-em]')) emailDoc(d, e.target.closest('[data-em]'));
   });
   // swipe left / right on phones
@@ -2656,7 +2656,7 @@ function viewDoc(main, d){
   }
   main.innerHTML = `
     <div class="pagehead"><div><div class="row"><span class="tag">${T.label}${kindOf(d) ? ' · ' + KINDS[kindOf(d)].short : ''}</span>${badge(st)}</div><h1 style="margin-top:6px">${esc(d.number)}</h1><p>${esc(d.customer?.name)} · ${fmtDate(d.date)}</p></div>
-      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" data-need="edit" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn" id="em" title="Email the PDF">${icon('mail',17)}Email</button><button class="btn tg" id="tg" title="Send the PDF on Telegram">${icon('send',17)}Telegram</button><button class="btn vb" id="vb" title="Send the PDF on Viber">${icon('viber',17)}Viber</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
+      <div class="row"><a class="btn" href="#/${T.route}">All ${T.plural.toLowerCase()}</a><a class="btn" data-need="edit" href="#/edit/${d.id}">Edit</a><button class="btn" id="print">Print</button><button class="btn" id="em" title="Email the PDF">${icon('mail',17)}Email</button><button class="btn" id="tg" title="Share the PDF (Viber, Telegram, WhatsApp…)">${icon('share',17)}Share</button><button class="btn primary" id="pdf">Download PDF</button></div></div>
     <div class="docview">
       <div class="sheet-fit">${sheetHTML(d)}</div>
       <div class="sidecol">
@@ -2669,8 +2669,7 @@ function viewDoc(main, d){
     </div>`;
   $('#print').addEventListener('click', () => { try { window.print(); } catch(e){ toast('Printing isn\'t available here. Use Download PDF instead.'); } });
   $('#pdf').addEventListener('click', e => makePDF(d, e.currentTarget));
-  $('#tg').addEventListener('click', e => shareTelegram(d, e.currentTarget, 'telegram'));
-  $('#vb').addEventListener('click', e => shareTelegram(d, e.currentTarget, 'viber'));
+  $('#tg').addEventListener('click', e => shareTelegram(d, e.currentTarget));
   $('#em').addEventListener('click', e => emailDoc(d, e.currentTarget));
   const sw = main.querySelector('#stampsw');
   if (sw) sw.addEventListener('change', async () => {
@@ -2883,7 +2882,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · Customer types';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-10-22 · Share button';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
@@ -3237,7 +3236,7 @@ function shareText(d){
 }
 let shareCache = null;   // the PDF from the last tap, reused if the browser needs a second tap
 function shareTelegram(d, btn, app){
-  return sharePDF(d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length, () => buildPDF(d), btn, app || 'telegram');
+  return sharePDF(d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length, () => buildPDF(d), btn, app);
 }
 // Email: phones get the share sheet with the PDF attached (pick Mail or Gmail);
 // computers download the PDF and open Gmail with the customer, subject and message filled in.
@@ -3265,25 +3264,29 @@ function docMail(d){
     body: `Dear ${who || 'Sir/Madam'},\n\nPlease find attached ${T.label.toLowerCase()} ${d.number}.\n\n${shareText(d)}\n\nThank you.` };
 }
 function emailDoc(d, btn){ return emailPDF(d.id + '|' + (d.updatedAt || '') + '|' + (S.settings.signImage || '').length, () => buildPDF(d), docMail(d), btn); }
-// Share a PDF on Telegram or Viber: only the file is sent, no message text.
-// Phones (and computers that support it) get the share sheet with the PDF attached; pick Telegram / Viber and the chat.
-// Other computers: the PDF is saved and the Telegram / Viber app is opened to attach it.
+// Share a PDF: only the file is sent, no message text.
+// Phones (and computers that support it) get the share sheet with the PDF attached: pick Viber, Telegram, WhatsApp… and the chat.
+// Other computers: a small menu asks for the app; the PDF is saved and that app is opened to attach it.
 const SHARE_APPS = {telegram:{name:'Telegram', open:'tg://'}, viber:{name:'Viber', open:'viber://chats'}};
-async function sharePDF(key, build, btn, app = 'telegram'){
-  const A = SHARE_APPS[app] || SHARE_APPS.telegram, label = btn.innerHTML; btn.disabled = true;
+async function sharePDF(key, build, btn, app){
+  const label = btn.innerHTML; btn.disabled = true;
   try {
     let f = shareCache && shareCache.key === key ? shareCache : null;
     if (!f){ btn.textContent = 'Preparing PDF…'; f = shareCache = {key, ...(await build())}; }
     const file = new File([f.blob], f.name, {type:'application/pdf'});
-    if (navigator.canShare && navigator.canShare({files:[file]})){
+    if (!app && navigator.canShare && navigator.canShare({files:[file]})){
       try { await navigator.share({files:[file]}); }
-      catch(e){ if (e && e.name === 'NotAllowedError') toast(`PDF is ready. Tap ${A.name} again to share it.`); else if (!e || e.name !== 'AbortError') throw e; }
+      catch(e){ if (e && e.name === 'NotAllowedError') toast('PDF is ready. Tap Share again.'); else if (!e || e.name !== 'AbortError') throw e; }
+    } else if (!app){
+      btn.disabled = false; btn.innerHTML = label;
+      return popMenu(btn, [['Viber', () => sharePDF(key, build, btn, 'viber')], ['Telegram', () => sharePDF(key, build, btn, 'telegram')], ['Download PDF', () => saveFile(f.name, f.blob)]]);
     } else {
+      const A = SHARE_APPS[app];
       await saveFile(f.name, f.blob);
       const a = document.createElement('a'); a.href = A.open; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
       toast(`PDF downloaded. In ${A.name}, pick the chat and attach the PDF.`);
     }
-  } catch(e){ console.error(e); toast(`Sharing didn't work here. Use Download PDF and send it in ${A.name}.`); }
+  } catch(e){ console.error(e); toast("Sharing didn't work here. Use Download PDF and send it."); }
   btn.disabled = false; btn.innerHTML = label;
 }
 
@@ -3336,7 +3339,7 @@ function customerBox(c){
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
     ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
-    ${isNew ? '' : `<div class="row"><button type="button" class="btn sm" data-stmt>Statement PDF</button><button type="button" class="btn sm" data-stmt-em>${icon('mail',15)}Email statement</button><button type="button" class="btn sm tg" data-stmt-tg>${icon('send',15)}Telegram</button><button type="button" class="btn sm vb" data-stmt-vb>${icon('viber',15)}Viber</button><span class="dim">Invoices, payments and balance</span></div>`}
+    ${isNew ? '' : `<div class="row"><button type="button" class="btn sm" data-stmt>Statement PDF</button><button type="button" class="btn sm" data-stmt-em>${icon('mail',15)}Email statement</button><button type="button" class="btn sm" data-stmt-tg>${icon('share',15)}Share</button><span class="dim">Invoices, payments and balance</span></div>`}
     ${isNew ? '' : `<div class="row" data-need="edit"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a>${isOwnerRole() ? '<button class="btn sm danger" data-delc>Delete customer</button>' : ''}</div>`}`,
     'Save customer', async w => {
       if (!canEdit()){ toast('Your role can only view customers.'); return false; }
@@ -3349,9 +3352,7 @@ function customerBox(c){
   const sb = w.querySelector('[data-stmt]');
   if (sb) sb.addEventListener('click', async () => { const l = sb.innerHTML; sb.disabled = true; sb.textContent = 'Preparing…'; try { const f = await buildStatement(c); await saveFile(f.name, f.blob); } catch(e){ console.error(e); toast('The statement could not be created.'); } sb.disabled = false; sb.innerHTML = l; });
   const st2 = w.querySelector('[data-stmt-tg]');
-  if (st2) st2.addEventListener('click', () => sharePDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c), st2, 'telegram'));
-  const sv = w.querySelector('[data-stmt-vb]');
-  if (sv) sv.addEventListener('click', () => sharePDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c), sv, 'viber'));
+  if (st2) st2.addEventListener('click', () => sharePDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c), st2));
   const se = w.querySelector('[data-stmt-em]');
   if (se) se.addEventListener('click', () => emailPDF('stmt|' + c.id + '|' + Date.now(), () => buildStatement(c),
     {to: c.email || '', subject: `Statement of account – ${S.settings.name || ''}`, body: `Dear ${c.name || 'Sir/Madam'},\n\nPlease find attached your statement of account.\n\n${statementText(c)}\n\nThank you.`}, se));
