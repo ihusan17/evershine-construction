@@ -591,6 +591,7 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .hbars .bar i{display:block;height:100%;border-radius:0 4px 4px 0}
 .hbars .v{font-variant-numeric:tabular-nums;font-weight:600}
 .neg{color:var(--bad)}
+.curtag{font-size:10.5px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:4px;padding:0 4px;margin-right:2px}
 .up{color:var(--ok,#2d8c55);font-weight:600}.dn{color:var(--bad);font-weight:600}
 table.list.pl tbody tr{cursor:default}table.list.pl tr[data-i]{cursor:pointer}
 table.list.pl tr.sec td{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--brand);padding-top:16px;border-bottom:0}
@@ -917,7 +918,7 @@ const FILTERS = {
 const UNITS = ['Nos','Bags','CUFT','CUM','Trip','Lot','Kg','Ton','Ltr','Sqft','Sqm','Rft','Day','Hour','Set'];
 const DEFAULTS = {
   name:'EVERSHINE CONSTRUCTION', address:'Ever Shine, Zikura Magu\nSh. Milandhoo', phone:'+960 7714133', email:'mhmd.ihsn80@gmail.com',
-  prefix:'ESC', bankName:'Bank of Maldives', accNo:'773 0000382 938 (MVR)', accName:'Ali Ibrahim',
+  prefix:'ESC', bankName:'Bank of Maldives', accNo:'773 0000382 938 (MVR)', accName:'Ali Ibrahim', accNoUSD:'', usdRate:15.42,
   quoteValidDays:20, invoiceDueDays:5, signDelivery:true, signDocs:true,
   quoteTerms:'This quotation remains valid for 20 days from the date of issue.\nUnless otherwise agreed, payment shall be made in full within 30 days from the date of invoice.\nTransport schedules are subject to weather and maritime conditions. We are not liable for delays caused by unforeseen sea conditions.',
   invoiceTerms:'Payment is due within 20 days from the invoice date\nAccepted payment methods: Cash & Bank Transfer\nForward payment receipt to 7714133 via viber or email once payment has been processed',
@@ -946,7 +947,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8
 const clone = o => JSON.parse(JSON.stringify(o));
 const hasThaana = s => /[\u0780-\u07BF]/.test(s||'');
 
-function amountWords(n){
+function amountWords(n, cur){
   const ones=['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
   const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
   const w = n => {
@@ -958,7 +959,7 @@ function amountWords(n){
   };
   n = r2(Math.abs(n)); const rf = Math.floor(n), l = Math.round((n-rf)*100);
   let s = rf === 0 ? 'zero' : w(rf);
-  return s.charAt(0).toUpperCase() + s.slice(1) + ' rufiyaa & ' + pad2(l) + '/100';
+  return s.charAt(0).toUpperCase() + s.slice(1) + (cur === 'USD' ? ' US dollars & ' : ' rufiyaa & ') + pad2(l) + '/100';
 }
 
 /* ---------- document maths ---------- */
@@ -992,6 +993,13 @@ const discAmt = d => { const v = num(d.discount); if (!v || d.type === 'delivery
 const discLabel = d => d.discountType === 'amt' ? 'Discount' : `Discount ${num(d.discount)}%`;
 const taxAmt = d => r2((subtotal(d) - discAmt(d)) * num(d.taxRate) / 100);
 const total = d => r2(subtotal(d) - discAmt(d) + taxAmt(d));
+// Currency: a document is in MVR unless set to USD. USD documents keep the rate used (MVR for 1 USD), so totals and reports
+// across documents are added up in MVR.
+const curOf = d => d && d.cur === 'USD' ? 'USD' : 'MVR';
+const fxOf = d => curOf(d) === 'USD' ? (num(d.fx) || num(S.settings.usdRate) || 15.42) : 1;
+const totM = d => r2(total(d) * fxOf(d)), balM = d => r2(balance(d) * fxOf(d)), payM = (d, p) => num(p.amount) * fxOf(d);
+const curTag = d => curOf(d) === 'USD' ? '<small class="curtag">USD</small> ' : '';
+const accFor = d => curOf(d) === 'USD' && (S.settings.accNoUSD || '').trim() ? S.settings.accNoUSD : S.settings.accNo;
 const paidOf = d => r2((d.payments||[]).reduce((s,p) => s + num(p.amount), 0));
 const balance = d => r2(total(d) - paidOf(d));
 const qtyTotal = d => (d.items||[]).reduce((s,it) => s + num(it.qty), 0);
@@ -1672,6 +1680,8 @@ Object.assign(DV, {
   'By category: goods & boat hire':'ބާވަތުން: މުދާ އަދި ބޯޓު ހަޔަރ',
   'Paid to (employee name)':'ދެއްކީ (މުވައްޒަފުގެ ނަން)', 'Employee name':'މުވައްޒަފުގެ ނަން', 'Name not given':'ނަމެއް ނުލިޔޭ',
   'No description':'ތަފްޞީލެއް ނެތް',
+  'Currency':'ފައިސާގެ ބާވަތް', 'Exchange rate':'އެކްސްޗޭންޖް ރޭޓް', 'MVR for 1 USD · used for your reports':'1 USD އަށް MVR · ރިޕޯޓުތަކަށް ބޭނުންކުރެވޭ', 'USD account number (optional)':'USD އެކައުންޓް ނަންބަރު (އިޚްތިޔާރީ)',
+  'Printed on USD documents instead of the MVR account':'USD ޑޮކިއުމަންޓްތަކުގައި MVR އެކައުންޓުގެ ބަދަލުގައި ޗާޕުވާނެ', 'USD exchange rate':'USD އެކްސްޗޭންޖް ރޭޓް', 'MVR for 1 USD; the starting rate for new USD documents':'1 USD އަށް MVR؛ އައު USD ޑޮކިއުމަންޓްތަކުގެ ފެށުމުގެ ރޭޓް',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -1755,16 +1765,16 @@ function noteEvents(){
     const T = TYPES[d.type]; if (!T || !d.number) return;
     const cust = d.customer?.name || '';
     if (d.createdAt) ev.push({id:'c:' + d.id, at:d.createdAt, kind:'new', doc:d.id, by:d.createdBy || '',
-      text:`New ${T.label.toLowerCase()} ${d.number}`, sub:[cust, d.type !== 'delivery' ? 'MVR ' + money(total(d)) : '', d.createdBy ? 'by ' + who(d.createdBy) : ''].filter(Boolean).join(' · ')});
+      text:`New ${T.label.toLowerCase()} ${d.number}`, sub:[cust, d.type !== 'delivery' ? curOf(d) + ' ' + money(total(d)) : '', d.createdBy ? 'by ' + who(d.createdBy) : ''].filter(Boolean).join(' · ')});
     if (isVoid(d)){ if (d.voided?.date) ev.push({id:'v:' + d.id, at:d.voided.date + 'T12:00:00', kind:'void', doc:d.id, text:`${d.number} was voided`, sub:cust}); return; }
     if (d.type === 'invoice'){
       const ps = d.payments || [], full = statusOf(d) === 'paid';
       ps.forEach((p, i) => { const last = i === ps.length - 1 && full;
         ev.push({id:`p:${d.id}:${i}`, at:p.at || ((p.date || d.date) + 'T12:00:00'), kind:last ? 'paid' : 'pay', doc:d.id, by:p.by || '',
-          text:last ? `${d.number} is paid in full` : `Payment received · ${d.number}`, sub:[`MVR ${money(num(p.amount))}`, cust, p.by ? 'by ' + who(p.by) : ''].filter(Boolean).join(' · ')}); });
+          text:last ? `${d.number} is paid in full` : `Payment received · ${d.number}`, sub:[`${curOf(d)} ${money(num(p.amount))}`, cust, p.by ? 'by ' + who(p.by) : ''].filter(Boolean).join(' · ')}); });
       const due = addDays(d.date, d.dueDays);
       if (!full && balance(d) > 0 && due < todayISO())
-        ev.push({id:`od:${d.id}:${due}`, at:addDays(due, 1) + 'T00:00:00', kind:'overdue', doc:d.id, text:`${d.number} is overdue`, sub:`MVR ${money(balance(d))} was due ${fmtDate(due)} · ${cust}`});
+        ev.push({id:`od:${d.id}:${due}`, at:addDays(due, 1) + 'T00:00:00', kind:'overdue', doc:d.id, text:`${d.number} is overdue`, sub:`${curOf(d)} ${money(balance(d))} was due ${fmtDate(due)} · ${cust}`});
     }
     if (d.type === 'quotation' && d.status === 'accepted') ev.push({id:'a:' + d.id, at:d.updatedAt || d.createdAt || d.date + 'T12:00:00', kind:'accepted', doc:d.id, text:`Quotation ${d.number} accepted`, sub:cust});
     if (d.type === 'delivery' && d.status === 'delivered' && d.delivered?.date) ev.push({id:'dl:' + d.id, at:d.delivered.date + 'T12:00:00', kind:'delivered', doc:d.id, text:`${d.number} delivered`, sub:cust});
@@ -1824,12 +1834,12 @@ function viewDashboard(main){
   const over = open.filter(d => statusOf(d) === 'overdue');
   const openQ = q.filter(d => ['draft','sent'].includes(statusOf(d)));
   const pend = dn.filter(d => statusOf(d) === 'pending');
-  const billed = inv.filter(d => !isVoid(d) && (d.date||'').startsWith(month)).reduce((s,d) => s + total(d), 0);
-  const collected = inv.reduce((s,d) => s + (d.payments||[]).filter(p => (p.date||'').startsWith(month)).reduce((a,p) => a + num(p.amount), 0), 0);
+  const billed = inv.filter(d => !isVoid(d) && (d.date||'').startsWith(month)).reduce((s,d) => s + totM(d), 0);
+  const collected = inv.reduce((s,d) => s + (d.payments||[]).filter(p => (p.date||'').startsWith(month)).reduce((a,p) => a + payM(d, p), 0), 0);
 
   const attn = [];
-  over.forEach(d => attn.push({d, rank:0 - daysBetween(addDays(d.date,d.dueDays), t), why:`Overdue by ${daysBetween(addDays(d.date,d.dueDays), t)} days · MVR ${money(balance(d))} due`}));
-  open.filter(d => statusOf(d) !== 'overdue').forEach(d => { const left = daysBetween(t, addDays(d.date,d.dueDays)); if (left <= 7) attn.push({d, rank:100+left, why: left === 0 ? `Payment due today · MVR ${money(balance(d))}` : `Payment due in ${left} day${left===1?'':'s'} · MVR ${money(balance(d))}`}); });
+  over.forEach(d => attn.push({d, rank:0 - daysBetween(addDays(d.date,d.dueDays), t), why:`Overdue by ${daysBetween(addDays(d.date,d.dueDays), t)} days · ${curOf(d)} ${money(balance(d))} due`}));
+  open.filter(d => statusOf(d) !== 'overdue').forEach(d => { const left = daysBetween(t, addDays(d.date,d.dueDays)); if (left <= 7) attn.push({d, rank:100+left, why: left === 0 ? `Payment due today · ${curOf(d)} ${money(balance(d))}` : `Payment due in ${left} day${left===1?'':'s'} · ${curOf(d)} ${money(balance(d))}`}); });
   openQ.forEach(d => { const left = daysBetween(t, addDays(d.date,d.validDays)); if (left <= 5) attn.push({d, rank:200+left, why:`Quote expires ${left === 0 ? 'today' : `in ${left} day${left===1?'':'s'}`} · no reply recorded`}); });
   pend.forEach(d => attn.push({d, rank:300, why:`Not yet marked as delivered`}));
   attn.sort((a,b) => a.rank - b.rank);
@@ -1840,9 +1850,9 @@ function viewDashboard(main){
     <div class="pagehead"><div><h1>Overview</h1><p>${esc(hello)}</p></div>
       <div class="row" data-need="edit"><a class="btn" href="#/new/quotation">New quotation</a><a class="btn" href="#/new/delivery">New delivery note</a><a class="btn primary" href="#/new/invoice">New invoice</a></div></div>
     <div class="board">
-      ${stat('wallet', money0(open.reduce((s,d)=>s+balance(d),0)), 'MVR', 'Awaiting payment', `${open.length} invoice${open.length===1?'':'s'}`)}
-      ${stat('clock', money0(over.reduce((s,d)=>s+balance(d),0)), 'MVR', 'Overdue', `${over.length} invoice${over.length===1?'':'s'}`, over.length ? 'bad' : '')}
-      ${stat('file', money0(openQ.reduce((s,d)=>s+total(d),0)), 'MVR', 'Open quotations', `${openQ.length} waiting for a reply`)}
+      ${stat('wallet', money0(open.reduce((s,d)=>s+balM(d),0)), 'MVR', 'Awaiting payment', `${open.length} invoice${open.length===1?'':'s'}`)}
+      ${stat('clock', money0(over.reduce((s,d)=>s+balM(d),0)), 'MVR', 'Overdue', `${over.length} invoice${over.length===1?'':'s'}`, over.length ? 'bad' : '')}
+      ${stat('file', money0(openQ.reduce((s,d)=>s+totM(d),0)), 'MVR', 'Open quotations', `${openQ.length} waiting for a reply`)}
       ${stat('truck', pend.length, '', 'To deliver', `delivery note${pend.length===1?'':'s'} pending`, pend.length ? 'warn' : '')}
       ${stat('calendar', money0(billed), 'MVR', 'Billed this month', `${money0(collected)} collected`, 'ok')}
     </div>
@@ -1852,7 +1862,7 @@ function viewDashboard(main){
           : `<div class="empty">Nothing is overdue or about to expire.</div>`}
       </section>
       <section class="panel"><h2>Recently updated</h2>
-        ${recent.length ? `<div class="tablewrap"><table class="list"><tbody>${recent.map(d => `<tr data-go="doc/${d.id}"><td><div class="docno">${esc(d.number)}<span class="tag">${TYPES[d.type].label}</span></div><div class="dim">${esc(d.customer?.name)}</div></td><td class="num">${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : money(total(d))}</td><td>${badge(statusOf(d))}</td></tr>`).join('')}</tbody></table></div>`
+        ${recent.length ? `<div class="tablewrap"><table class="list"><tbody>${recent.map(d => `<tr data-go="doc/${d.id}"><td><div class="docno">${esc(d.number)}<span class="tag">${TYPES[d.type].label}</span></div><div class="dim">${esc(d.customer?.name)}</div></td><td class="num">${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : curTag(d) + money(total(d))}</td><td>${badge(statusOf(d))}</td></tr>`).join('')}</tbody></table></div>`
           : `<div class="empty">No documents yet. <a href="#/new/quotation">Create your first quotation</a>.</div>`}
       </section>
     </div>`;
@@ -1867,11 +1877,11 @@ function listStats(type){
   if (type === 'invoice'){
     const live = ds.filter(d => !isVoid(d));
     const open = live.filter(d => ['unpaid','partial','overdue'].includes(statusOf(d))), over = open.filter(d => statusOf(d) === 'overdue');
-    const got = live.reduce((s,d) => s + (d.payments||[]).filter(p => (p.date||'').startsWith(month)).reduce((a,p) => a + num(p.amount), 0), 0);
+    const got = live.reduce((s,d) => s + (d.payments||[]).filter(p => (p.date||'').startsWith(month)).reduce((a,p) => a + payM(d, p), 0), 0);
     const paid = live.filter(d => statusOf(d) === 'paid' && (d.payments||[]).length);
     const avg = paid.length ? Math.round(paid.reduce((s,d) => s + Math.max(0, daysBetween(d.date, d.payments.map(p => p.date||d.date).sort().pop())), 0) / paid.length) : null;
-    return stat('clock', money0(over.reduce((s,d)=>s+balance(d),0)), 'MVR', 'Overdue amount', `${over.length} invoice${over.length===1?'':'s'}`, over.length ? 'bad' : '')
-      + stat('wallet', money0(open.reduce((s,d)=>s+balance(d),0)), 'MVR', 'Unpaid totals', `${open.length} invoice${open.length===1?'':'s'}`)
+    return stat('clock', money0(over.reduce((s,d)=>s+balM(d),0)), 'MVR', 'Overdue amount', `${over.length} invoice${over.length===1?'':'s'}`, over.length ? 'bad' : '')
+      + stat('wallet', money0(open.reduce((s,d)=>s+balM(d),0)), 'MVR', 'Unpaid totals', `${open.length} invoice${open.length===1?'':'s'}`)
       + stat('check', money0(got), 'MVR', 'Collected this month', '', 'ok')
       + stat('hourglass', avg == null ? '–' : avg, avg == null ? '' : `day${avg===1?'':'s'}`, 'Average paid time', `${paid.length} paid invoice${paid.length===1?'':'s'}`, 'warn');
   }
@@ -1879,8 +1889,8 @@ function listStats(type){
     const open = ds.filter(d => ['draft','sent'].includes(statusOf(d))), acc = ds.filter(d => statusOf(d) === 'accepted');
     const soon = open.filter(d => daysBetween(t, addDays(d.date, d.validDays)) <= 5);
     const decided = ds.filter(d => ['accepted','rejected','expired'].includes(statusOf(d))).length;
-    return stat('file', money0(open.reduce((s,d)=>s+total(d),0)), 'MVR', 'Open quotations', `${open.length} waiting for a reply`)
-      + stat('check', money0(acc.reduce((s,d)=>s+total(d),0)), 'MVR', 'Accepted', `${acc.length} quotation${acc.length===1?'':'s'}`, 'ok')
+    return stat('file', money0(open.reduce((s,d)=>s+totM(d),0)), 'MVR', 'Open quotations', `${open.length} waiting for a reply`)
+      + stat('check', money0(acc.reduce((s,d)=>s+totM(d),0)), 'MVR', 'Accepted', `${acc.length} quotation${acc.length===1?'':'s'}`, 'ok')
       + stat('hourglass', soon.length, '', 'Expiring soon', 'within 5 days', soon.length ? 'warn' : '')
       + stat('calendar', decided ? Math.round(acc.length / decided * 100) + '%' : '–', '', 'Win rate', `${decided} decided`);
   }
@@ -1909,13 +1919,13 @@ function viewList(main, type){
       return `<tr data-go="doc/${d.id}"${sel.has(d.id) ? ' class="picked"' : ''}>${ce ? `<td class="c-sel"><input type="checkbox" data-sel="${esc(d.id)}" ${sel.has(d.id) ? 'checked' : ''} aria-label="Select ${esc(d.number)}"></td>` : ''}
       <td class="c-no"><div class="docno"><button type="button" class="pvlink" data-pv="${esc(d.id)}" title="Quick preview">${esc(d.number)}</button>${kindOf(d) === 'hire' ? '<span class="tag">Boat hire</span>' : ''}</div></td><td class="c-date" style="white-space:nowrap">${fmtDate(d.date)}${extra ? `<span class="m-only"> · ${esc(extra)}</span>` : ''}</td><td class="cust c-cust">${esc(d.customer?.name)}</td>
       <td class="dim c-proj">${esc(extra)}</td>
-      <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : money(total(d))}</td>
-      ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || isVoid(d) ? 'zero' : ''}" data-l="Balance ">${isVoid(d) ? '–' : money(balance(d))}</td>` : ''}
+      <td class="num c-amt" data-l="${type==='delivery' ? 'Qty ' : curOf(d) === 'USD' ? '' : 'MVR '}">${type==='delivery' ? qfmt(qtyTotal(d)) : curTag(d) + money(total(d))}</td>
+      ${type==='invoice' ? `<td class="num c-bal ${statusOf(d) === 'paid' || isVoid(d) ? 'zero' : ''}" data-l="Balance ">${isVoid(d) ? '–' : curTag(d) + money(balance(d))}</td>` : ''}
       <td class="c-st"><button type="button" class="stbtn" data-stm="${esc(d.id)}" title="Change status" aria-haspopup="menu">${badge(statusOf(d))}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></td></tr>`; }).join('')
       : `<tr><td colspan="${cols}" class="empty">${docsOf(type).length ? 'No matches. Try a different search or filter.' : `No ${T.plural.toLowerCase()} yet. <a href="#/new/${type}">Create one</a>.`}</td></tr>`;
     bindGo($('#rows'));
     shown = list.map(d => d.id); bulk();
-    const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+total(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+balance(d),0))} unpaid` : '');
+    const sum = type === 'delivery' ? `${list.length} shown` : `${list.length} shown · MVR ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+totM(d),0))}` + (type==='invoice' ? ` · ${money(list.filter(d=>!isVoid(d)).reduce((s,d)=>s+balM(d),0))} unpaid` : '');
     $('#lsum').textContent = sum;
     return list;
   };
@@ -1935,7 +1945,7 @@ function viewList(main, type){
     const todo = act === 'paid' ? docs.filter(d => r2(balance(d)) > 0) : docs.filter(d => statusOf(d) !== act);
     const skipped = sel.size - todo.length;
     if (!todo.length) return toast(`Nothing to change: the selected ${T.plural.toLowerCase()} are already ${act === 'paid' ? 'paid' : STATUS[act][0].toLowerCase()} or void.`);
-    const label = act === 'paid' ? 'paid' : STATUS[act][0].toLowerCase(), amt = act === 'paid' ? todo.reduce((a, d) => a + r2(balance(d)), 0) : 0;
+    const label = act === 'paid' ? 'paid' : STATUS[act][0].toLowerCase(), amt = act === 'paid' ? todo.reduce((a, d) => a + balM(d), 0) : 0;
     confirmBox(`Mark ${todo.length} ${todo.length === 1 ? T.label.toLowerCase() : T.plural.toLowerCase()} as ${label}?`,
       (act === 'paid' ? `A payment for each invoice's full balance is recorded with today's date (MVR ${money(amt)} in total). ` : act === 'delivered' ? 'They are marked delivered today. ' : '')
       + todo.map(d => d.number).slice(0, 8).join(', ') + (todo.length > 8 ? '…' : '') + (skipped ? ` (${skipped} skipped: already ${label} or void)` : ''),
@@ -2007,7 +2017,7 @@ function statusMenu(btn){
     if (st === 'expired') items.push('<div class="note">Past its valid-until date, so it shows as Expired until accepted or rejected.</div>');
     if (isOwnerRole()) it('void', 'Void…', false, 'neutral');
   } else if (d.type === 'invoice'){
-    if (st !== 'paid'){ it('paidFull', `Mark as paid (MVR ${money(balance(d))})`, false, 'ok'); it('pay', 'Record a payment…', false, 'warn'); }
+    if (st !== 'paid'){ it('paidFull', `Mark as paid (${curOf(d)} ${money(balance(d))})`, false, 'ok'); it('pay', 'Record a payment…', false, 'warn'); }
     else items.push(`<div class="note">Paid in full. Remove payments on the invoice page to reopen it.</div>`);
     if (isOwnerRole()) it('void', 'Void…', false, 'neutral');
   } else {
@@ -2047,12 +2057,12 @@ function statementData(c){
   const inv = Object.values(S.docs).filter(d => d.type === 'invoice' && d.customerId === c.id && !isVoid(d)).sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.number||'').localeCompare(b.number||''));
   const rows = [];
   inv.forEach(d => {
-    rows.push({date:d.date, ref:d.number, what:'Invoice' + (d.project ? ' · ' + d.project : ''), debit:total(d), credit:0, o:0});
-    (d.payments || []).forEach(p => rows.push({date:p.date || d.date, ref:d.number, what:'Payment received' + (p.method ? ' · ' + p.method : '') + (p.ref ? ' · ' + p.ref : ''), debit:0, credit:num(p.amount), o:1}));
+    rows.push({date:d.date, ref:d.number, what:'Invoice' + (d.project ? ' · ' + d.project : '') + (curOf(d) === 'USD' ? ` · USD ${money(total(d))} @ ${fxOf(d)}` : ''), debit:totM(d), credit:0, o:0});
+    (d.payments || []).forEach(p => rows.push({date:p.date || d.date, ref:d.number, what:'Payment received' + (p.method ? ' · ' + p.method : '') + (p.ref ? ' · ' + p.ref : ''), debit:0, credit:r2(payM(d, p)), o:1}));
   });
   rows.sort((a,b) => (a.date||'').localeCompare(b.date||'') || a.o - b.o);
   let bal = 0; rows.forEach(r => { bal = r2(bal + r.debit - r.credit); r.bal = bal; });
-  const billed = r2(inv.reduce((s,d) => s + total(d), 0)), paid = r2(inv.reduce((s,d) => s + paidOf(d), 0));
+  const billed = r2(inv.reduce((s,d) => s + totM(d), 0)), paid = r2(inv.reduce((s,d) => s + paidOf(d) * fxOf(d), 0));
   const open = inv.filter(d => balance(d) > 0.005);
   return {inv, rows, billed, paid, due: r2(billed - paid), open};
 }
@@ -2111,7 +2121,7 @@ function drawStatement(pdf, c){
 function balanceData(){
   const t = todayISO();
   const rows = custList().map(c => { const sd = statementData(c);
-    const overdue = r2(sd.open.filter(d => addDays(d.date, d.dueDays) < t).reduce((a, d) => a + balance(d), 0));
+    const overdue = r2(sd.open.filter(d => addDays(d.date, d.dueDays) < t).reduce((a, d) => a + balM(d), 0));
     return {c, due:sd.due, open:sd.open.length, overdue, oldest: sd.open.length ? sd.open[0].date : ''}; })
     .filter(r => Math.abs(r.due) > 0.005).sort((a, b) => b.due - a.due);
   const owed = r2(rows.filter(r => r.due > 0).reduce((a, r) => a + r.due, 0)), credit = r2(rows.filter(r => r.due < 0).reduce((a, r) => a - r.due, 0));
@@ -2213,10 +2223,10 @@ function periodMonths(p){
 const expList = () => Object.values(S.expenses || {}).sort((a,b) => (b.date||'').localeCompare(a.date||''));
 const docCosts = d => expList().filter(x => x.docId && (x.docId === d.id || (d.sourceId && x.docId === d.sourceId)));
 function jobCostsPanel(d){
-  const costs = docCosts(d), sum = r2(costs.reduce((a,x) => a + num(x.amount), 0)), profit = r2(total(d) - sum);
+  const costs = docCosts(d), sum = r2(costs.reduce((a,x) => a + num(x.amount), 0)), profit = r2(totM(d) - sum);
   return `<section class="panel" id="jobcosts" data-need="edit"><h2>Job costs <button type="button" class="btn sm" data-addcost>${icon('plus',15)}Add cost</button></h2>
     ${costs.length ? `<ul class="costlist">${costs.map(x => `<li data-x="${esc(x.id)}"><span>${esc(x.desc || x.category)}<br><span class="dim">${fmtDate(x.date)} · ${esc(x.category || '')}</span></span><b>${money(x.amount)}</b></li>`).join('')}</ul>` : '<div class="empty" style="padding:14px">No costs linked yet. Add fuel, materials or labour for this job to see its profit.</div>'}
-    <div class="facts" style="border-top:1px solid var(--line)"><div class="row" style="gap:22px"><div><div class="k">Costs</div><div class="v">${money(sum)}</div></div><div><div class="k">${d.type === 'quotation' ? 'Estimated profit' : 'Profit'}</div><div class="v ${profit < 0 ? 'neg' : ''}">${money(profit)}</div></div></div></div></section>`;
+    <div class="facts" style="border-top:1px solid var(--line)"><div class="row" style="gap:22px"><div><div class="k">Costs</div><div class="v">${money(sum)}</div></div><div><div class="k">${d.type === 'quotation' ? 'Estimated profit' : 'Profit'}${curOf(d) === 'USD' ? ' (MVR)' : ''}</div><div class="v ${profit < 0 ? 'neg' : ''}">${money(profit)}</div></div></div></div></section>`;
 }
 function expenseBox(x, preset){
   if (!canEdit()) return;
@@ -2268,8 +2278,8 @@ function viewReports(main, tab){
     const M = {}; months.forEach(k => M[k] = {sales:0, coll:0, exp:0});
     const inv = Object.values(S.docs).filter(d => d.type === 'invoice' && !isVoid(d));
     const custs = {};
-    inv.forEach(d => { const k = ym(d.date); if (set.has(k)){ M[k].sales += total(d); const cn = d.customer?.name || '—'; custs[cn] = (custs[cn] || 0) + total(d); }
-      (d.payments || []).forEach(p => { const pk = ym(p.date || d.date); if (set.has(pk)) M[pk].coll += num(p.amount); }); });
+    inv.forEach(d => { const k = ym(d.date); if (set.has(k)){ M[k].sales += totM(d); const cn = d.customer?.name || '—'; custs[cn] = (custs[cn] || 0) + totM(d); }
+      (d.payments || []).forEach(p => { const pk = ym(p.date || d.date); if (set.has(pk)) M[pk].coll += payM(d, p); }); });
     const cats = {};
     if (showExp) expList().forEach(x => { const k = ym(x.date); if (set.has(k)){ M[k].exp += num(x.amount); cats[x.category || 'Other'] = (cats[x.category || 'Other'] || 0) + num(x.amount); } });
     const T = months.reduce((a,k) => ({sales:a.sales + M[k].sales, coll:a.coll + M[k].coll, exp:a.exp + M[k].exp}), {sales:0, coll:0, exp:0});
@@ -2355,7 +2365,7 @@ function plData(from, to, basis){
     if (basis === 'cash'){ const got = (d.payments || []).filter(p => inR(p.date || d.date)).reduce((s,p) => s + num(p.amount), 0); f = tot > 0 ? Math.min(got, tot) / tot : 0; }
     else if (inR(d.date)) f = 1;
     if (!f) return;
-    const k = d.kind === 'hire' ? 'hire' : 'goods', g = subtotal(d) * f, ds = discAmt(d) * f, gs = taxAmt(d) * f;
+    const k = d.kind === 'hire' ? 'hire' : 'goods', x = f * fxOf(d), g = subtotal(d) * x, ds = discAmt(d) * x, gs = taxAmt(d) * x;   // USD documents in MVR
     P[k] += g; P.disc += ds; P.gst += gs;
     P.src[k].push({d, v:g}); if (ds) P.src.disc.push({d, v:-ds}); if (gs) P.src.gst.push({d, v:gs});
     // paid vs credit sales (without GST): what has been received on this invoice so far
@@ -2540,7 +2550,7 @@ function previewDoc(id, ids){
   document.body.appendChild(w);
   const show = () => {
     const d = S.docs[ids[i]]; if (!d) return close();
-    w.querySelector('.pvtitle').innerHTML = `<b>${esc(d.number)}</b>${badge(statusOf(d))}<div class="dim">${esc(d.customer?.name || '')}${d.type === 'delivery' ? '' : ' · MVR ' + money(total(d))}</div>`;
+    w.querySelector('.pvtitle').innerHTML = `<b>${esc(d.number)}</b>${badge(statusOf(d))}<div class="dim">${esc(d.customer?.name || '')}${d.type === 'delivery' ? '' : ' · ' + curOf(d) + ' ' + money(total(d))}</div>`;
     w.querySelector('.pvcount').textContent = ids.length > 1 ? `${i + 1} of ${ids.length}` : '';
     w.querySelectorAll('[data-step]').forEach(b => b.hidden = ids.length < 2);
     w.querySelector('[data-step="-1"]').disabled = i === 0; w.querySelector('[data-step="1"]').disabled = i === ids.length - 1;
@@ -2591,7 +2601,7 @@ function newDraft(type, kind){
 function convertDraft(src, type){
   const d = newDraft(type);
   Object.assign(d, {customerId:src.customerId, customer:clone(src.customer||{}), po:src.po||'', project:src.project||'', sourceId:src.id,
-    deliveryAddress: src.deliveryAddress || '', kind: type === 'delivery' ? null : kindOf(src), layout: src.layout || 'items', taxRate: src.taxRate || 0, discount: type === 'delivery' ? 0 : (src.discount || 0), discountType: src.discountType || 'pct'});
+    deliveryAddress: src.deliveryAddress || '', kind: type === 'delivery' ? null : kindOf(src), layout: src.layout || 'items', taxRate: src.taxRate || 0, cur: src.cur || 'MVR', fx: src.fx || '', discount: type === 'delivery' ? 0 : (src.discount || 0), discountType: src.discountType || 'pct'});
   d.items = clone(src.items||[]).map(it => {
     if (type === 'delivery' && src.layout === 'lump') return {...blankItem(), desc: kindOf(src) === 'hire' ? hireLines(it) : it.desc, unit: kindOf(src) === 'hire' ? 'Trip' : (it.unit || 'Lot'), qty: it.qty || 1};
     if (src.type === 'delivery' && d.layout === 'lump') return {...blankItem(), desc: it.desc};
@@ -2621,6 +2631,8 @@ function viewEditor(main, d, isEdit){
           ${d.type==='quotation' ? `<div class="fld"><label for="f-valid-s">Valid for</label>${daysPick('f-valid', 'data-f="validDays"', d.validDays)}<span class="hint" id="h-valid"></span></div>` : ''}
           ${d.type==='invoice' ? `<div class="fld"><label for="f-due-s">Payment due in</label>${daysPick('f-due', 'data-f="dueDays"', d.dueDays)}<span class="hint" id="h-due"></span></div>` : ''}
           <div class="fld"><label for="f-po">P.O number</label><input id="f-po" data-f="po" value="${esc(d.po)}" placeholder="Optional"></div>
+          ${!isDN ? `<div class="fld"><label for="f-cur">Currency</label><select id="f-cur" data-f="cur"><option value="MVR" ${curOf(d) === 'MVR' ? 'selected' : ''}>MVR (Rufiyaa)</option><option value="USD" ${curOf(d) === 'USD' ? 'selected' : ''}>USD (US dollar)</option></select></div>
+          <div class="fld" id="fxwrap" ${curOf(d) === 'USD' ? '' : 'hidden'}><label for="f-fx">Exchange rate</label><input id="f-fx" data-f="fx" inputmode="decimal" value="${esc(String(fxOf(d) === 1 ? (num(S.settings.usdRate) || 15.42) : fxOf(d)))}"><span class="hint">MVR for 1 USD · used for your reports</span></div>` : ''}
           ${!isDN ? `<div class="fld span4"><label for="f-project">Project</label><input id="f-project" data-f="project" value="${esc(d.project)}" placeholder="Optional, e.g. VESSEL HIRE (REHENDHI)"></div>` : ''}
         </div>
       </section>
@@ -2716,7 +2728,7 @@ function viewEditor(main, d, isEdit){
     if (!isDN && d.layout !== 'lump') d.items.forEach((it,i) => { const c = $('#a'+i); if (c) c.textContent = money(lineAmt(d,it)); });
     if (isDN){ $('#tot').innerHTML = `<div class="totals"><span>Total quantity</span><span class="gt">${qfmt(qtyTotal(d))}</span></div>`; return; }
     const tx = num(d.taxRate);
-    $('#tot').innerHTML = `<div class="totals"><span>Sub total</span><span>${money(subtotal(d))}</span>${discAmt(d) ? `<span>${esc(discLabel(d))}</span><span>-${money(discAmt(d))}</span>` : ''}${tx ? `<span>GST ${tx}%</span><span>${money(taxAmt(d))}</span>` : ''}<span>Grand total (MVR)</span><span class="gt">${money(total(d))}</span></div><div class="words">${esc(amountWords(total(d)))}</div>`;
+    $('#tot').innerHTML = `<div class="totals"><span>Sub total</span><span>${money(subtotal(d))}</span>${discAmt(d) ? `<span>${esc(discLabel(d))}</span><span>-${money(discAmt(d))}</span>` : ''}${tx ? `<span>GST ${tx}%</span><span>${money(taxAmt(d))}</span>` : ''}<span>Grand total (${curOf(d)})</span><span class="gt">${money(total(d))}</span></div><div class="words">${esc(amountWords(total(d), curOf(d)))}</div>`;
   };
 
   const form = $('#ed');
@@ -2728,7 +2740,8 @@ function viewEditor(main, d, isEdit){
         d.terms = syncTermDays(d.terms, d.type, el.value); const ta = $('#f-terms'); if (ta){ ta.value = d.terms; fitT(); }
       }
       if (el.dataset.f === 'date' && d._auto && !isEdit){ d.number = nextNumber(d.type, d.date); $('#f-number').value = d.number; }
-      if (['taxRate','discount','discountType'].includes(el.dataset.f)) drawTotals();
+      if (el.dataset.f === 'cur'){ $('#fxwrap').hidden = el.value !== 'USD'; if (el.value === 'USD' && !num(d.fx)) d.fx = $('#f-fx').value; }
+      if (['taxRate','discount','discountType','cur'].includes(el.dataset.f)) drawTotals();
       hints();
     } else if (el.dataset.g){
       d.signs = {...dnSigns(d), [el.dataset.g]: el.value};
@@ -2777,7 +2790,8 @@ function viewEditor(main, d, isEdit){
     if (on){ tbox.focus(); tbox.setSelectionRange(tbox.value.length, tbox.value.length); } fitT();
   });
   // Description box: pick a saved product to fill the line (not for boat trips, where the description is the cargo)
-  const fillLine = (it, p) => ({...it, desc: p.name || '', unit: p.unit || it.unit || '', qty: num(it.qty) ? it.qty : '1', rate: isDN ? (it.rate || '') : String(p.rate ?? '')});
+  // product rates are in MVR: a USD document gets them converted with its exchange rate
+  const fillLine = (it, p) => ({...it, desc: p.name || '', unit: p.unit || it.unit || '', qty: num(it.qty) ? it.qty : '1', rate: isDN ? (it.rate || '') : String(p.rate ?? '') === '' ? '' : String(curOf(d) === 'USD' ? r2(num(p.rate) / fxOf(d)) : p.rate)});
   const focusQty = i => { const qty = $('#ibody').querySelector(`[data-i="${i}"][data-k="qty"]`); if (qty){ qty.focus(); qty.select(); } };
   productDrop($('#ibody'), {rates: !isDN, on: () => isDN || d.kind !== 'hire',
     pick: (i, p) => { const it = d.items[i]; if (!it || !p) return; d.items[i] = fillLine(it, p); drawItems(); focusQty(i); },
@@ -2859,11 +2873,11 @@ function viewDoc(main, d){
   const kids = Object.values(S.docs).filter(x => x.sourceId === d.id);
   let facts = '';
   if (d.type === 'invoice'){
-    facts = `<div><div class="k">Grand total (MVR)</div><div class="big">${money(total(d))}</div></div>
+    facts = `<div><div class="k">Grand total (${curOf(d)})</div><div class="big">${money(total(d))}</div></div>
       <div class="row" style="gap:24px"><div><div class="k">Paid</div><div class="v">${money(paidOf(d))}</div></div><div><div class="k">Balance</div><div class="v">${st==='void'?'–':money(balance(d))}</div></div></div>
       <div><div class="k">Due date</div><div class="v">${fmtDate(addDays(d.date,d.dueDays))}</div></div>`;
   } else if (d.type === 'quotation'){
-    facts = `<div><div class="k">Grand total (MVR)</div><div class="big">${money(total(d))}</div></div>
+    facts = `<div><div class="k">Grand total (${curOf(d)})</div><div class="big">${money(total(d))}</div></div>
       <div><div class="k">Valid until</div><div class="v">${fmtDate(addDays(d.date,d.validDays))}</div></div>`;
   } else {
     facts = `<div><div class="k">Total quantity</div><div class="big">${qfmt(qtyTotal(d))}</div></div>
@@ -2916,7 +2930,7 @@ function viewDoc(main, d){
   });
   main.querySelectorAll('[data-rmpay]').forEach(b => b.addEventListener('click', () => {
     const i = +b.dataset.rmpay, p = d.payments[i];
-    confirmBox('Remove this payment?', `MVR ${money(p.amount)} recorded on ${fmtDate(p.date)} will be removed from ${d.number}.`, 'Remove payment', async () => {
+    confirmBox('Remove this payment?', `${curOf(d)} ${money(p.amount)} recorded on ${fmtDate(p.date)} will be removed from ${d.number}.`, 'Remove payment', async () => {
       const n = clone(d); n.payments.splice(i,1); n.updatedAt = new Date().toISOString(); await put('docs', d.id, n); toast('Payment removed');
     });
   }));
@@ -2973,7 +2987,7 @@ function modal(title, body, okText, onOk, danger){
 function confirmBox(title, text, okText, fn){ modal(title, `<p style="margin:0">${esc(text)}</p>`, okText, fn, true); }
 function paymentBox(d){
   modal(`Record payment for ${d.number}`, `
-    <div class="fld"><label for="p-amt">Amount (MVR)</label><input id="p-amt" inputmode="decimal" value="${balance(d).toFixed(2)}"><span class="hint">Balance is MVR ${money(balance(d))}</span></div>
+    <div class="fld"><label for="p-amt">Amount (${curOf(d)})</label><input id="p-amt" inputmode="decimal" value="${balance(d).toFixed(2)}"><span class="hint">Balance is ${curOf(d)} ${money(balance(d))}</span></div>
     <div class="fld"><label for="p-date">Date received</label><input id="p-date" type="date" value="${todayISO()}"></div>
     <div class="fld"><label for="p-m">Method</label><select id="p-m"><option>Bank transfer</option><option>Cash</option><option>Cheque</option><option>Other</option></select></div>
     <div class="fld"><label for="p-ref">Reference</label><input id="p-ref" placeholder="Optional, e.g. transfer reference"></div>`,
@@ -2984,7 +2998,7 @@ function paymentBox(d){
       n.payments.push({amount:amt, date:w.querySelector('#p-date').value || todayISO(), method:w.querySelector('#p-m').value, ref:w.querySelector('#p-ref').value.trim(), at:new Date().toISOString(), by:S.user || ''});
       n.updatedAt = new Date().toISOString();
       await put('docs', d.id, n);
-      toast(statusOf(n) === 'paid' ? `${d.number} is paid in full` : `Payment recorded · MVR ${money(balance(n))} still due`);
+      toast(statusOf(n) === 'paid' ? `${d.number} is paid in full` : `Payment recorded · ${curOf(d)} ${money(balance(n))} still due`);
     });
 }
 function deliverBox(d){
@@ -3037,9 +3051,9 @@ function sheetHTML(d){
   let head, rows, cols;
   if (isDN){ cols = 4; head = `<th style="width:50px" class="c">S/N</th><th>Description</th><th style="width:90px" class="c">Unit</th><th style="width:100px" class="r">Qty</th>`;
     rows = items.map((it,i) => `<tr><td class="c">${i+1}</td>${td(it.desc)}<td class="c">${esc(it.unit)}</td><td class="r">${qfmt(it.qty)}</td></tr>`); }
-  else if (lump){ cols = 2; head = `<th>Description</th><th style="width:150px" class="r">Amount (MVR)</th>`;
+  else if (lump){ cols = 2; head = `<th>Description</th><th style="width:150px" class="r">Amount (${curOf(d)})</th>`;
     rows = items.map(it => `<tr>${kindOf(d) === 'hire' ? `<td>${hireCell(it)}</td>` : td(it.desc)}<td class="r">${money(lineAmt(d,it))}</td></tr>`); }
-  else { cols = 5; head = `<th>Description</th><th style="width:70px" class="c">Unit</th><th style="width:80px" class="r">Qty</th><th style="width:90px" class="r">Rate</th><th style="width:120px" class="r">Amt. (MVR)</th>`;
+  else { cols = 5; head = `<th>Description</th><th style="width:70px" class="c">Unit</th><th style="width:80px" class="r">Qty</th><th style="width:90px" class="r">Rate</th><th style="width:120px" class="r">Amt. (${curOf(d)})</th>`;
     rows = items.map(it => `<tr>${td(it.desc)}<td class="c">${esc(it.unit)}</td><td class="r">${qfmt(it.qty)}</td><td class="r">${money(it.rate)}</td><td class="r">${money(lineAmt(d,it))}</td></tr>`); }
   const meta = [[T.numLabel, d.number], [T.dateLabel + ':', fmtDate(d.date)]];
   if (d.type === 'quotation') meta.push(['Valid until:', fmtDate(addDays(d.date, d.validDays))]);
@@ -3049,7 +3063,7 @@ function sheetHTML(d){
   const paidNow = paidOf(d), sg = dnSigns(d);
   let sum = '';
   if (isDN) sum = `<div class="sum"><div class="w"></div><table><tr class="gt"><td>Total</td><td>${qfmt(qtyTotal(d))}</td></tr></table></div>`;
-  else sum = `<div class="sum"><div class="w"><b>Amount in words (MVR):</b> ${esc(amountWords(total(d)))}</div><table>
+  else sum = `<div class="sum"><div class="w"><b>Amount in words (${curOf(d)}):</b> ${esc(amountWords(total(d), curOf(d)))}</div><table>
       <tr><td>Sub Total</td><td>${money(subtotal(d))}</td></tr>
       ${discAmt(d) ? `<tr><td>${esc(discLabel(d))}</td><td>-${money(discAmt(d))}</td></tr>` : ''}
       ${num(d.taxRate) ? `<tr><td>GST ${num(d.taxRate)}%</td><td>${money(taxAmt(d))}</td></tr>` : ''}
@@ -3075,7 +3089,7 @@ function sheetHTML(d){
           `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="" style="--sc:${signScale()}">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>${esc(t)}</p>`).join('')}</div>` : ''}
-       <div class="botrow"><div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(s.bankName)}</div><span>Acc no.</span><div>${esc(s.accNo)}</div><span>Acc Name</span><div>${esc(s.accName)}</div></div>
+       <div class="botrow"><div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(s.bankName)}</div><span>Acc no.</span><div>${esc(accFor(d))}</div><span>Acc Name</span><div>${esc(s.accName)}</div></div>
        <div class="auth"><div class="for">For ${esc(s.name)}</div><div class="sl">${s.signDocs !== false && signImg() ? `<img src="${signImg()}" alt="" style="max-height:${Math.round(56 * signScale())}px">` : ''}</div><div class="cap">Authorised signature</div>${s.signName ? `<div class="nm">${esc(s.signName)}</div>` : ''}</div></div>`}
     <div class="foot">${s.thanks ? `<b>${esc(s.thanks)}</b>` : ''}<div class="bar"><i></i><i></i></div>
       <div class="q">If you have any queries regarding this ${T.label.toLowerCase()}, please contact</div>
@@ -3114,7 +3128,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-10-22 · P&L expense lines';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-11-01 · USD documents';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
@@ -3143,11 +3157,11 @@ function pdfHeader(pdf, k, title, meta){
   return Math.max(cy, my, 33) + 7;
 }
 // Bank Details block with the blue bar. Returns {top, y}.
-function pdfBank(pdf, k, y){
+function pdfBank(pdf, k, y, d){
   const s = S.settings, {L, BLUE, GREY, font, lh, txt, tw} = k;
   const top = y - 3.6, BX = L + 4.2;
   font(9.75, true, BLUE); pdf.text('Bank Details', BX, y); y += lh(9.75) + 0.6;
-  const rows = [['Bank Name', s.bankName], ['Acc no.', s.accNo], ['Acc Name', s.accName]];
+  const rows = [['Bank Name', s.bankName], ['Acc no.', d ? accFor(d) : s.accNo], ['Acc Name', s.accName]];
   font(9.4, false); const lab = Math.max(...rows.map(r => tw(r[0]))) + 4.5;
   rows.forEach(([a, v]) => { font(9.4, false, GREY); txt(a, BX, y); font(9.4, false); txt(v || '', BX + lab, y); y += lh(9.4); });
   pdf.setFillColor(...BLUE); pdf.rect(L, top, 1.05, y - top - 2.4, 'F');
@@ -3230,8 +3244,8 @@ function drawPDF(pdf, d, fill){
   // items table
   let cols;
   if (isDN) cols = [{h:'S/N', w:13, a:'center'}, {h:'Description', w:0, a:'left'}, {h:'Unit', w:24, a:'center'}, {h:'Qty', w:26, a:'right'}];
-  else if (lump) cols = [{h:'Description', w:0, a:'left'}, {h:'Amount (MVR)', w:40, a:'right'}];
-  else cols = [{h:'Description', w:0, a:'left'}, {h:'Unit', w:18.5, a:'center'}, {h:'Qty', w:21, a:'right'}, {h:'Rate', w:24, a:'right'}, {h:'Amt. (MVR)', w:32, a:'right'}];
+  else if (lump) cols = [{h:'Description', w:0, a:'left'}, {h:'Amount (' + curOf(d) + ')', w:40, a:'right'}];
+  else cols = [{h:'Description', w:0, a:'left'}, {h:'Unit', w:18.5, a:'center'}, {h:'Qty', w:21, a:'right'}, {h:'Rate', w:24, a:'right'}, {h:'Amt. (' + curOf(d) + ')', w:32, a:'right'}];
   const fixed = cols.reduce((a,k) => a + k.w, 0); cols.forEach(k => { if (!k.w) k.w = CW - fixed; });
   let x0 = L; cols.forEach(k => { k.x = x0; x0 += k.w; });
   const PAD = 2.6;
@@ -3339,7 +3353,7 @@ function drawPDF(pdf, d, fill){
     // label and words on one line, level with the Grand Total row; wraps only if the words are too long
     const gtRow = tRows.findIndex(r => r[2] === 'gt');
     let wy = sumTop + gtRow * TH + 4.6;
-    const lab = 'Amount in words (MVR): ', words = amountWords(total(d)), maxW = tx - L - 4;
+    const lab = 'Amount in words (' + curOf(d) + '): ', words = amountWords(total(d), curOf(d)), maxW = tx - L - 4;
     // shrink the text slightly for long amounts so it stays on one line
     let fs = 9.4;
     const fits = f => { font(f, true); const a = pdf.getTextWidth(lab); font(f, false); return a + pdf.getTextWidth(words) <= maxW; };
@@ -3400,7 +3414,7 @@ function drawPDF(pdf, d, fill){
       y += 3;
     }
     // Bank Details on the left, authorised signature on the right
-    ensure(36); const bank = pdfBank(pdf, k, y);
+    ensure(36); const bank = pdfBank(pdf, k, y, d);
     y = Math.max(bank.y, pdfAuthSign(pdf, k, bank.top));
   }
 
@@ -3460,8 +3474,8 @@ function shareText(d){
   const T = TYPES[d.type], s = S.settings, st = statusOf(d);
   const lines = [`${T.label} ${d.number}`, d.customer?.name ? `Customer: ${d.customer.name}` : '', `Date: ${fmtDate(d.date)}`];
   if (d.type === 'delivery') lines.push(`Total quantity: ${qfmt(qtyTotal(d))}`);
-  else lines.push(`Total: MVR ${money(total(d))}`);
-  if (d.type === 'invoice' && st !== 'paid' && st !== 'void') lines.push(`Balance due: MVR ${money(balance(d))} by ${fmtDate(addDays(d.date, d.dueDays))}`);
+  else lines.push(`Total: ${curOf(d)} ${money(total(d))}`);
+  if (d.type === 'invoice' && st !== 'paid' && st !== 'void') lines.push(`Balance due: ${curOf(d)} ${money(balance(d))} by ${fmtDate(addDays(d.date, d.dueDays))}`);
   if (d.type === 'quotation') lines.push(`Valid until: ${fmtDate(addDays(d.date, d.validDays))}`);
   lines.push('', s.name || '', [s.phone, s.email].filter(Boolean).join(' · '));
   return lines.filter((l, i) => l !== '' || i > 0).join('\n').trim();
@@ -3527,7 +3541,7 @@ const custState = {q:'', f:'all', k:'all', sort:'name'};
 function viewCustomers(main){
   const st = custState, all = custList();
   const stats = id => { const ds = Object.values(S.docs).filter(d => d.customerId === id); const inv = ds.filter(d => d.type === 'invoice' && !isVoid(d));
-    return {n:ds.length, billed:inv.reduce((s,d)=>s+total(d),0), due:inv.reduce((s,d)=>s+Math.max(0,balance(d)),0), last:ds.reduce((m,d) => (d.date||'') > m ? d.date : m, '')}; };
+    return {n:ds.length, billed:inv.reduce((s,d)=>s+totM(d),0), due:inv.reduce((s,d)=>s+Math.max(0,balM(d)),0), last:ds.reduce((m,d) => (d.date||'') > m ? d.date : m, '')}; };
   const X = {}; all.forEach(c => X[c.id] = stats(c.id));
   const FL = [['all','All', () => true, ''], ['owing','Owes money', c => X[c.id].due > 0.005, 'bad'], ['active','Has documents', c => X[c.id].n > 0, ''], ['none','No documents', c => X[c.id].n === 0, 'neutral']];
   main.innerHTML = `
@@ -3570,7 +3584,7 @@ function customerBox(c){
     <div class="fld"><label for="c-k">Type</label><select id="c-k">${CUST_KINDS.map(([k, l]) => `<option value="${k}" ${custKind(c) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="fld"><label for="c-a">Address</label><textarea id="c-a" rows="3">${esc(c.address)}</textarea></div>
     <div class="fgrid two" style="padding:0"><div class="fld"><label for="c-p">Phone</label><input id="c-p" value="${esc(c.phone)}"></div><div class="fld"><label for="c-e">Email</label><input id="c-e" value="${esc(c.email)}"></div></div>
-    ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : 'MVR '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
+    ${ds.length ? `<div><div class="dim" style="margin-bottom:6px">Documents</div><div class="links" style="border-bottom:1px solid var(--line)">${ds.slice(0,12).map(d => `<a href="#/doc/${d.id}" data-x><b class="pvlink" data-pv="${esc(d.id)}" role="button" tabindex="0" title="Quick preview">${esc(d.number)}</b> <span class="dim">${fmtDate(d.date)} · ${d.type==='delivery' ? qfmt(qtyTotal(d))+' qty' : curOf(d)+' '+money(total(d))}</span> ${badge(statusOf(d))}</a>`).join('')}</div></div>` : ''}
     ${isNew ? '' : `<div class="row"><button type="button" class="btn sm" data-stmt>Statement PDF</button><button type="button" class="btn sm" data-stmt-em>${icon('mail',15)}Email statement</button><button type="button" class="btn sm" data-stmt-tg>${icon('share',15)}Share</button><span class="dim">Invoices, payments and balance</span></div>`}
     ${isNew ? '' : `<div class="row" data-need="edit"><a class="btn sm" href="#/new/quotation" data-new="quotation">New quotation</a><a class="btn sm" href="#/new/invoice" data-new="invoice">New invoice</a>${isOwnerRole() ? '<button class="btn sm danger" data-delc>Delete customer</button>' : ''}</div>`}`,
     'Save customer', async w => {
@@ -3987,7 +4001,7 @@ function viewSettings(main, openKey){
         ${F('name','Company name')}${F('address','Address',{area:true,rows:2})}${F('phone','Phone')}${F('email','Email')}
       </div></fieldset>`, {save:true})}
       ${ROW('bank', 'Bank details', `<fieldset class="lockset" disabled><div class="fgrid">
-        ${F('bankName','Bank name',{span:'span2'})}${F('accNo','Account number')}${F('accName','Account name')}
+        ${F('bankName','Bank name',{span:'span2'})}${F('accNo','Account number')}${F('accName','Account name')}${F('accNoUSD','USD account number (optional)',{hint:'Printed on USD documents instead of the MVR account'})}${F('usdRate','USD exchange rate',{hint:'MVR for 1 USD; the starting rate for new USD documents'})}
       </div></fieldset>`, {save:true})}
       ${ROW('num', 'Numbering &amp; timing', `<fieldset class="lockset" disabled><div class="fgrid">
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
