@@ -3132,7 +3132,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-11-01 · USD bank account';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-11-01 · Full-width terms';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
@@ -3410,7 +3410,7 @@ function drawPDF(pdf, d, fill){
       ensure(14); font(9.75, true, BLUE); pdf.text('Terms & Conditions', L, y);
       pdf.setFillColor(...BLUE); pdf.rect(L, y + 1.3, tw('Terms & Conditions'), 0.55, 'F'); y += lh(9.75) + 2.2;
       terms.forEach(t => {
-        font(9.4, false); const ls = wrap(t, CW - 48); ensure(ls.length * lh(9.4) + 1);
+        font(9.4, false); const ls = wrap(t, CW - 5);   // full width: from the text start (L + 4.2) to the right margin ensure(ls.length * lh(9.4) + 1);
         // thin line on the same edge as the Bank Details bar; text starts where the bank text starts
         const top = y - 3; font(9.4, false); ls.forEach(l => { pdf.text(l, L + 4.2, y); y += lh(9.4); });
         pdf.setDrawColor(201, 214, 229); pdf.setLineWidth(0.45); pdf.line(L + 0.25, top, L + 0.25, y - lh(9.4) + 1.2); y += 1;
