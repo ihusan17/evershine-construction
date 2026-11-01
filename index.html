@@ -591,6 +591,7 @@ main{background:var(--surface);border-radius:28px 0 0 0;padding:32px 36px 60px;m
 .hbars .bar i{display:block;height:100%;border-radius:0 4px 4px 0}
 .hbars .v{font-variant-numeric:tabular-nums;font-weight:600}
 .neg{color:var(--bad)}
+.fld.subhd{display:block}.subhd{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--brand);margin-top:4px}.subhd .dim{text-transform:none;letter-spacing:0;font-weight:500}
 .curtag{font-size:10.5px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:4px;padding:0 4px;margin-right:2px}
 .up{color:var(--ok,#2d8c55);font-weight:600}.dn{color:var(--bad);font-weight:600}
 table.list.pl tbody tr{cursor:default}table.list.pl tr[data-i]{cursor:pointer}
@@ -918,7 +919,7 @@ const FILTERS = {
 const UNITS = ['Nos','Bags','CUFT','CUM','Trip','Lot','Kg','Ton','Ltr','Sqft','Sqm','Rft','Day','Hour','Set'];
 const DEFAULTS = {
   name:'EVERSHINE CONSTRUCTION', address:'Ever Shine, Zikura Magu\nSh. Milandhoo', phone:'+960 7714133', email:'mhmd.ihsn80@gmail.com',
-  prefix:'ESC', bankName:'Bank of Maldives', accNo:'773 0000382 938 (MVR)', accName:'Ali Ibrahim', accNoUSD:'', usdRate:15.42,
+  prefix:'ESC', bankName:'Bank of Maldives', accNo:'773 0000382 938 (MVR)', accName:'Ali Ibrahim', bankNameUSD:'', accNoUSD:'', accNameUSD:'', usdRate:15.42,
   quoteValidDays:20, invoiceDueDays:5, signDelivery:true, signDocs:true,
   quoteTerms:'This quotation remains valid for 20 days from the date of issue.\nUnless otherwise agreed, payment shall be made in full within 30 days from the date of invoice.\nTransport schedules are subject to weather and maritime conditions. We are not liable for delays caused by unforeseen sea conditions.',
   invoiceTerms:'Payment is due within 20 days from the invoice date\nAccepted payment methods: Cash & Bank Transfer\nForward payment receipt to 7714133 via viber or email once payment has been processed',
@@ -999,7 +1000,9 @@ const curOf = d => d && d.cur === 'USD' ? 'USD' : 'MVR';
 const fxOf = d => curOf(d) === 'USD' ? (num(d.fx) || num(S.settings.usdRate) || 15.42) : 1;
 const totM = d => r2(total(d) * fxOf(d)), balM = d => r2(balance(d) * fxOf(d)), payM = (d, p) => num(p.amount) * fxOf(d);
 const curTag = d => curOf(d) === 'USD' ? '<small class="curtag">USD</small> ' : '';
-const accFor = d => curOf(d) === 'USD' && (S.settings.accNoUSD || '').trim() ? S.settings.accNoUSD : S.settings.accNo;
+// bank details printed on a document: the USD account (when one is saved) on USD documents, otherwise the MVR account
+const bankFor = d => { const s = S.settings, usd = curOf(d) === 'USD' && (s.accNoUSD || '').trim();
+  return usd ? {bankName:s.bankNameUSD || s.bankName, accNo:s.accNoUSD, accName:s.accNameUSD || s.accName} : {bankName:s.bankName, accNo:s.accNo, accName:s.accName}; };
 const paidOf = d => r2((d.payments||[]).reduce((s,p) => s + num(p.amount), 0));
 const balance = d => r2(total(d) - paidOf(d));
 const qtyTotal = d => (d.items||[]).reduce((s,it) => s + num(it.qty), 0);
@@ -1682,6 +1685,7 @@ Object.assign(DV, {
   'No description':'ތަފްޞީލެއް ނެތް',
   'Currency':'ފައިސާގެ ބާވަތް', 'Exchange rate':'އެކްސްޗޭންޖް ރޭޓް', 'MVR for 1 USD · used for your reports':'1 USD އަށް MVR · ރިޕޯޓުތަކަށް ބޭނުންކުރެވޭ', 'USD account number (optional)':'USD އެކައުންޓް ނަންބަރު (އިޚްތިޔާރީ)',
   'Printed on USD documents instead of the MVR account':'USD ޑޮކިއުމަންޓްތަކުގައި MVR އެކައުންޓުގެ ބަދަލުގައި ޗާޕުވާނެ', 'USD exchange rate':'USD އެކްސްޗޭންޖް ރޭޓް', 'MVR for 1 USD; the starting rate for new USD documents':'1 USD އަށް MVR؛ އައު USD ޑޮކިއުމަންޓްތަކުގެ ފެށުމުގެ ރޭޓް',
+  'MVR account':'MVR އެކައުންޓް', 'USD account':'USD އެކައުންޓް', '· printed on MVR documents':'· MVR ޑޮކިއުމަންޓްތަކުގައި ޗާޕުވާ', '· printed on USD documents; leave empty to use the MVR account':'· USD ޑޮކިއުމަންޓްތަކުގައި ޗާޕުވާ؛ ހުސްނަމަ MVR އެކައުންޓް ބޭނުންކުރެވޭ',
   'just now':'މިހާރު', 'yesterday':'އިއްޔެ', 'Nothing is overdue or about to expire.':'ލަސްވެފައި ނުވަތަ ހަމަވާން ކައިރި އެއްވެސް އެއްޗެއް ނެތް.'
 });
 const DV_MON = {January:'ޖަނަވަރީ', February:'ފެބުރުއަރީ', March:'މާރިޗު', April:'އޭޕްރީލް', May:'މެއި', June:'ޖޫން', July:'ޖުލައި', August:'އޯގަސްޓު', September:'ސެޕްޓެމްބަރު', October:'އޮކްޓޫބަރު', November:'ނޮވެމްބަރު', December:'ޑިސެމްބަރު'};
@@ -3089,7 +3093,7 @@ function sheetHTML(d){
           `<div><b>${t}</b><div class="ln sg"><span>Sign:</span><span>${img ? `<img src="${img}" alt="" style="--sc:${signScale()}">` : ''}</span></div><div class="ln"><span>Name:</span><span>${esc(nm)}</span></div><div class="ln"><span>Date:</span><span>${dt ? fmtDate(dt) : ''}</span></div></div>`).join('')}
       </div>`
     : `${terms.length ? `<div class="terms"><b>Terms &amp; Conditions</b>${terms.map(t => `<p>${esc(t)}</p>`).join('')}</div>` : ''}
-       <div class="botrow"><div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(s.bankName)}</div><span>Acc no.</span><div>${esc(accFor(d))}</div><span>Acc Name</span><div>${esc(s.accName)}</div></div>
+       <div class="botrow"><div class="bank"><b>Bank Details</b><span>Bank Name</span><div>${esc(bankFor(d).bankName)}</div><span>Acc no.</span><div>${esc(bankFor(d).accNo)}</div><span>Acc Name</span><div>${esc(bankFor(d).accName)}</div></div>
        <div class="auth"><div class="for">For ${esc(s.name)}</div><div class="sl">${s.signDocs !== false && signImg() ? `<img src="${signImg()}" alt="" style="max-height:${Math.round(56 * signScale())}px">` : ''}</div><div class="cap">Authorised signature</div>${s.signName ? `<div class="nm">${esc(s.signName)}</div>` : ''}</div></div>`}
     <div class="foot">${s.thanks ? `<b>${esc(s.thanks)}</b>` : ''}<div class="bar"><i></i><i></i></div>
       <div class="q">If you have any queries regarding this ${T.label.toLowerCase()}, please contact</div>
@@ -3128,7 +3132,7 @@ const PDF_FONT_B = "AAEAAAAPAIAAAwBwQkFTRdYM160AAHk0AAAAhEdERUYqNisoAAB5uAAAAU5H
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 // Dhivehi (Thaana) is right-to-left. jsPDF's built-in bidi already lays right-to-left text out, letters and fili included,
 // exactly like the browser, so text goes to the PDF unchanged. (Reversing it here as well turned Dhivehi the wrong way round.)
-const APP_VERSION = '2026-11-01 · USD documents';   // shown at the bottom of Settings, to check the browser has the newest portal
+const APP_VERSION = '2026-11-01 · USD bank account';   // shown at the bottom of Settings, to check the browser has the newest portal
 const vis = s => String(s ?? '');
 
 // Page geometry, colours and text helpers shared by every PDF (documents and statements)
@@ -3161,7 +3165,7 @@ function pdfBank(pdf, k, y, d){
   const s = S.settings, {L, BLUE, GREY, font, lh, txt, tw} = k;
   const top = y - 3.6, BX = L + 4.2;
   font(9.75, true, BLUE); pdf.text('Bank Details', BX, y); y += lh(9.75) + 0.6;
-  const rows = [['Bank Name', s.bankName], ['Acc no.', d ? accFor(d) : s.accNo], ['Acc Name', s.accName]];
+  const b = d ? bankFor(d) : s, rows = [['Bank Name', b.bankName], ['Acc no.', b.accNo], ['Acc Name', b.accName]];
   font(9.4, false); const lab = Math.max(...rows.map(r => tw(r[0]))) + 4.5;
   rows.forEach(([a, v]) => { font(9.4, false, GREY); txt(a, BX, y); font(9.4, false); txt(v || '', BX + lab, y); y += lh(9.4); });
   pdf.setFillColor(...BLUE); pdf.rect(L, top, 1.05, y - top - 2.4, 'F');
@@ -3975,7 +3979,7 @@ function viewSettings(main, openKey){
   const days = n => `${num(n) || 20} day${num(n) === 1 ? '' : 's'}`;
   const SUM = {
     co: [s.name, String(s.address || '').split('\n').map(x => x.trim()).filter(Boolean).join(', '), s.phone].filter(Boolean).join(' · '),
-    bank: [s.bankName, s.accNo, s.accName].filter(Boolean).join(' · ') || 'Not filled in yet',
+    bank: ([s.bankName, s.accNo, s.accName].filter(Boolean).join(' · ') || 'Not filled in yet') + ((s.accNoUSD || '').trim() ? ' · USD: ' + s.accNoUSD : ''),
     num: `next ${['quotation', 'invoice', 'delivery'].map(t => esc(nextNumber(t))).join(', ')} · quotes valid ${days(s.quoteValidDays)} · invoices due ${days(s.invoiceDueDays)}`,
     sig: `${s.signImage ? 'Your signature' : 'Default signature'} · quotations & invoices: ${s.signDocs !== false ? 'printed' : 'sign by hand'} · delivery notes: ${s.signDelivery ? 'printed' : 'sign by hand'}`,
     txt: `${lines(s.quoteTerms)} quotation terms · ${lines(s.invoiceTerms)} invoice terms · footer “${s.thanks || ''}”`,
@@ -4001,7 +4005,11 @@ function viewSettings(main, openKey){
         ${F('name','Company name')}${F('address','Address',{area:true,rows:2})}${F('phone','Phone')}${F('email','Email')}
       </div></fieldset>`, {save:true})}
       ${ROW('bank', 'Bank details', `<fieldset class="lockset" disabled><div class="fgrid">
-        ${F('bankName','Bank name',{span:'span2'})}${F('accNo','Account number')}${F('accName','Account name')}${F('accNoUSD','USD account number (optional)',{hint:'Printed on USD documents instead of the MVR account'})}${F('usdRate','USD exchange rate',{hint:'MVR for 1 USD; the starting rate for new USD documents'})}
+        <div class="fld span4 subhd">MVR account <span class="dim">· printed on MVR documents</span></div>
+        ${F('bankName','Bank name',{span:'span2'})}${F('accNo','Account number')}${F('accName','Account name')}
+        <div class="fld span4 subhd">USD account <span class="dim">· printed on USD documents; leave empty to use the MVR account</span></div>
+        ${F('bankNameUSD','Bank name',{span:'span2'})}${F('accNoUSD','Account number')}${F('accNameUSD','Account name')}
+        ${F('usdRate','USD exchange rate',{hint:'MVR for 1 USD; the starting rate for new USD documents'})}
       </div></fieldset>`, {save:true})}
       ${ROW('num', 'Numbering &amp; timing', `<fieldset class="lockset" disabled><div class="fgrid">
         ${F('vesselName','Boat name (for hire documents)',{hint:'Used for the project line, e.g. VESSEL HIRE (REHENDHI)'})}
